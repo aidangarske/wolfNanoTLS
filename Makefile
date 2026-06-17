@@ -42,8 +42,15 @@ KSH_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
   $(WC)/curve25519.c $(WC)/fe_operations.c \
   src/shell_slim/wn_keyshare.c tests/wn_host_seed.c
 
-.PHONY: host kstest tstest rectest ksharetest test clean
-test: host kstest tstest rectest ksharetest ## build + run all local self-tests
+SHELL_SRC := src/shell_slim/wn_keyshare.c src/shell_slim/wn_keyschedule.c \
+  src/shell_slim/wn_transcript.c src/shell_slim/wn_record.c
+HS_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
+  $(WC)/logging.c $(WC)/random.c $(WC)/sha256.c $(WC)/sha512.c $(WC)/hmac.c \
+  $(WC)/kdf.c $(WC)/aes.c $(WC)/curve25519.c $(WC)/fe_operations.c \
+  $(SHELL_SRC) tests/wn_host_seed.c
+
+.PHONY: host kstest tstest rectest ksharetest hstest test clean
+test: host kstest tstest rectest ksharetest hstest ## build + run all local self-tests
 
 host: ## build + run the crypto floor self-test locally (PORTABLE_C)
 	@mkdir -p $(BUILD)
@@ -79,6 +86,13 @@ ksharetest: ## build + run the X25519 key-share tests (PORTABLE_C)
 	   $(KSH_SRC) tests/keyshare_test.c -o $(BUILD)/keyshare_test
 	@echo "---- run ----"
 	@./$(BUILD)/keyshare_test
+
+hstest: ## build + run the end-to-end crypto handshake (PORTABLE_C)
+	@mkdir -p $(BUILD)
+	cc $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(HS_SRC) tests/handshake_crypto_test.c -o $(BUILD)/handshake_crypto_test
+	@echo "---- run ----"
+	@./$(BUILD)/handshake_crypto_test
 
 clean:
 	rm -rf $(BUILD) *.o
