@@ -1,0 +1,81 @@
+/* mldsa_test.c
+ *
+ * Copyright (C) 2026 wolfSSL Inc.
+ *
+ * This file is part of wolfNano.
+ *
+ * wolfNano is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * wolfNano is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, see <https://www.gnu.org/licenses/>.
+ */
+
+/* ML-DSA-65 sign/verify round-trip and tamper rejection. */
+
+#include <wolfssl/wolfcrypt/settings.h>
+#include <wolfssl/wolfcrypt/wc_mldsa.h>
+#include <wolfssl/wolfcrypt/random.h>
+#include <stdio.h>
+
+static int fails = 0;
+
+static void check(int ok, const char* name)
+{
+    printf("%s %s\n", ok ? "PASS" : "FAIL", name);
+    if (!ok) {
+        fails++;
+    }
+}
+
+int main(void)
+{
+    WC_RNG rng;
+    wc_MlDsaKey key;
+    byte sig[5000];
+    const byte msg[12] = { 'w','o','l','f','N','a','n','o',' ','p','q','c' };
+    word32 sigLen;
+    int sigSz = 0, res = 0, rc;
+
+    printf("wolfNano ML-DSA-65 sign/verify test\n");
+
+    rc = wc_InitRng(&rng);
+    check(rc == 0, "RNG init");
+
+    rc  = wc_MlDsaKey_Init(&key, NULL, INVALID_DEVID);
+    rc |= wc_MlDsaKey_SetParams(&key, WC_ML_DSA_65);
+    rc |= wc_MlDsaKey_MakeKey(&key, &rng);
+    rc |= wc_MlDsaKey_GetSigLen(&key, &sigSz);
+    check((rc == 0) && (sigSz > 0) && (sigSz <= (int)sizeof(sig)),
+          "keygen + signature size");
+
+    sigLen = (word32)sizeof(sig);
+    rc = wc_MlDsaKey_SignCtx(&key, NULL, 0, sig, &sigLen, msg, sizeof(msg),
+                             &rng);
+    check((rc == 0) && (sigLen == (word32)sigSz), "sign");
+
+    res = 0;
+    rc = wc_MlDsaKey_VerifyCtx(&key, sig, sigLen, NULL, 0, msg, sizeof(msg),
+                               &res);
+    check((rc == 0) && (res == 1), "verify");
+
+    sig[0] ^= 0x01;
+    res = 1;
+    rc = wc_MlDsaKey_VerifyCtx(&key, sig, sigLen, NULL, 0, msg, sizeof(msg),
+                               &res);
+    check(res != 1, "tampered signature rejected");
+
+    wc_MlDsaKey_Free(&key);
+    wc_FreeRng(&rng);
+
+    printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASS",
+           fails, fails == 1 ? "" : "s");
+    return fails ? 1 : 0;
+}

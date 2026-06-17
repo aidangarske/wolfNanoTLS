@@ -66,9 +66,11 @@ WCT_SRC := $(FLOOR_SRC) $(WC)/sp_int.c wolfssl/wolfcrypt/test/test.c \
 MLKEM_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
   $(WC)/logging.c $(WC)/random.c $(WC)/sha256.c $(WC)/sha512.c $(WC)/sha3.c \
   $(WC)/wc_mlkem.c $(WC)/wc_mlkem_poly.c tests/wn_host_seed.c
+MLDSA_SRC := $(FLOOR_SRC) $(WC)/sp_int.c $(WC)/sha3.c $(WC)/wc_mldsa.c \
+  tests/wn_host_seed.c
 
-.PHONY: host kstest tstest rectest ksharetest hstest wctest msgtest chtest shtest mlkemtest test clean
-test: host kstest tstest rectest ksharetest hstest wctest msgtest chtest shtest mlkemtest ## build + run all local self-tests
+.PHONY: host kstest tstest rectest ksharetest hstest wctest msgtest chtest shtest mlkemtest mldsatest test clean
+test: host kstest tstest rectest ksharetest hstest wctest msgtest chtest shtest mlkemtest mldsatest ## build + run all local self-tests
 
 host: ## build + run the crypto floor self-test locally (PORTABLE_C)
 	@mkdir -p $(BUILD)
@@ -148,6 +150,20 @@ mlkemtest: ## build + run the ML-KEM-768 KEM test (WOLFNANO_MLKEM)
 	   $(MLKEM_SRC) tests/mlkem_test.c -o $(BUILD)/mlkem_test
 	@echo "---- run ----"
 	@./$(BUILD)/mlkem_test
+
+mldsatest: ## build + run ML-DSA-65 round-trip + verify-only no-malloc proof
+	@mkdir -p $(BUILD)
+	cc $(CFLAGS_COMMON) -DWOLFNANO_MLDSA -DWOLFNANO_MLDSA_SIGN \
+	   -DWOLFNANO_ALLOW_MALLOC -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(MLDSA_SRC) tests/mldsa_test.c -o $(BUILD)/mldsa_test
+	@echo "---- run (sign/verify round-trip) ----"
+	@./$(BUILD)/mldsa_test
+	@echo "---- verify-only no-malloc proof ----"
+	@cc $(CFLAGS_COMMON) -DWOLFNANO_MLDSA -DWOLFNANO_TARGET_PORTABLE_C \
+	   -c $(WC)/wc_mldsa.c -o $(BUILD)/wc_mldsa_vo.o 2>/dev/null
+	@nm $(BUILD)/wc_mldsa_vo.o | grep -E ' U _(malloc|calloc|realloc|free)$$' \
+	   && echo "  FAIL: verify-only references heap" \
+	   || echo "  PASS: verify-only ML-DSA is allocation-free"
 
 interop: ## live TLS 1.3 PSK handshake vs OpenSSL and wolfSSL
 	@mkdir -p $(BUILD)

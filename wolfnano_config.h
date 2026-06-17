@@ -129,4 +129,25 @@ extern int wn_seed(unsigned char* output, unsigned int sz);
     #define WOLFSSL_SHAKE256
 #endif
 
+#ifdef WOLFNANO_MLDSA
+    #define WOLFSSL_HAVE_MLDSA
+    #define WOLFSSL_NO_ML_DSA_44       /* ML-DSA-65 only */
+    #define WOLFSSL_NO_ML_DSA_87
+    /* Default: verify-only, no-allocation (the wolfNano client cert-verify
+     * path). WOLFNANO_MLDSA_SIGN adds keygen/sign (needs working memory). */
+    #ifndef WOLFNANO_MLDSA_SIGN
+        #define WOLFSSL_MLDSA_VERIFY_ONLY
+        #define WOLFSSL_MLDSA_VERIFY_NO_MALLOC
+    #endif
+    #ifndef WOLFSSL_SHA3
+        #define WOLFSSL_SHA3
+    #endif
+    #ifndef WOLFSSL_SHAKE128
+        #define WOLFSSL_SHAKE128
+    #endif
+    #ifndef WOLFSSL_SHAKE256
+        #define WOLFSSL_SHAKE256
+    #endif
+#endif
+
 #endif /* WOLFNANO_CONFIG_H */
