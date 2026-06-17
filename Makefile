@@ -24,6 +24,15 @@ FLOOR_SRC := \
 TEST_SRC := tests/floor_test.c tests/wn_host_seed.c
 
 SHELL_INC := -Iinclude/wolfnano -Isrc/shell_slim
+
+# Full client crypto + shell for the live interop handshake.
+CONN_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
+  $(WC)/logging.c $(WC)/random.c $(WC)/sha256.c $(WC)/sha512.c $(WC)/hmac.c \
+  $(WC)/kdf.c $(WC)/aes.c $(WC)/curve25519.c $(WC)/fe_operations.c \
+  src/shell_slim/wn_msg.c src/shell_slim/wn_keyschedule.c \
+  src/shell_slim/wn_transcript.c src/shell_slim/wn_record.c \
+  src/shell_slim/wn_keyshare.c src/shell_slim/wn_serverhello.c \
+  src/shell_slim/wn_connect.c tests/wn_host_seed.c
 KS_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
   $(WC)/logging.c $(WC)/random.c $(WC)/sha256.c $(WC)/sha512.c \
   $(WC)/hmac.c $(WC)/kdf.c \
@@ -128,6 +137,12 @@ shtest: ## build + run the ServerHello parser test (PORTABLE_C)
 	   tests/serverhello_test.c -o $(BUILD)/serverhello_test
 	@echo "---- run ----"
 	@./$(BUILD)/serverhello_test
+
+interop: ## live TLS 1.3 PSK handshake vs openssl s_server
+	@mkdir -p $(BUILD)
+	cc $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANOTLS_TARGET_PORTABLE_C \
+	   $(CONN_SRC) tests/interop_psk_test.c -o $(BUILD)/interop_psk_client
+	@sh tests/interop_psk.sh
 
 clean:
 	rm -rf $(BUILD) *.o
