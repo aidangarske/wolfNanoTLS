@@ -37,8 +37,13 @@ REC_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
   $(WC)/logging.c $(WC)/random.c $(WC)/sha256.c $(WC)/sha512.c $(WC)/aes.c \
   src/shell_slim/wn_record.c tests/wn_host_seed.c
 
-.PHONY: host kstest tstest rectest test clean
-test: host kstest tstest rectest ## build + run all local self-tests
+KSH_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
+  $(WC)/logging.c $(WC)/random.c $(WC)/sha256.c $(WC)/sha512.c \
+  $(WC)/curve25519.c $(WC)/fe_operations.c \
+  src/shell_slim/wn_keyshare.c tests/wn_host_seed.c
+
+.PHONY: host kstest tstest rectest ksharetest test clean
+test: host kstest tstest rectest ksharetest ## build + run all local self-tests
 
 host: ## build + run the crypto floor self-test locally (PORTABLE_C)
 	@mkdir -p $(BUILD)
@@ -67,6 +72,13 @@ rectest: ## build + run the record-protection tests (PORTABLE_C)
 	   $(REC_SRC) tests/record_test.c -o $(BUILD)/record_test
 	@echo "---- run ----"
 	@./$(BUILD)/record_test
+
+ksharetest: ## build + run the X25519 key-share tests (PORTABLE_C)
+	@mkdir -p $(BUILD)
+	cc $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(KSH_SRC) tests/keyshare_test.c -o $(BUILD)/keyshare_test
+	@echo "---- run ----"
+	@./$(BUILD)/keyshare_test
 
 clean:
 	rm -rf $(BUILD) *.o
