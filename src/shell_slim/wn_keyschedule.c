@@ -1,0 +1,97 @@
+/* wn_keyschedule.c
+ *
+ * Copyright (C) 2026 wolfSSL Inc.
+ *
+ * This file is part of wolfNanoTLS.
+ *
+ * wolfNanoTLS is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * wolfNanoTLS is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, see <https://www.gnu.org/licenses/>.
+ */
+
+/**
+ * TLS 1.3 key schedule over the wc_* seam. Ported from wolfSSL tls13.c
+ * (DeriveKey / Tls13_HKDF_Expand_Label usage), buffers caller-provided.
+ */
+
+#include "wn_keyschedule.h"
+#include "wolfnano_crypto.h"
+
+static word32 wn_DigestSize(int digest)
+{
+    word32 sz = 0;
+
+    if (digest == WC_SHA256) {
+        sz = WC_SHA256_DIGEST_SIZE;
+    }
+    else if (digest == WC_SHA384) {
+        sz = WC_SHA384_DIGEST_SIZE;
+    }
+
+    return sz;
+}
+
+int wn_Tls13_Extract(byte* prk, const byte* salt, word32 saltLen,
+                     const byte* ikm, word32 ikmLen, int digest)
+{
+    int ret = WOLFNANOTLS_SUCCESS;
+
+    if ((prk == NULL) || (ikm == NULL) || (wn_DigestSize(digest) == 0)) {
+        ret = WOLFNANOTLS_E_INVALID_ARG;
+    }
+
+    if (ret == WOLFNANOTLS_SUCCESS) {
+        /* wc_ takes a non-const ikm but does not modify it for Extract. */
+        ret = wc_Tls13_HKDF_Extract(prk, salt, saltLen,
+                                    (byte*)ikm, ikmLen, digest);
+        if (ret != 0) {
+            ret = WOLFNANOTLS_E_CRYPTO;
+        }
+    }
+
+    return ret;
+}
+
+int wn_Tls13_ExpandLabel(byte* okm, word32 okmLen, const byte* secret,
+                         const char* label, const byte* info, word32 infoLen,
+                         int digest)
+{
+    static const byte protocol[6] = { 't', 'l', 's', '1', '3', ' ' };
+    int ret = WOLFNANOTLS_SUCCESS;
+    word32 hashLen;
+
+    hashLen = wn_DigestSize(digest);
+    if ((okm == NULL) || (secret == NULL) || (label == NULL) ||
+        (hashLen == 0)) {
+        ret = WOLFNANOTLS_E_INVALID_ARG;
+    }
+
+    if (ret == WOLFNANOTLS_SUCCESS) {
+        ret = wc_Tls13_HKDF_Expand_Label(okm, okmLen, secret, hashLen,
+                  protocol, (word32)sizeof(protocol),
+                  (const byte*)label, (word32)XSTRLEN(label),
+                  info, infoLen, digest);
+        if (ret != 0) {
+            ret = WOLFNANOTLS_E_CRYPTO;
+        }
+    }
+
+    return ret;
+}
+
+int wn_Tls13_DeriveSecret(byte* out, const byte* secret, const char* label,
+                          const byte* transcriptHash, word32 hashLen,
+                          int digest)
+{
+    return wn_Tls13_ExpandLabel(out, hashLen, secret, label,
+                                transcriptHash, hashLen, digest);
+}
