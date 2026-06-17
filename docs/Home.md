@@ -27,11 +27,14 @@ only through a thin `wc_*` provider seam.
 
 ## Current status
 
-Early development.
+Early development, but the TLS 1.3 client works end to end.
 
-- Done: the crypto floor builds and passes its KATs locally (mac/linux), with
-  true no-allocator verified and a pluggable entropy seed hook.
-- Next: the slim hand-written TLS 1.3 shell.
-- Deferred: hardware targets and assembly, PQC adders, X.509, the FIPS backend.
+- Done: the crypto floor (RFC KATs + wolfSSL's own crypto test, trimmed) with
+  true no-allocator verified; the slim TLS 1.3 shell (key schedule, transcript,
+  record protection, key share, ClientHello/ServerHello, handshake driver);
+  side-channel hardening; and a **live TLS 1.3 PSK+ECDHE handshake against
+  OpenSSL**.
+- Next: Raw-Public-Key auth, PQC adders, X.509 (Phase 4), the FIPS backend.
+- Deferred: hardware targets and on-device assembly benchmarks.
 
 See [Getting Started](Getting-Started.md).

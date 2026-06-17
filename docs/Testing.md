@@ -40,6 +40,9 @@ for the `src` floor statically (independent of any runtime malloc trap).
 | `make ksharetest` | X25519 key share / ECDHE agreement |
 | `make hstest` | end-to-end crypto handshake (ECDHE + schedule + transcript + record) |
 | `make wctest` | wolfSSL's own `wolfcrypt/test/test.c`, config-trimmed to the floor |
+| `make msgtest` | wire encode/decode primitives |
+| `make chtest` / `make shtest` | ClientHello encoder / ServerHello parser (RFC 8448) |
+| `make interop` | **live TLS 1.3 PSK+ECDHE handshake vs `openssl s_server`** |
 
 `make wctest` reuses wolfSSL's comprehensive crypto test verbatim from the
 submodule. Compiled with the wolfNanoTLS config, its `#ifdef` guards trim it to
@@ -50,9 +53,15 @@ complements the wolfNanoTLS RFC-vector KATs rather than replacing them.
 The CVE-dense core (key schedule, transcript) is verified against RFC 8448
 vectors first, as planned.
 
+## Live interop
+
+`make interop` launches `openssl s_server` (TLS 1.3, external PSK) and runs the
+wolfNanoTLS client against it. A green run means OpenSSL accepted our ClientHello
+(including the PSK binder), we parsed its ServerHello, completed ECDHE,
+decrypted its EncryptedExtensions + Finished, verified the server Finished MAC,
+and sent our client Finished. Requires `openssl`.
+
 ## Still ahead
 
-The wire-level handshake state machine (ClientHello encode, ServerHello /
-EncryptedExtensions / Certificate / CertVerify / Finished parse) and live
-interop against stock wolfSSL / OpenSSL. A data-driven suite matrix and a
-structured `test-pki/` follow with the certificate path.
+Certificate / Raw-Public-Key authentication (Phase 4 brings X.509), a
+data-driven suite matrix, and the structured `test-pki/`.

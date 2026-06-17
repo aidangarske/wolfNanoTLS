@@ -27,8 +27,13 @@ provider seam.
 
 ## Status
 
-Early development. See the implementation plan; v0.1.0 targets the `src` build
-on Cortex-M33 + a portable-C baseline.
+Early development, but functional: the wolfNanoTLS TLS 1.3 client completes a
+**live PSK+ECDHE handshake against OpenSSL**, with the crypto floor validated by
+both RFC-vector KATs and wolfSSL's own (config-trimmed) crypto test, true
+no-allocation verified, and side-channel hardening on. The full TLS 1.3 client
+shell is ~1.3k lines / ~8.7 KB `.text` (vs wolfSSL's `tls13.c`+`tls.c` alone at
+~52 KB). Run `make test` for the suites and `make interop` for the live
+handshake. Next: Raw-Public-Key auth, PQC, X.509, the FIPS backend.
 
 ## License
 

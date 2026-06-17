@@ -13,7 +13,8 @@ CMP="-Os -ffunction-sections -fdata-sections -DWOLFSSL_USER_SETTINGS -Ibench/cmp
 
 textsum() { size "$@" 2>/dev/null | awk 'NR>1{t+=$1} END{printf "%d", t}'; }
 
-for f in wn_keyschedule wn_transcript wn_record; do
+for f in wn_msg wn_keyschedule wn_transcript wn_record wn_keyshare \
+         wn_serverhello wn_clienthello wn_connect; do
     cc $NANO -c src/shell_slim/$f.c -o "$OUT/nano/$f.o" 2>/dev/null
 done
 for f in tls13 tls; do
@@ -27,7 +28,7 @@ WSSL_LOC=$(cat wolfssl/src/tls13.c wolfssl/src/tls.c wolfssl/src/internal.c \
     wolfssl/src/ssl.c 2>/dev/null | wc -l | tr -d ' ')
 
 echo "TLS-layer __TEXT footprint (bytes, -Os, host clang):"
-echo "  wolfNanoTLS slim shell (keyschedule+transcript+record): $NANO_SHELL"
+echo "  wolfNanoTLS slim shell (full TLS 1.3 client)          : $NANO_SHELL"
 echo "  wolfSSL TLS layer    (tls13.c + tls.c only)        : $WSSL_TLS"
 echo
 echo "TLS-layer source size (lines):"

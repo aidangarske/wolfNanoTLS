@@ -11,13 +11,15 @@ sh bench/footprint.sh
 
 | | __TEXT bytes | source lines |
 |---|---|---|
-| wolfNanoTLS slim shell (key schedule + transcript + record) | 1,886 | 387 |
+| wolfNanoTLS slim shell (full TLS 1.3 PSK+ECDHE client) | 8,724 | 1,351 |
 | wolfSSL TLS layer (`tls13.c` + `tls.c` only) | 52,318 | (subset) |
 | wolfSSL `tls13.c`+`tls.c`+`internal.c`+`ssl.c` | n/a | 96,433 |
 
-wolfNanoTLS's TLS layer is roughly 28x smaller in compiled `.text` than just
-`tls13.c` + `tls.c`, and it omits `internal.c` and `ssl.c` entirely (the
-`WOLFSSL` object model), which is the bulk of the wolfSSL TLS-layer size.
+The complete wolfNanoTLS TLS 1.3 client (handshake driver, ClientHello/ServerHello,
+key schedule, transcript, record protection, key share, wire codec) is roughly
+6x smaller in compiled `.text` than just `tls13.c` + `tls.c`, and it omits
+`internal.c` and `ssl.c` entirely (the `WOLFSSL` object model), which is the
+bulk of the wolfSSL TLS-layer size.
 
 ## Notes
 
