@@ -45,4 +45,11 @@ WOLFNANOTLS_API int wn_Tls13_DeriveSecret(byte* out, const byte* secret,
                                        const byte* transcriptHash,
                                        word32 hashLen, int digest);
 
+/* Finished MAC (RFC 8446 4.4.4) and the PSK binder (4.2.11.2), which share the
+ * same construction: HMAC(HKDF-Expand-Label(baseKey, "finished", ""),
+ * transcriptHash). out is Hash.length bytes. */
+WOLFNANOTLS_API int wn_Tls13_FinishedMac(byte* out, const byte* baseKey,
+                                      const byte* transcriptHash,
+                                      word32 hashLen, int digest);
+
 #endif /* WN_KEYSCHEDULE_H */

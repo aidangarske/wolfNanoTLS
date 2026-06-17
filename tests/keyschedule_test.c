@@ -119,6 +119,9 @@ int main(void)
     byte master[32];
     byte cAp[32];
     byte sAp[32];
+    byte fmac[32];
+    byte fmanual[32];
+    Hmac h;
     int rc;
 
     printf("wolfNanoTLS TLS 1.3 key-schedule KATs (RFC 8448 section 3)\n");
@@ -182,6 +185,18 @@ int main(void)
                                WC_SHA256);
     check((rc == WOLFNANOTLS_SUCCESS) && eq(sAp, sApTrafficExp, 32),
           "server_application_traffic_secret_0");
+
+    /* FinishedMac == HMAC(HKDF-Expand-Label(sHs,"finished"), transcript).
+     * The finished key itself is RFC 8448 KAT'd above (sFinishedKeyExp); here
+     * we confirm FinishedMac composes it with HMAC correctly. */
+    rc  = wn_Tls13_FinishedMac(fmac, sHs, emptyHash, 32, WC_SHA256);
+    rc |= wc_HmacInit(&h, NULL, INVALID_DEVID);
+    rc |= wc_HmacSetKey(&h, WC_SHA256, sFinishedKeyExp, 32);
+    rc |= wc_HmacUpdate(&h, emptyHash, 32);
+    rc |= wc_HmacFinal(&h, fmanual);
+    wc_HmacFree(&h);
+    check((rc == WOLFNANOTLS_SUCCESS) && eq(fmac, fmanual, 32),
+          "FinishedMac = HMAC(finished_key, transcript)");
 
     printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASS",
            fails, fails == 1 ? "" : "s");

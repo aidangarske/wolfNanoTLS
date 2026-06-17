@@ -26,6 +26,11 @@
 #include "wn_keyschedule.h"
 #include "wolfnano_crypto.h"
 
+#ifndef WOLFSSL_MISC_INCLUDED
+    #define WOLFSSL_MISC_INCLUDED
+    #include <wolfcrypt/src/misc.c>   /* inline ForceZero, wolfSSL idiom */
+#endif
+
 static word32 wn_DigestSize(int digest)
 {
     word32 sz = 0;
@@ -94,4 +99,46 @@ int wn_Tls13_DeriveSecret(byte* out, const byte* secret, const char* label,
 {
     return wn_Tls13_ExpandLabel(out, hashLen, secret, label,
                                 transcriptHash, hashLen, digest);
+}
+
+int wn_Tls13_FinishedMac(byte* out, const byte* baseKey,
+                         const byte* transcriptHash, word32 hashLen,
+                         int digest)
+{
+    Hmac hmac;
+    byte finishedKey[WC_SHA512_DIGEST_SIZE];
+    int ret = WOLFNANOTLS_SUCCESS;
+    int hmacInit = 0;
+
+    if ((out == NULL) || (baseKey == NULL) || (transcriptHash == NULL) ||
+        (hashLen == 0) || (hashLen > sizeof(finishedKey))) {
+        ret = WOLFNANOTLS_E_INVALID_ARG;
+    }
+
+    if (ret == WOLFNANOTLS_SUCCESS) {
+        ret = wn_Tls13_ExpandLabel(finishedKey, hashLen, baseKey, "finished",
+                                   NULL, 0, digest);
+    }
+
+    if (ret == WOLFNANOTLS_SUCCESS) {
+        if (wc_HmacInit(&hmac, NULL, INVALID_DEVID) != 0) {
+            ret = WOLFNANOTLS_E_CRYPTO;
+        }
+    }
+
+    if (ret == WOLFNANOTLS_SUCCESS) {
+        hmacInit = 1;
+        if ((wc_HmacSetKey(&hmac, digest, finishedKey, hashLen) != 0) ||
+            (wc_HmacUpdate(&hmac, transcriptHash, hashLen) != 0) ||
+            (wc_HmacFinal(&hmac, out) != 0)) {
+            ret = WOLFNANOTLS_E_CRYPTO;
+        }
+    }
+
+    if (hmacInit) {
+        wc_HmacFree(&hmac);
+    }
+    ForceZero(finishedKey, sizeof(finishedKey));
+
+    return ret;
 }
