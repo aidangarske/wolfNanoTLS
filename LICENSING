@@ -2,7 +2,7 @@ wolfNano is wolfSSL Inc. software and is licensed identically to wolfSSL:
 the GNU General Public License version 3 (GPLv3, see COPYING) or, at your
 option, a wolfSSL commercial license.
 
-Copyright (C) 2006-2026 wolfSSL Inc.
+Copyright (C) 2026 wolfSSL Inc.
 
 wolfNano consumes wolfSSL as a pinned git submodule and never modifies it.
 The default `WOLFNANO_CRYPTO=src` build is GPLv3. The optional

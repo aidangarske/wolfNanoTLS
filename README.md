@@ -5,7 +5,7 @@ want for the smallest constrained MCUs, assembled into a plain-Makefile project
 (in the spirit of wolfCOSE / wolfIP) with **zero dynamic allocation** and
 wolfSSL's target-specific assembly speedups intact.
 
-wolfNano is a **behavioral subset of wolfSSL** — it never offers a primitive,
+wolfNano is a **behavioral subset of wolfSSL**: it never offers a primitive,
 group, suite, or extension wolfSSL lacks. It consumes wolfSSL as a pinned git
 submodule and **never modifies it**; crypto is reached through a thin `wc_*`
 provider seam.
@@ -17,8 +17,8 @@ provider seam.
 - **True no-allocator** product shell + `src` crypto floor (caller/static
   buffers, `WOLFSSL_NO_MALLOC`).
 - **Provider seam** (`WOLFNANO_CRYPTO`):
-  - `src` (default, GPLv3) — selected `wolfcrypt/src/*.c` from the submodule.
-  - `fips` (commercial) — links a customer-supplied wolfSSL FIPS bundle under
+  - `src` (default, GPLv3): selected `wolfcrypt/src/*.c` from the submodule.
+  - `fips` (commercial): links a customer-supplied wolfSSL FIPS bundle under
     the unchanged shell.
 - **Per-algorithm compile flags** (`WOLFNANO_HAVE_*`); ML-KEM / ML-DSA are
   compile-out-able adders.

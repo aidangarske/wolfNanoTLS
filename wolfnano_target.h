@@ -1,6 +1,6 @@
 /* wolfnano_target.h
  *
- * Copyright (C) 2006-2026 wolfSSL Inc.
+ * Copyright (C) 2026 wolfSSL Inc.
  *
  * This file is part of wolfNano.
  *
@@ -15,17 +15,20 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
+ * along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
 #ifndef WOLFNANO_TARGET_H
 #define WOLFNANO_TARGET_H
 
-/* One target macro selects the whole asm bundle. asm macro/file names locked
- * against wolfssl master 59295869 (re-verify on submodule re-pin). */
+/* One target macro selects the whole asm bundle.
+ *
+ * Active target: PORTABLE_C (local mac/linux testing). The hardware/asm target
+ * below is DEFERRED and not built yet; it is kept only as the verified record
+ * of the asm macro/file names (locked against wolfssl master 59295869,
+ * re-verify on submodule re-pin) for when hardware work begins. */
 
-#if defined(WOLFNANO_TARGET_CORTEXM33)
+#if defined(WOLFNANO_TARGET_CORTEXM33) /* deferred: hardware target, not built yet */
     /* symmetric + hash: Thumb2 inline asm (selects thumb2-*-asm_c.c) */
     #define WOLFSSL_ARMASM
     #define WOLFSSL_ARMASM_THUMB2
