@@ -28,7 +28,7 @@ provider seam.
 ## Status
 
 Early development, but functional: the wolfNanoTLS TLS 1.3 client completes a
-**live PSK+ECDHE handshake against OpenSSL**, with the crypto floor validated by
+**live PSK+ECDHE handshake against both OpenSSL and wolfSSL**, with the crypto floor validated by
 both RFC-vector KATs and wolfSSL's own (config-trimmed) crypto test, true
 no-allocation verified, and side-channel hardening on. The full TLS 1.3 client
 shell is ~1.3k lines / ~8.7 KB `.text` (vs wolfSSL's `tls13.c`+`tls.c` alone at

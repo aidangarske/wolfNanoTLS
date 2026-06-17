@@ -32,8 +32,8 @@ Early development, but the TLS 1.3 client works end to end.
 - Done: the crypto floor (RFC KATs + wolfSSL's own crypto test, trimmed) with
   true no-allocator verified; the slim TLS 1.3 shell (key schedule, transcript,
   record protection, key share, ClientHello/ServerHello, handshake driver);
-  side-channel hardening; and a **live TLS 1.3 PSK+ECDHE handshake against
-  OpenSSL**.
+  side-channel hardening; and a **live TLS 1.3 PSK+ECDHE handshake against both
+  OpenSSL and wolfSSL**.
 - Next: Raw-Public-Key auth, PQC adders, X.509 (Phase 4), the FIPS backend.
 - Deferred: hardware targets and on-device assembly benchmarks.
 

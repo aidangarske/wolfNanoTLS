@@ -83,7 +83,7 @@ int main(int argc, char** argv)
     struct sockaddr_in sa;
     WC_RNG rng;
     byte scratch[8192];
-    int fd, port, rc;
+    int fd, port, rc, tries;
 
     port = (argc > 1) ? atoi(argv[1]) : 4433;
     pskLen = hex2bin((argc > 2) ? argv[2] : defHex, psk, sizeof(psk));
@@ -98,7 +98,16 @@ int main(int argc, char** argv)
     sa.sin_family = AF_INET;
     sa.sin_port = htons((unsigned short)port);
     inet_pton(AF_INET, "127.0.0.1", &sa.sin_addr);
-    if (connect(fd, (struct sockaddr*)&sa, sizeof(sa)) != 0) {
+    rc = -1;
+    tries = 0;
+    while ((tries < 50) && (rc != 0)) {
+        rc = connect(fd, (struct sockaddr*)&sa, sizeof(sa));
+        if (rc != 0) {
+            usleep(50000);
+            tries++;
+        }
+    }
+    if (rc != 0) {
         printf("connect failed\n");
         return 2;
     }
@@ -115,7 +124,7 @@ int main(int argc, char** argv)
     close(fd);
 
     printf("wn_Connect_Psk = %d\n", rc);
-    printf("%s\n", (rc == 0) ? "PASS TLS 1.3 PSK handshake vs OpenSSL"
+    printf("%s\n", (rc == 0) ? "PASS TLS 1.3 PSK handshake"
                              : "FAIL handshake");
     return (rc == 0) ? 0 : 1;
 }

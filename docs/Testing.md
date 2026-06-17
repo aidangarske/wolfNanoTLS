@@ -42,7 +42,7 @@ for the `src` floor statically (independent of any runtime malloc trap).
 | `make wctest` | wolfSSL's own `wolfcrypt/test/test.c`, config-trimmed to the floor |
 | `make msgtest` | wire encode/decode primitives |
 | `make chtest` / `make shtest` | ClientHello encoder / ServerHello parser (RFC 8448) |
-| `make interop` | **live TLS 1.3 PSK+ECDHE handshake vs `openssl s_server`** |
+| `make interop` | **live TLS 1.3 PSK+ECDHE handshake vs OpenSSL and wolfSSL** |
 
 `make wctest` reuses wolfSSL's comprehensive crypto test verbatim from the
 submodule. Compiled with the wolfNanoTLS config, its `#ifdef` guards trim it to
@@ -55,11 +55,17 @@ vectors first, as planned.
 
 ## Live interop
 
-`make interop` launches `openssl s_server` (TLS 1.3, external PSK) and runs the
-wolfNanoTLS client against it. A green run means OpenSSL accepted our ClientHello
-(including the PSK binder), we parsed its ServerHello, completed ECDHE,
-decrypted its EncryptedExtensions + Finished, verified the server Finished MAC,
-and sent our client Finished. Requires `openssl`.
+`make interop` launches `openssl s_server` (TLS 1.3, external PSK) and a stock
+wolfSSL example server, and runs the wolfNanoTLS client against each. A green run
+means the peer accepted our ClientHello (including the PSK binder), we parsed
+its ServerHello, completed ECDHE, decrypted its EncryptedExtensions + Finished,
+verified the server Finished MAC, and sent our client Finished. Verified against
+**OpenSSL 3.6.2 and wolfSSL**.
+
+The wolfSSL server must be built with PSK + X25519:
+`./configure --enable-tls13 --enable-psk --enable-curve25519`. Point
+`WOLFSSL_SERVER` at the example server, or it skips cleanly. Requires `openssl`
+for the OpenSSL leg.
 
 ## Still ahead
 
