@@ -138,11 +138,12 @@ shtest: ## build + run the ServerHello parser test (PORTABLE_C)
 	@echo "---- run ----"
 	@./$(BUILD)/serverhello_test
 
-interop: ## live TLS 1.3 PSK handshake vs openssl s_server
+interop: ## live TLS 1.3 PSK handshake vs OpenSSL and wolfSSL
 	@mkdir -p $(BUILD)
 	cc $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C \
 	   $(CONN_SRC) tests/interop_psk_test.c -o $(BUILD)/interop_psk_client
-	@sh tests/interop_psk.sh
+	@echo "== vs OpenSSL =="; sh tests/interop_psk.sh
+	@echo "== vs wolfSSL =="; sh tests/interop_wolfssl.sh
 
 clean:
 	rm -rf $(BUILD) *.o

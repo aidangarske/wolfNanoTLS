@@ -38,18 +38,56 @@ static int sock_recv(void* ctx, byte* buf, word32 len)
     return (int)recv(*(int*)ctx, buf, len, 0);
 }
 
+static int hexval(char c)
+{
+    int v = -1;
+
+    if ((c >= '0') && (c <= '9')) {
+        v = c - '0';
+    }
+    else if ((c >= 'a') && (c <= 'f')) {
+        v = c - 'a' + 10;
+    }
+    else if ((c >= 'A') && (c <= 'F')) {
+        v = c - 'A' + 10;
+    }
+
+    return v;
+}
+
+static word32 hex2bin(const char* hex, byte* out, word32 maxOut)
+{
+    word32 n = 0;
+    int hi, lo;
+
+    while ((hex[0] != '\0') && (hex[1] != '\0') && (n < maxOut)) {
+        hi = hexval(hex[0]);
+        lo = hexval(hex[1]);
+        if ((hi < 0) || (lo < 0)) {
+            break;
+        }
+        out[n] = (byte)((hi << 4) | lo);
+        n++;
+        hex += 2;
+    }
+
+    return n;
+}
+
 int main(int argc, char** argv)
 {
-    static const byte psk[16] = {
-        0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,
-        0x08,0x09,0x0a,0x0b,0x0c,0x0d,0x0e,0x0f
-    };
+    static const char* defHex = "000102030405060708090a0b0c0d0e0f";
+    byte psk[64];
+    const char* identity;
+    word32 pskLen;
     struct sockaddr_in sa;
     WC_RNG rng;
     byte scratch[8192];
     int fd, port, rc;
 
     port = (argc > 1) ? atoi(argv[1]) : 4433;
+    pskLen = hex2bin((argc > 2) ? argv[2] : defHex, psk, sizeof(psk));
+    identity = (argc > 3) ? argv[3] : "Client_identity";
 
     fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) {
@@ -70,8 +108,8 @@ int main(int argc, char** argv)
         return 2;
     }
 
-    rc = wn_Connect_Psk(&rng, sock_send, sock_recv, &fd, psk, sizeof(psk),
-                        "Client_identity", scratch, sizeof(scratch));
+    rc = wn_Connect_Psk(&rng, sock_send, sock_recv, &fd, psk, pskLen,
+                        identity, scratch, sizeof(scratch));
 
     wc_FreeRng(&rng);
     close(fd);
