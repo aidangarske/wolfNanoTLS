@@ -48,6 +48,11 @@
     #define NO_ASN_TIME
 #endif
 
+/* ---- X.509 adder (minimal cert path validation) ---- */
+#ifdef WOLFNANOTLS_X509
+    #define WOLFSSL_SMALL_CERT_VERIFY  /* low-memory cert signature check */
+#endif
+
 /* ---- side-channel hardening (constant-time) ---- */
 #define ECC_TIMING_RESISTANT
 #define TFM_TIMING_RESISTANT

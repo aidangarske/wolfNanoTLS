@@ -30,12 +30,19 @@ ML-KEM-768 and ML-DSA-65 verify are both **allocation-free** under
 it is gated behind `WOLFNANOTLS_MLDSA_SIGN`. The hybrid concatenation is ML-KEM
 component first, then X25519 (draft-kwiatkowski-tls-ecdhe-mlkem).
 
-## Planned adders
+## Cert auth (Phase 4, in progress)
 
-| Adder | Algorithm | Status |
+| Adder | Capability | Status |
 |---|---|---|
-| `WOLFNANOTLS_X509` | minimal cert path validation | planned (Phase 4) |
-| `WOLFNANOTLS_HAVE_RSA_VERIFY` | RSA verify for real-world chains | planned (Phase 4) |
+| `WOLFNANOTLS_X509` | parse cert + verify signature against issuer key | done (cert chain-link) |
+| `WOLFNANOTLS_X509` | full path validation (chain build, time, names) | planned |
+| `WOLFNANOTLS_HAVE_RSA_VERIFY` | RSA-signed chains | planned |
+| handshake Certificate / CertVerify integration | cert-based (non-PSK) handshake | planned |
+
+**Memory note:** unlike the floor and the PSK/RPK handshake (which are true
+no-allocator), X.509 cert parsing uses a `DecodedCert` and needs working memory.
+`WOLFNANOTLS_X509` therefore requires a heap or a `WOLFSSL_STATIC_MEMORY` pool;
+it is not part of the true-no-allocator guarantee.
 
 ## Backend boundary note
 

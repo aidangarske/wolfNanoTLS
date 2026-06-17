@@ -73,8 +73,10 @@ HYBRID_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
   $(WC)/curve25519.c $(WC)/fe_operations.c $(WC)/wc_mlkem.c \
   $(WC)/wc_mlkem_poly.c src/shell_slim/wn_hybrid.c tests/wn_host_seed.c
 
-.PHONY: host kstest tstest rectest ksharetest hstest wctest msgtest chtest shtest mlkemtest mldsatest hybridtest test clean
-test: host kstest tstest rectest ksharetest hstest wctest msgtest chtest shtest mlkemtest mldsatest hybridtest ## build + run all local self-tests
+CERT_SRC := $(FLOOR_SRC) $(WC)/sp_int.c tests/wn_host_seed.c
+
+.PHONY: host kstest tstest rectest ksharetest hstest wctest msgtest chtest shtest mlkemtest mldsatest hybridtest certtest test clean
+test: host kstest tstest rectest ksharetest hstest wctest msgtest chtest shtest mlkemtest mldsatest hybridtest certtest ## build + run all local self-tests
 
 host: ## build + run the crypto floor self-test locally (PORTABLE_C)
 	@mkdir -p $(BUILD)
@@ -175,6 +177,14 @@ hybridtest: ## build + run the X25519MLKEM768 hybrid key-share test
 	   $(HYBRID_SRC) tests/hybrid_test.c -o $(BUILD)/hybrid_test
 	@echo "---- run ----"
 	@./$(BUILD)/hybrid_test
+
+certtest: ## build + run the X.509 cert-verify test (WOLFNANOTLS_X509; needs heap)
+	@mkdir -p $(BUILD)
+	cc $(CFLAGS_COMMON) -DWOLFNANOTLS_X509 -DWOLFNANOTLS_ALLOW_MALLOC \
+	   -DWOLFNANOTLS_TARGET_PORTABLE_C \
+	   $(CERT_SRC) tests/cert_test.c -o $(BUILD)/cert_test
+	@echo "---- run ----"
+	@./$(BUILD)/cert_test
 
 interop: ## live TLS 1.3 PSK handshake vs OpenSSL and wolfSSL
 	@mkdir -p $(BUILD)
