@@ -54,8 +54,8 @@ HS_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
 WCT_SRC := $(FLOOR_SRC) $(WC)/sp_int.c wolfssl/wolfcrypt/test/test.c \
   tests/wn_host_seed.c
 
-.PHONY: host kstest tstest rectest ksharetest hstest wctest msgtest chtest test clean
-test: host kstest tstest rectest ksharetest hstest wctest msgtest chtest ## build + run all local self-tests
+.PHONY: host kstest tstest rectest ksharetest hstest wctest msgtest chtest shtest test clean
+test: host kstest tstest rectest ksharetest hstest wctest msgtest chtest shtest ## build + run all local self-tests
 
 host: ## build + run the crypto floor self-test locally (PORTABLE_C)
 	@mkdir -p $(BUILD)
@@ -120,6 +120,14 @@ chtest: ## build + run the ClientHello encoder test (PORTABLE_C)
 	   tests/clienthello_test.c -o $(BUILD)/clienthello_test
 	@echo "---- run ----"
 	@./$(BUILD)/clienthello_test
+
+shtest: ## build + run the ServerHello parser test (PORTABLE_C)
+	@mkdir -p $(BUILD)
+	cc $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C \
+	   src/shell_slim/wn_msg.c src/shell_slim/wn_serverhello.c \
+	   tests/serverhello_test.c -o $(BUILD)/serverhello_test
+	@echo "---- run ----"
+	@./$(BUILD)/serverhello_test
 
 clean:
 	rm -rf $(BUILD) *.o
