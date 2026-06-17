@@ -29,8 +29,12 @@ KS_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
   $(WC)/hmac.c $(WC)/kdf.c \
   src/shell_slim/wn_keyschedule.c tests/wn_host_seed.c
 
-.PHONY: host kstest test clean
-test: host kstest ## build + run all local self-tests
+TS_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
+  $(WC)/logging.c $(WC)/random.c $(WC)/sha256.c $(WC)/sha512.c \
+  src/shell_slim/wn_transcript.c tests/wn_host_seed.c
+
+.PHONY: host kstest tstest test clean
+test: host kstest tstest ## build + run all local self-tests
 
 host: ## build + run the crypto floor self-test locally (PORTABLE_C)
 	@mkdir -p $(BUILD)
@@ -45,6 +49,13 @@ kstest: ## build + run the TLS 1.3 key-schedule KATs (PORTABLE_C)
 	   $(KS_SRC) tests/keyschedule_test.c -o $(BUILD)/keyschedule_test
 	@echo "---- run ----"
 	@./$(BUILD)/keyschedule_test
+
+tstest: ## build + run the transcript-hash tests (PORTABLE_C)
+	@mkdir -p $(BUILD)
+	cc $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(TS_SRC) tests/transcript_test.c -o $(BUILD)/transcript_test
+	@echo "---- run ----"
+	@./$(BUILD)/transcript_test
 
 clean:
 	rm -rf $(BUILD) *.o
