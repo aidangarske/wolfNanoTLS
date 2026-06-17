@@ -68,9 +68,13 @@ MLKEM_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
   $(WC)/wc_mlkem.c $(WC)/wc_mlkem_poly.c tests/wn_host_seed.c
 MLDSA_SRC := $(FLOOR_SRC) $(WC)/sp_int.c $(WC)/sha3.c $(WC)/wc_mldsa.c \
   tests/wn_host_seed.c
+HYBRID_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
+  $(WC)/logging.c $(WC)/random.c $(WC)/sha256.c $(WC)/sha512.c $(WC)/sha3.c \
+  $(WC)/curve25519.c $(WC)/fe_operations.c $(WC)/wc_mlkem.c \
+  $(WC)/wc_mlkem_poly.c src/shell_slim/wn_hybrid.c tests/wn_host_seed.c
 
-.PHONY: host kstest tstest rectest ksharetest hstest wctest msgtest chtest shtest mlkemtest mldsatest test clean
-test: host kstest tstest rectest ksharetest hstest wctest msgtest chtest shtest mlkemtest mldsatest ## build + run all local self-tests
+.PHONY: host kstest tstest rectest ksharetest hstest wctest msgtest chtest shtest mlkemtest mldsatest hybridtest test clean
+test: host kstest tstest rectest ksharetest hstest wctest msgtest chtest shtest mlkemtest mldsatest hybridtest ## build + run all local self-tests
 
 host: ## build + run the crypto floor self-test locally (PORTABLE_C)
 	@mkdir -p $(BUILD)
@@ -164,6 +168,13 @@ mldsatest: ## build + run ML-DSA-65 round-trip + verify-only no-malloc proof
 	@nm $(BUILD)/wc_mldsa_vo.o | grep -E ' U _(malloc|calloc|realloc|free)$$' \
 	   && echo "  FAIL: verify-only references heap" \
 	   || echo "  PASS: verify-only ML-DSA is allocation-free"
+
+hybridtest: ## build + run the X25519MLKEM768 hybrid key-share test
+	@mkdir -p $(BUILD)
+	cc $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANOTLS_MLKEM -DWOLFNANOTLS_TARGET_PORTABLE_C \
+	   $(HYBRID_SRC) tests/hybrid_test.c -o $(BUILD)/hybrid_test
+	@echo "---- run ----"
+	@./$(BUILD)/hybrid_test
 
 interop: ## live TLS 1.3 PSK handshake vs OpenSSL and wolfSSL
 	@mkdir -p $(BUILD)
