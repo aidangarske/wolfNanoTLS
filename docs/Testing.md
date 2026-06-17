@@ -29,9 +29,23 @@ The floor is compiled to objects and inspected so no translation unit references
 `malloc`/`calloc`/`realloc`/`free`. This proves the true-no-allocator property
 for the `src` floor statically (independent of any runtime malloc trap).
 
-## Coming with the shell
+## Shell test suites (`make test`)
 
-When the slim TLS 1.3 shell lands, the heaviest coverage goes first at the
-rewritten core (transcript-hash KATs, key-schedule RFC vectors, fragmented
-record reassembly), diffed against stock wolfSSL as the interop oracle. A
-data-driven suite matrix and a structured `test-pki/` follow.
+| Target | Covers |
+|---|---|
+| `make host` | crypto floor KATs (SHA-256, HKDF, AES-GCM, X25519, ECDSA, Ed25519, DRBG) |
+| `make kstest` | TLS 1.3 key schedule, full RFC 8448 secret tree (12 KATs) |
+| `make tstest` | transcript hash: incremental + non-destructive interim, SHA-256/384 |
+| `make rectest` | record protection: seal/open, tamper rejection, sequence binding |
+| `make ksharetest` | X25519 key share / ECDHE agreement |
+| `make hstest` | end-to-end crypto handshake (ECDHE + schedule + transcript + record) |
+
+The CVE-dense core (key schedule, transcript) is verified against RFC 8448
+vectors first, as planned.
+
+## Still ahead
+
+The wire-level handshake state machine (ClientHello encode, ServerHello /
+EncryptedExtensions / Certificate / CertVerify / Finished parse) and live
+interop against stock wolfSSL / OpenSSL. A data-driven suite matrix and a
+structured `test-pki/` follow with the certificate path.

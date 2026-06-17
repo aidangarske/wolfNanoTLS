@@ -9,8 +9,12 @@ wolfNano/
   COPYING, LICENSING     GPLv3 + commercial, copyright wolfSSL Inc.
   include/wolfnano/       public API (wn_*) and provider seam (added with the shell)
   src/
-    shell_slim/          the slim hand-written TLS 1.3 shell (added in the shell phase)
-    glue.c               wn_* API to wc_* crypto (added with the shell)
+    shell_slim/          the slim hand-written TLS 1.3 shell
+      wn_keyschedule.c   TLS 1.3 key schedule (RFC 8446 7.1) over the wc_* seam
+      wn_transcript.c    handshake transcript hash (incremental, interim digest)
+      wn_record.c        TLS 1.3 record protection (AES-GCM, nonce + AAD)
+      wn_keyshare.c      X25519 (EC)DHE key share
+    glue.c               wn_* API to wc_* crypto (added with the handshake driver)
   tests/
     floor_test.c         crypto floor KAT self-test
     wn_host_seed.c       host entropy seed hook for the self-test
