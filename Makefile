@@ -33,8 +33,12 @@ TS_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
   $(WC)/logging.c $(WC)/random.c $(WC)/sha256.c $(WC)/sha512.c \
   src/shell_slim/wn_transcript.c tests/wn_host_seed.c
 
-.PHONY: host kstest tstest test clean
-test: host kstest tstest ## build + run all local self-tests
+REC_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
+  $(WC)/logging.c $(WC)/random.c $(WC)/sha256.c $(WC)/sha512.c $(WC)/aes.c \
+  src/shell_slim/wn_record.c tests/wn_host_seed.c
+
+.PHONY: host kstest tstest rectest test clean
+test: host kstest tstest rectest ## build + run all local self-tests
 
 host: ## build + run the crypto floor self-test locally (PORTABLE_C)
 	@mkdir -p $(BUILD)
@@ -56,6 +60,13 @@ tstest: ## build + run the transcript-hash tests (PORTABLE_C)
 	   $(TS_SRC) tests/transcript_test.c -o $(BUILD)/transcript_test
 	@echo "---- run ----"
 	@./$(BUILD)/transcript_test
+
+rectest: ## build + run the record-protection tests (PORTABLE_C)
+	@mkdir -p $(BUILD)
+	cc $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(REC_SRC) tests/record_test.c -o $(BUILD)/record_test
+	@echo "---- run ----"
+	@./$(BUILD)/record_test
 
 clean:
 	rm -rf $(BUILD) *.o
