@@ -49,8 +49,13 @@ HS_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
   $(WC)/kdf.c $(WC)/aes.c $(WC)/curve25519.c $(WC)/fe_operations.c \
   $(SHELL_SRC) tests/wn_host_seed.c
 
-.PHONY: host kstest tstest rectest ksharetest hstest test clean
-test: host kstest tstest rectest ksharetest hstest ## build + run all local self-tests
+# wolfSSL's own crypto test, compiled with the wolfNano config so #ifdef trims
+# it to exactly the floor algorithms.
+WCT_SRC := $(FLOOR_SRC) $(WC)/sp_int.c wolfssl/wolfcrypt/test/test.c \
+  tests/wn_host_seed.c
+
+.PHONY: host kstest tstest rectest ksharetest hstest wctest test clean
+test: host kstest tstest rectest ksharetest hstest wctest ## build + run all local self-tests
 
 host: ## build + run the crypto floor self-test locally (PORTABLE_C)
 	@mkdir -p $(BUILD)
@@ -93,6 +98,13 @@ hstest: ## build + run the end-to-end crypto handshake (PORTABLE_C)
 	   $(HS_SRC) tests/handshake_crypto_test.c -o $(BUILD)/handshake_crypto_test
 	@echo "---- run ----"
 	@./$(BUILD)/handshake_crypto_test
+
+wctest: ## run wolfSSL's wolfcrypt test against the floor (config-trimmed)
+	@mkdir -p $(BUILD)
+	cc $(CFLAGS_COMMON) -DNO_MAIN_DRIVER -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(WCT_SRC) tests/wolfcrypt_test_main.c -o $(BUILD)/wctest
+	@echo "---- run ----"
+	@./$(BUILD)/wctest | tail -3
 
 clean:
 	rm -rf $(BUILD) *.o

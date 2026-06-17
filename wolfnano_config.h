@@ -28,6 +28,7 @@
 /* ---- standing size cuts (always) ---- */
 #define NO_OLD_TLS
 #define NO_MD5
+#define NO_MD4
 #define NO_SHA            /* SHA-1 */
 #define NO_DES3
 #define NO_RC4
@@ -36,6 +37,8 @@
 #define NO_DH
 #define NO_PWDBASED
 #define NO_PKCS12
+#define NO_SIG_WRAPPER     /* shell calls wc_* directly, not the wrapper */
+#define NO_AES_CBC         /* TLS 1.3 is AEAD-only */
 #define SINGLE_THREADED
 #define NO_FILESYSTEM
 #define NO_ERROR_STRINGS

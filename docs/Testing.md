@@ -39,6 +39,13 @@ for the `src` floor statically (independent of any runtime malloc trap).
 | `make rectest` | record protection: seal/open, tamper rejection, sequence binding |
 | `make ksharetest` | X25519 key share / ECDHE agreement |
 | `make hstest` | end-to-end crypto handshake (ECDHE + schedule + transcript + record) |
+| `make wctest` | wolfSSL's own `wolfcrypt/test/test.c`, config-trimmed to the floor |
+
+`make wctest` reuses wolfSSL's comprehensive crypto test verbatim from the
+submodule. Compiled with the wolfNano config, its `#ifdef` guards trim it to
+exactly the floor algorithms (SHA-2, HMAC, HKDF, PRF, GMAC, AES-GCM, ECC,
+X25519, Ed25519, DRBG); MD4/MD5/RSA/DES3/AES-CBC and the rest compile out. This
+complements the wolfNano RFC-vector KATs rather than replacing them.
 
 The CVE-dense core (key schedule, transcript) is verified against RFC 8448
 vectors first, as planned.
