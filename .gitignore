@@ -1,0 +1,15 @@
+*.o
+*.a
+*.so
+*.lo
+*.la
+*.elf
+*.bin
+*.hex
+*.map
+*.d
+build/
+bin/
+obj/
+*.gcda
+*.gcno

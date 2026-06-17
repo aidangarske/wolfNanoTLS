@@ -1,0 +1,13 @@
+wolfNanoTLS is wolfSSL Inc. software and is licensed identically to wolfSSL:
+the GNU General Public License version 3 (GPLv3, see COPYING) or, at your
+option, a wolfSSL commercial license.
+
+Copyright (C) 2006-2026 wolfSSL Inc.
+
+wolfNanoTLS consumes wolfSSL as a pinned git submodule and never modifies it.
+The default `WOLFNANOTLS_CRYPTO=src` build is GPLv3. The optional
+`WOLFNANOTLS_CRYPTO=fips` build links a separately-licensed, commercial wolfSSL
+FIPS module supplied by the user; that build path is NOT GPLv3-only and
+requires a commercial wolfSSL license for the FIPS module.
+
+For commercial licensing contact wolfSSL Inc. (https://www.wolfssl.com).
