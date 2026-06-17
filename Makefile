@@ -63,8 +63,12 @@ HS_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
 WCT_SRC := $(FLOOR_SRC) $(WC)/sp_int.c wolfssl/wolfcrypt/test/test.c \
   tests/wn_host_seed.c
 
-.PHONY: host kstest tstest rectest ksharetest hstest wctest msgtest chtest shtest test clean
-test: host kstest tstest rectest ksharetest hstest wctest msgtest chtest shtest ## build + run all local self-tests
+MLKEM_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
+  $(WC)/logging.c $(WC)/random.c $(WC)/sha256.c $(WC)/sha512.c $(WC)/sha3.c \
+  $(WC)/wc_mlkem.c $(WC)/wc_mlkem_poly.c tests/wn_host_seed.c
+
+.PHONY: host kstest tstest rectest ksharetest hstest wctest msgtest chtest shtest mlkemtest test clean
+test: host kstest tstest rectest ksharetest hstest wctest msgtest chtest shtest mlkemtest ## build + run all local self-tests
 
 host: ## build + run the crypto floor self-test locally (PORTABLE_C)
 	@mkdir -p $(BUILD)
@@ -137,6 +141,13 @@ shtest: ## build + run the ServerHello parser test (PORTABLE_C)
 	   tests/serverhello_test.c -o $(BUILD)/serverhello_test
 	@echo "---- run ----"
 	@./$(BUILD)/serverhello_test
+
+mlkemtest: ## build + run the ML-KEM-768 KEM test (WOLFNANOTLS_MLKEM)
+	@mkdir -p $(BUILD)
+	cc $(CFLAGS_COMMON) -DWOLFNANOTLS_MLKEM -DWOLFNANOTLS_TARGET_PORTABLE_C \
+	   $(MLKEM_SRC) tests/mlkem_test.c -o $(BUILD)/mlkem_test
+	@echo "---- run ----"
+	@./$(BUILD)/mlkem_test
 
 interop: ## live TLS 1.3 PSK handshake vs OpenSSL and wolfSSL
 	@mkdir -p $(BUILD)

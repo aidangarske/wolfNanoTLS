@@ -115,4 +115,18 @@ extern int wn_seed(unsigned char* output, unsigned int sz);
     #endif
 #endif
 
+/* ---- PQC adders (compile-out-able) ---- */
+#ifdef WOLFNANOTLS_MLKEM
+    #define WOLFSSL_HAVE_MLKEM
+    #define WOLFSSL_WC_ML_KEM           /* wolfCrypt implementation */
+    #define WOLFSSL_WC_ML_KEM_768       /* ML-KEM-768 only */
+    #define WOLFSSL_NO_ML_KEM_512
+    #define WOLFSSL_NO_ML_KEM_1024
+    #ifndef WOLFSSL_SHA3
+        #define WOLFSSL_SHA3
+    #endif
+    #define WOLFSSL_SHAKE128
+    #define WOLFSSL_SHAKE256
+#endif
+
 #endif /* WOLFNANOTLS_CONFIG_H */
