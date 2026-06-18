@@ -83,7 +83,12 @@ HYBRID_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
 
 CERT_SRC := $(FLOOR_SRC) $(WC)/sp_int.c tests/wn_host_seed.c
 
-.PHONY: host kstest tstest rectest ksharetest hstest wctest msgtest chtest shtest mlkemtest mldsatest hybridtest certtest test clean
+# WOLFNANO_CRYPTO=fips backend (Phase 5 seam proof). Point at a built wolfSSL
+# FIPS bundle (FIPS Ready or a licensed validated module).
+WOLFNANO_FIPS_DIR ?= $(HOME)/Downloads/wolfssl-5.8.2-gplv3-fips-ready
+FIPS_LIB := $(WOLFNANO_FIPS_DIR)/src/.libs/libwolfssl.a
+
+.PHONY: host kstest tstest rectest ksharetest hstest wctest msgtest chtest shtest mlkemtest mldsatest hybridtest certtest fipsproof test clean
 test: host kstest tstest rectest ksharetest hstest wctest msgtest chtest shtest mlkemtest mldsatest hybridtest certtest ## build + run all local self-tests
 
 host: ## build + run the crypto floor self-test locally (PORTABLE_C)
@@ -212,6 +217,26 @@ interop: ## live TLS 1.3 PSK handshake vs OpenSSL and wolfSSL
 	@echo "== cert(RSA-PSS) vs wolfSSL =="; sh tests/interop_cert_wolfssl.sh rsa
 	@echo "== cert(Ed25519) vs wolfSSL =="; sh tests/interop_cert_wolfssl.sh ed
 	@echo "== cert(chain leaf<-inter<-root) vs wolfSSL =="; sh tests/interop_cert_wolfssl.sh chain
+
+fipsproof: ## Phase 5: same shell sources link against the FIPS backend; CASTs pass
+	@mkdir -p $(BUILD)
+	@test -f $(FIPS_LIB) || { echo "SKIP fipsproof (no FIPS lib at $(FIPS_LIB); set WOLFNANO_FIPS_DIR)"; exit 0; }
+	@echo "== seam crypto vs wolfCrypt FIPS module =="
+	@sh tests/fips_seam_proof.sh $(WOLFNANO_FIPS_DIR)
+	@echo "== shell seam surface is backend-identical (zero source changes) =="
+	@cc $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C \
+	   -c src/shell_slim/wn_keyschedule.c -o $(BUILD)/ks_src.o
+	@cc -Os -DWOLFSSL_USE_OPTIONS_H -I$(WOLFNANO_FIPS_DIR) $(SHELL_INC) \
+	   -DWOLFNANO_TARGET_PORTABLE_C \
+	   -c src/shell_slim/wn_keyschedule.c -o $(BUILD)/ks_fips.o
+	@nm -u $(BUILD)/ks_src.o  | grep '_wc_' | sort > $(BUILD)/seam_src.txt
+	@# FIPS headers route each wc_* call to its _fips boundary wrapper; strip the
+	@# suffix to compare the logical crypto surface (the .c is byte-identical).
+	@nm -u $(BUILD)/ks_fips.o | grep '_wc_' | sed 's/_fips$$//' | sort > $(BUILD)/seam_fips.txt
+	@if diff -q $(BUILD)/seam_src.txt $(BUILD)/seam_fips.txt >/dev/null; then \
+	   echo "PASS same wc_* seam surface on src and fips (fips routes via _fips wrappers)"; \
+	   sed 's/^/    /' $(BUILD)/seam_src.txt; \
+	 else echo "FAIL seam surface differs"; diff $(BUILD)/seam_src.txt $(BUILD)/seam_fips.txt; exit 1; fi
 
 clean:
 	rm -rf $(BUILD) *.o
