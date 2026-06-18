@@ -6,9 +6,15 @@ TYPE=${1:-ecdsa}
 PORT=14436
 SERVER=${WOLFSSL_SERVER:-$HOME/wolfssl/examples/server/server}
 WOLFSSL_DIR=$(dirname "$(dirname "$(dirname "$SERVER")")")
-CERT="$(pwd)/test-pki/server/$TYPE-cert.pem"
-KEY="$(pwd)/test-pki/server/$TYPE-key.pem"
-ANCHOR="$(pwd)/test-pki/server/$TYPE-cert.der"
+if [ "$TYPE" = "chain" ]; then
+    CERT="$(pwd)/test-pki/chain/fullchain.pem"     # leaf + intermediate
+    KEY="$(pwd)/test-pki/chain/leaf-key.pem"
+    ANCHOR="$(pwd)/test-pki/chain/root-cert.der"   # pinned root
+else
+    CERT="$(pwd)/test-pki/server/$TYPE-cert.pem"
+    KEY="$(pwd)/test-pki/server/$TYPE-key.pem"
+    ANCHOR="$(pwd)/test-pki/server/$TYPE-cert.der"
+fi
 
 if [ ! -x "$SERVER" ] || [ ! -f "$CERT" ]; then
     echo "SKIP wolfSSL cert interop ($TYPE: server or cert not found)"
