@@ -4,17 +4,25 @@
 set -u
 TYPE=${1:-ecdsa}
 PORT=14435
-CERT=test-pki/server/$TYPE-cert.pem
-KEY=test-pki/server/$TYPE-key.pem
-ANCHOR=test-pki/server/$TYPE-cert.der
+CHAINARG=""
+if [ "$TYPE" = "chain" ]; then
+    CERT=test-pki/chain/leaf-cert.pem
+    KEY=test-pki/chain/leaf-key.pem
+    ANCHOR=test-pki/chain/root-cert.der          # pinned root
+    CHAINARG="-cert_chain test-pki/chain/inter-cert.pem"  # send intermediate
+else
+    CERT=test-pki/server/$TYPE-cert.pem
+    KEY=test-pki/server/$TYPE-key.pem
+    ANCHOR=test-pki/server/$TYPE-cert.der
+fi
 
 if [ ! -f "$CERT" ] || [ ! -f "$KEY" ]; then
     echo "SKIP cert interop ($TYPE cert missing)"
     exit 0
 fi
 
-openssl s_server -cert "$CERT" -key "$KEY" -tls1_3 -accept "$PORT" -quiet \
-    >/tmp/wn_cert_srv.log 2>&1 &
+openssl s_server -cert "$CERT" -key "$KEY" $CHAINARG -tls1_3 -accept "$PORT" \
+    -quiet >/tmp/wn_cert_srv.log 2>&1 &
 SPID=$!
 
 sleep 1

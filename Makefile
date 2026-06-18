@@ -207,6 +207,7 @@ interop: ## live TLS 1.3 PSK handshake vs OpenSSL and wolfSSL
 	@echo "== cert(ECDSA) vs OpenSSL =="; sh tests/interop_cert.sh ecdsa
 	@echo "== cert(RSA-PSS) vs OpenSSL =="; sh tests/interop_cert.sh rsa
 	@echo "== cert(Ed25519) vs OpenSSL =="; sh tests/interop_cert.sh ed
+	@echo "== cert(chain leaf<-inter<-root) vs OpenSSL =="; sh tests/interop_cert.sh chain
 	@echo "== cert(ECDSA) vs wolfSSL =="; sh tests/interop_cert_wolfssl.sh ecdsa
 	@echo "== cert(RSA-PSS) vs wolfSSL =="; sh tests/interop_cert_wolfssl.sh rsa
 	@echo "== cert(Ed25519) vs wolfSSL =="; sh tests/interop_cert_wolfssl.sh ed

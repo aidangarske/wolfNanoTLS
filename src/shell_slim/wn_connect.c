@@ -419,6 +419,7 @@ int wn_Connect_Psk(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv, void* ioCtx,
 
 #define WN_HS_CERTIFICATE 11
 #define WN_HS_CERT_VERIFY 15
+#define WN_MAX_CHAIN      4
 
 /* Build the TLS 1.3 CertificateVerify signed content (RFC 8446 4.4.3). */
 static void wn_BuildCvTbs(byte* tbs, word32* tbsLen, const byte* th,
@@ -596,46 +597,66 @@ static int wn_CertVerify(word16 scheme, const byte* spki, word32 spkiLen,
     return ret;
 }
 
-/* Verify the leaf is signed by the pinned anchor and copy its SPKI out. */
-static int wn_VerifyLeaf(const byte* leaf, word32 leafLen, const byte* anchor,
-                         word32 anchorLen, byte* spki, word32* spkiLen)
+/* Verify a presented cert chain (leaf first) up to the pinned anchor: each
+ * cert must be signed by the next, and the topmost by the anchor. Copies the
+ * leaf SPKI out for CertificateVerify. Signature-chain only (no constraint or
+ * name checks yet). */
+static int wn_VerifyChain(const byte** certs, const word32* certLens, int n,
+                          const byte* anchor, word32 anchorLen, byte* spki,
+                          word32* spkiLen)
 {
-    DecodedCert dc;
+    DecodedCert issuer;
+    DecodedCert leaf;
+    const byte* issuerDer;
+    word32 issuerLen;
+    int i;
     int ret = WOLFNANO_SUCCESS;
-    int dcInit = 0;
+    int leafInit = 0;
 
-    wc_InitDecodedCert(&dc, anchor, anchorLen, NULL);
-    if (wc_ParseCert(&dc, CERT_TYPE, NO_VERIFY, NULL) != 0) {
-        ret = WOLFNANO_E_CRYPTO;
+    if (n < 1) {
+        ret = WOLFNANO_E_INVALID_ARG;
     }
-    else {
-        dcInit = 1;
-    }
-    if (ret == WOLFNANO_SUCCESS) {
-        if (CheckCertSignaturePubKey(leaf, leafLen, NULL, dc.publicKey,
-                dc.pubKeySize, dc.keyOID) != 0) {
-            ret = WOLFNANO_E_CRYPTO;
+
+    for (i = 0; (i < n) && (ret == WOLFNANO_SUCCESS); i++) {
+        if ((i + 1) < n) {
+            issuerDer = certs[i + 1];
+            issuerLen = certLens[i + 1];
         }
-    }
-    if (dcInit) {
-        wc_FreeDecodedCert(&dc);
-    }
-
-    if (ret == WOLFNANO_SUCCESS) {
-        wc_InitDecodedCert(&dc, leaf, leafLen, NULL);
-        if (wc_ParseCert(&dc, CERT_TYPE, NO_VERIFY, NULL) != 0) {
+        else {
+            issuerDer = anchor;
+            issuerLen = anchorLen;
+        }
+        wc_InitDecodedCert(&issuer, issuerDer, issuerLen, NULL);
+        if (wc_ParseCert(&issuer, CERT_TYPE, NO_VERIFY, NULL) != 0) {
             ret = WOLFNANO_E_CRYPTO;
         }
         else {
-            if (dc.pubKeySize > *spkiLen) {
+            if (CheckCertSignaturePubKey(certs[i], certLens[i], NULL,
+                    issuer.publicKey, issuer.pubKeySize, issuer.keyOID) != 0) {
+                ret = WOLFNANO_E_CRYPTO;
+            }
+            wc_FreeDecodedCert(&issuer);
+        }
+    }
+
+    if (ret == WOLFNANO_SUCCESS) {
+        wc_InitDecodedCert(&leaf, certs[0], certLens[0], NULL);
+        if (wc_ParseCert(&leaf, CERT_TYPE, NO_VERIFY, NULL) != 0) {
+            ret = WOLFNANO_E_CRYPTO;
+        }
+        else {
+            leafInit = 1;
+            if (leaf.pubKeySize > *spkiLen) {
                 ret = WOLFNANO_E_CRYPTO;
             }
             else {
-                XMEMCPY(spki, dc.publicKey, dc.pubKeySize);
-                *spkiLen = dc.pubKeySize;
+                XMEMCPY(spki, leaf.publicKey, leaf.pubKeySize);
+                *spkiLen = leaf.pubKeySize;
             }
-            wc_FreeDecodedCert(&dc);
         }
+    }
+    if (leafInit) {
+        wc_FreeDecodedCert(&leaf);
     }
 
     return ret;
@@ -659,7 +680,9 @@ int wn_Connect_Cert(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv,
     byte hsacc[6144];
     byte leafSpki[1024];
     byte plain[2048];
-    word32 chLen, recLen, thLen, pubLen, ssLen, plainLen, hsLen2, spkiLen;
+    const byte* certs[WN_MAX_CHAIN];
+    word32 certLens[WN_MAX_CHAIN];
+    word32 chLen, recLen, thLen, pubLen, ssLen, plainLen, spkiLen;
     word32 accLen = 0, sSeq = 0, off = 0;
     byte rtype, ctype;
     int ret = WOLFNANO_SUCCESS;
@@ -790,17 +813,29 @@ int wn_Connect_Cert(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv,
                 ret = wn_Transcript_Update(&tc, hsacc + off, mLen + 4);
             }
             if ((ret == WOLFNANO_SUCCESS) && (mType == WN_HS_CERTIFICATE)) {
+                int nc = 0;
+                word32 cl;
+                word16 extl;
                 wn_Reader_Init(&hr, hsacc + off + 4, mLen);
                 (void)wn_Read_Bytes(&hr, wn_Read_U8(&hr)); /* cert_req_context */
-                (void)wn_Read_U24(&hr);                    /* cert_list len */
-                hsLen2 = wn_Read_U24(&hr);                 /* leaf cert len */
+                (void)wn_Read_U24(&hr);                    /* cert_list length */
+                while ((hr.pos < mLen) && (nc < WN_MAX_CHAIN) &&
+                       (hr.err == 0)) {
+                    cl = wn_Read_U24(&hr);                  /* cert_data length */
+                    certs[nc] = hsacc + off + 4 + hr.pos;
+                    certLens[nc] = cl;
+                    nc++;
+                    (void)wn_Read_Bytes(&hr, cl);
+                    extl = wn_Read_U16(&hr);               /* entry extensions */
+                    (void)wn_Read_Bytes(&hr, extl);
+                }
                 spkiLen = (word32)sizeof(leafSpki);
                 if (hr.err != 0) {
                     ret = WOLFNANO_E_CRYPTO;
                 }
                 else {
-                    ret = wn_VerifyLeaf(hsacc + off + 4 + hr.pos, hsLen2,
-                                        anchor, anchorLen, leafSpki, &spkiLen);
+                    ret = wn_VerifyChain(certs, certLens, nc, anchor, anchorLen,
+                                         leafSpki, &spkiLen);
                 }
                 gotCert = 1;
             }
