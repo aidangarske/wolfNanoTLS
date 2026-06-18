@@ -33,8 +33,11 @@
 #define NO_DES3
 #define NO_RC4
 #define NO_DSA
-#define NO_RSA
 #define NO_DH
+/* RSA off unless the verify adder is enabled (real-world cert chains). */
+#ifndef WOLFNANOTLS_HAVE_RSA_VERIFY
+    #define NO_RSA
+#endif
 #define NO_PWDBASED
 #define NO_PKCS12
 #define NO_SIG_WRAPPER     /* shell calls wc_* directly, not the wrapper */
@@ -51,6 +54,13 @@
 /* ---- X.509 adder (minimal cert path validation) ---- */
 #ifdef WOLFNANOTLS_X509
     #define WOLFSSL_SMALL_CERT_VERIFY  /* low-memory cert signature check */
+#endif
+
+/* ---- RSA verify adder (RSA-signed cert chains, RSA-PSS for TLS 1.3) ---- */
+#ifdef WOLFNANOTLS_HAVE_RSA_VERIFY
+    #define WOLFSSL_RSA_VERIFY_ONLY
+    #define WOLFSSL_RSA_PUBLIC_ONLY
+    #define WC_RSA_PSS
 #endif
 
 /* ---- side-channel hardening (constant-time) ---- */

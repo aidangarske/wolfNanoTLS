@@ -178,11 +178,11 @@ hybridtest: ## build + run the X25519MLKEM768 hybrid key-share test
 	@echo "---- run ----"
 	@./$(BUILD)/hybrid_test
 
-certtest: ## build + run the X.509 cert-verify test (WOLFNANOTLS_X509; needs heap)
+certtest: ## build + run the X.509 cert-verify test (ECC + RSA; needs heap)
 	@mkdir -p $(BUILD)
-	cc $(CFLAGS_COMMON) -DWOLFNANOTLS_X509 -DWOLFNANOTLS_ALLOW_MALLOC \
-	   -DWOLFNANOTLS_TARGET_PORTABLE_C \
-	   $(CERT_SRC) tests/cert_test.c -o $(BUILD)/cert_test
+	cc $(CFLAGS_COMMON) -DWOLFNANOTLS_X509 -DWOLFNANOTLS_HAVE_RSA_VERIFY \
+	   -DWOLFNANOTLS_ALLOW_MALLOC -DWOLFNANOTLS_TARGET_PORTABLE_C \
+	   $(CERT_SRC) $(WC)/rsa.c tests/cert_test.c -o $(BUILD)/cert_test
 	@echo "---- run ----"
 	@./$(BUILD)/cert_test
 

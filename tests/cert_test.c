@@ -23,6 +23,7 @@
  * certs. */
 
 #define USE_CERT_BUFFERS_256
+#define USE_CERT_BUFFERS_2048
 
 #include <wolfssl/wolfcrypt/settings.h>
 #include <wolfssl/wolfcrypt/asn_public.h>
@@ -43,6 +44,9 @@ static void check(int ok, const char* name)
 int main(void)
 {
     DecodedCert ca;
+#ifndef NO_RSA
+    DecodedCert rsaCa;
+#endif
     byte server[sizeof(serv_ecc_der_256)];
     int rc, verifyRc;
 
@@ -69,6 +73,18 @@ int main(void)
     check(verifyRc != 0, "tampered server cert rejected");
 
     wc_FreeDecodedCert(&ca);
+
+#ifndef NO_RSA
+    wc_InitDecodedCert(&rsaCa, ca_cert_der_2048,
+                       (word32)sizeof_ca_cert_der_2048, NULL);
+    rc = wc_ParseCert(&rsaCa, CERT_TYPE, NO_VERIFY, NULL);
+    verifyRc = CheckCertSignaturePubKey(server_cert_der_2048,
+                   (word32)sizeof_server_cert_der_2048, NULL,
+                   rsaCa.publicKey, rsaCa.pubKeySize, rsaCa.keyOID);
+    check((rc == 0) && (verifyRc == 0),
+          "RSA-2048 server cert verified by CA key");
+    wc_FreeDecodedCert(&rsaCa);
+#endif
 
     printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASS",
            fails, fails == 1 ? "" : "s");
