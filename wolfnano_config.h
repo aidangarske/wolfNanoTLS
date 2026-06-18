@@ -56,10 +56,16 @@
     #define WOLFSSL_SMALL_CERT_VERIFY  /* low-memory cert signature check */
 #endif
 
-/* ---- RSA verify adder (RSA-signed cert chains, RSA-PSS for TLS 1.3) ---- */
+/* ---- RSA verify adder (RSA-signed cert chains, RSA-PSS for TLS 1.3) ----
+ * Verify/public-only by default; WOLFNANO_RSA_FULL adds keygen/sign (needs
+ * working memory) for tooling such as the benchmark. */
 #ifdef WOLFNANO_HAVE_RSA_VERIFY
-    #define WOLFSSL_RSA_VERIFY_ONLY
-    #define WOLFSSL_RSA_PUBLIC_ONLY
+    #ifndef WOLFNANO_RSA_FULL
+        #define WOLFSSL_RSA_VERIFY_ONLY
+        #define WOLFSSL_RSA_PUBLIC_ONLY
+    #else
+        #define WOLFSSL_KEY_GEN
+    #endif
     #define WC_RSA_PSS
 #endif
 
@@ -74,7 +80,9 @@
  * validated Hash-DRBG; only the seed is pluggable. */
 #define HAVE_HASHDRBG
 #define CUSTOM_RAND_GENERATE_SEED wn_seed
+#ifndef __ASSEMBLER__
 extern int wn_seed(unsigned char* output, unsigned int sz);
+#endif
 
 /* ---- memory model: true no-allocator (wolfCOSE bar) ---- *
  * Pass -DWOLFNANO_ALLOW_MALLOC during bring-up to temporarily relax. */

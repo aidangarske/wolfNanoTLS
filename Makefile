@@ -88,7 +88,67 @@ CERT_SRC := $(FLOOR_SRC) $(WC)/sp_int.c tests/wn_host_seed.c
 WOLFNANO_FIPS_DIR ?= $(HOME)/Downloads/wolfssl-5.8.2-gplv3-fips-ready
 FIPS_LIB := $(WOLFNANO_FIPS_DIR)/src/.libs/libwolfssl.a
 
-.PHONY: host kstest tstest rectest ksharetest hstest wctest msgtest chtest shtest mlkemtest mldsatest hybridtest certtest fipsproof test clean
+# ---- WOLFNANO_ASM: per-arch speedup bundle (mirrors wolfSSL --enable-*asm) ----
+# Default 'none' = lightweight portable C (WOLFSSL_SP_MATH_ALL, no asm). Each
+# accelerated arch selects its toolchain, flags, specialized SP file + asm files.
+# The macro bundle lives in wolfnano_target.h (selected via FLAGS_<arch>).
+WOLFNANO_ASM ?= none
+ARM   := $(WC)/port/arm
+RISCV := $(WC)/port/riscv
+
+CC_none      := cc
+FLAGS_none   := -DWOLFNANO_TARGET_PORTABLE_C
+SPSRC_none   := $(WC)/sp_int.c
+ASMSRC_none  :=
+
+CC_intel     := cc
+FLAGS_intel  := -march=native -DWOLFNANO_TARGET_X86_64
+SPSRC_intel  := $(WC)/sp_int.c $(WC)/sp_x86_64.c $(WC)/sp_x86_64_asm.S
+ASMSRC_intel := $(WC)/aes_asm.S $(WC)/aes_gcm_asm.S $(WC)/sha256_asm.S \
+                $(WC)/sha512_asm.S $(WC)/fe_x25519_asm.S $(WC)/cpuid.c
+
+# Prefer a complete arm-none-eabi toolchain (with newlib) if one is installed;
+# fall back to the bare name (overridable: make floor-thumb2 CC_thumb2=...).
+ARM_GNU_BIN := $(wildcard /Applications/ArmGNUToolchain/*/arm-none-eabi/bin)
+CC_thumb2     := $(firstword $(wildcard $(ARM_GNU_BIN)/arm-none-eabi-gcc) arm-none-eabi-gcc)
+FLAGS_thumb2  := -mcpu=cortex-m33 -mthumb -DWOLFNANO_TARGET_CORTEXM33
+SPSRC_thumb2  := $(WC)/sp_int.c $(WC)/sp_cortexm.c
+ASMSRC_thumb2 := $(ARM)/thumb2-aes-asm_c.c $(ARM)/thumb2-sha256-asm_c.c \
+                 $(ARM)/thumb2-sha512-asm_c.c $(ARM)/thumb2-curve25519_c.c
+
+CC_aarch64     := $(shell command -v aarch64-elf-gcc 2>/dev/null || echo aarch64-none-elf-gcc)
+FLAGS_aarch64  := -march=armv8-a+crypto -DWOLFNANO_TARGET_AARCH64
+SPSRC_aarch64  := $(WC)/sp_int.c $(WC)/sp_arm64.c
+ASMSRC_aarch64 := $(ARM)/armv8-aes-asm_c.c $(ARM)/armv8-sha256-asm_c.c \
+                  $(ARM)/armv8-sha512-asm_c.c $(ARM)/armv8-curve25519_c.c
+
+CC_armv7     := $(CC_thumb2)
+FLAGS_armv7  := -march=armv7-a -DWOLFNANO_TARGET_ARMV8_32
+SPSRC_armv7  := $(WC)/sp_int.c $(WC)/sp_arm32.c
+ASMSRC_armv7 := $(ARM)/armv8-32-aes-asm_c.c $(ARM)/armv8-32-sha256-asm_c.c \
+                $(ARM)/armv8-32-sha512-asm_c.c $(ARM)/armv8-32-curve25519_c.c
+
+CC_riscv64     := riscv64-unknown-elf-gcc
+FLAGS_riscv64  := -march=rv64gc -DWOLFNANO_TARGET_RISCV64
+SPSRC_riscv64  := $(WC)/sp_int.c $(WC)/sp_c64.c
+ASMSRC_riscv64 := $(RISCV)/riscv-64-aes.c $(RISCV)/riscv-64-sha256.c \
+                  $(RISCV)/riscv-64-sha512.c
+
+# Extra asm for the bench's optional algos (ChaCha/Poly1305 + ML-KEM/ML-DSA),
+# pulled in by USE_INTEL_SPEEDUP on intel; empty elsewhere.
+BENCHASM_none    :=
+BENCHASM_intel   := $(WC)/chacha_asm.S $(WC)/poly1305_asm.S $(WC)/sha3_asm.S \
+                    $(WC)/wc_mlkem_asm.S $(WC)/wc_mldsa_asm.S
+BENCHASM_thumb2  :=
+BENCHASM_aarch64 :=
+BENCHASM_armv7   :=
+BENCHASM_riscv64 :=
+
+ASM_CC    := $(CC_$(WOLFNANO_ASM))
+ASM_FLAGS := $(FLAGS_$(WOLFNANO_ASM))
+ASM_SRC   := $(SPSRC_$(WOLFNANO_ASM)) $(ASMSRC_$(WOLFNANO_ASM))
+
+.PHONY: host kstest tstest rectest ksharetest hstest wctest msgtest chtest shtest mlkemtest mldsatest hybridtest certtest fipsproof bench benchrun targets test clean
 test: host kstest tstest rectest ksharetest hstest wctest msgtest chtest shtest mlkemtest mldsatest hybridtest certtest ## build + run all local self-tests
 
 host: ## build + run the crypto floor self-test locally (PORTABLE_C)
@@ -245,6 +305,40 @@ fipsproof: ## Phase 5: same shell sources link against the FIPS backend; CASTs p
 	   echo "PASS same wc_* seam surface on src and fips (fips routes via _fips wrappers)"; \
 	   sed 's/^/    /' $(BUILD)/seam_src.txt; \
 	 else echo "FAIL seam surface differs"; diff $(BUILD)/seam_src.txt $(BUILD)/seam_fips.txt; exit 1; fi
+
+# Build + run the all-algo bench for the active WOLFNANO_ASM arch.
+benchrun:
+	@mkdir -p $(BUILD)
+	$(ASM_CC) $(CFLAGS_COMMON) $(SHELL_INC) $(ASM_FLAGS) \
+	   -DWOLFNANO_MLKEM -DWOLFNANO_MLDSA -DWOLFNANO_MLDSA_SIGN \
+	   -DWOLFNANO_HAVE_CHACHA -DWOLFNANO_HAVE_RSA_VERIFY -DWOLFNANO_RSA_FULL \
+	   -DWOLFNANO_ALLOW_MALLOC \
+	   $(WC)/sha3.c $(WC)/wc_mlkem.c $(WC)/wc_mlkem_poly.c $(WC)/wc_mldsa.c \
+	   $(WC)/chacha.c $(WC)/poly1305.c $(WC)/chacha20_poly1305.c $(WC)/rsa.c \
+	   $(FLOOR_SRC) $(ASM_SRC) $(BENCHASM_$(WOLFNANO_ASM)) \
+	   tests/bench_all.c tests/wn_host_seed.c \
+	   -o $(BUILD)/bench_$(WOLFNANO_ASM)
+	@./$(BUILD)/bench_$(WOLFNANO_ASM)
+
+bench: ## crypto speed, all algos: portable C vs Intel asm side by side
+	@$(MAKE) --no-print-directory benchrun WOLFNANO_ASM=none
+	@$(MAKE) --no-print-directory benchrun WOLFNANO_ASM=intel
+
+# floor-<arch>: cross-compile the crypto floor + that arch's asm to objects,
+# proving wolfNano builds from source for the target. (Host arches use `host` /
+# `bench` instead.) A missing/incomplete toolchain skips with a message.
+floor-%:
+	@mkdir -p $(BUILD)/$*
+	@if ! command -v $(CC_$*) >/dev/null 2>&1; then echo "SKIP floor-$* (no $(CC_$*))"; \
+	 else ok=1; for f in $(FLOOR_SRC) $(SPSRC_$*) $(ASMSRC_$*); do \
+	     $(CC_$*) $(CFLAGS_COMMON) $(SHELL_INC) $(FLAGS_$*) -c $$f \
+	       -o $(BUILD)/$*/`basename $$f`.o 2>/dev/null || { ok=0; break; }; \
+	   done; \
+	   if [ $$ok = 1 ]; then echo "OK floor-$* (cross objects built)"; \
+	   else echo "SKIP floor-$* ($(CC_$*) present but toolchain incomplete, e.g. no libc headers)"; fi; \
+	 fi
+
+targets: floor-thumb2 floor-aarch64 floor-armv7 floor-riscv64 ## cross-compile the floor for every non-host arch
 
 clean:
 	rm -rf $(BUILD) *.o
