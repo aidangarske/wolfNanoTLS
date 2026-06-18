@@ -36,9 +36,9 @@ component first, then X25519 (draft-kwiatkowski-tls-ecdhe-mlkem).
 |---|---|---|
 | `WOLFNANOTLS_X509` | parse cert + verify signature against issuer key | done |
 | `WOLFNANOTLS_HAVE_RSA_VERIFY` | RSA-signed chains | done |
-| handshake Certificate / CertVerify (ECDSA P-256) | cert-based (non-PSK) handshake | done, live vs OpenSSL |
+| handshake Certificate / CertVerify | cert-based (non-PSK) handshake | done, live vs OpenSSL + wolfSSL |
+| CertVerify schemes: ECDSA P-256/384, RSA-PSS SHA-256/384, Ed25519 | | done, all live vs OpenSSL |
 | full path validation (multi-cert chain, time, names) | | planned |
-| RSA-PSS / Ed25519 CertVerify schemes | | planned |
 
 **Memory note:** unlike the floor and the PSK/RPK handshake (which are true
 no-allocator), X.509 cert parsing uses a `DecodedCert` and needs working memory.
