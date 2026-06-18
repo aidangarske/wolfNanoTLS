@@ -82,12 +82,13 @@ int wn_ClientHello_Build(byte* out, word32* outLen, word32 outCap,
         wn_Write_U16(&w, 2);
         wn_Write_U16(&w, WN_GROUP_X25519_CP);
 
-        /* signature_algorithms: ed25519, ecdsa_secp256r1_sha256 */
+        /* signature_algorithms */
         wn_Write_U16(&w, WN_EXT_SIG_ALGS);
+        wn_Write_U16(&w, 8);
         wn_Write_U16(&w, 6);
-        wn_Write_U16(&w, 4);
         wn_Write_U16(&w, 0x0807);              /* ed25519 */
         wn_Write_U16(&w, 0x0403);              /* ecdsa_secp256r1_sha256 */
+        wn_Write_U16(&w, 0x0804);              /* rsa_pss_rsae_sha256 */
 
         /* key_share: one X25519 entry */
         wn_Write_U16(&w, WN_EXT_KEY_SHARE);

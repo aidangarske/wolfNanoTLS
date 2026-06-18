@@ -200,11 +200,14 @@ interop: ## live TLS 1.3 PSK handshake vs OpenSSL and wolfSSL
 	   $(CONN_SRC) tests/interop_psk_test.c -o $(BUILD)/interop_psk_client
 	@echo "== PSK vs OpenSSL =="; sh tests/interop_psk.sh
 	@echo "== PSK vs wolfSSL =="; sh tests/interop_wolfssl.sh
-	cc $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANOTLS_X509 -DWOLFNANOTLS_ALLOW_MALLOC \
-	   -DWOLFNANOTLS_TARGET_PORTABLE_C \
-	   $(CONN_CERT_SRC) tests/interop_cert_test.c -o $(BUILD)/interop_cert_client
-	@echo "== cert vs OpenSSL =="; sh tests/interop_cert.sh
-	@echo "== cert vs wolfSSL =="; sh tests/interop_cert_wolfssl.sh
+	cc $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANOTLS_X509 -DWOLFNANOTLS_HAVE_RSA_VERIFY \
+	   -DWOLFNANOTLS_ALLOW_MALLOC -DWOLFNANOTLS_TARGET_PORTABLE_C \
+	   $(CONN_CERT_SRC) $(WC)/rsa.c tests/interop_cert_test.c \
+	   -o $(BUILD)/interop_cert_client
+	@echo "== cert(ECDSA) vs OpenSSL =="; sh tests/interop_cert.sh ecdsa
+	@echo "== cert(RSA-PSS) vs OpenSSL =="; sh tests/interop_cert.sh rsa
+	@echo "== cert(Ed25519) vs OpenSSL =="; sh tests/interop_cert.sh ed
+	@echo "== cert(ECDSA) vs wolfSSL =="; sh tests/interop_cert_wolfssl.sh
 
 clean:
 	rm -rf $(BUILD) *.o

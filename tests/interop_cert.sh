@@ -1,13 +1,15 @@
 #!/bin/sh
-# Live interop: openssl s_server with the pinned ECDSA P-256 cert, wolfNanoTLS
-# certificate client against it.
+# Live interop: openssl s_server with a pinned server cert, wolfNanoTLS cert
+# client against it. $1 selects the cert type (ecdsa | rsa | ed).
 set -u
+TYPE=${1:-ecdsa}
 PORT=14435
-CERT=test-pki/server/ec-cert.pem
-KEY=test-pki/server/ec-key.pem
+CERT=test-pki/server/$TYPE-cert.pem
+KEY=test-pki/server/$TYPE-key.pem
+ANCHOR=test-pki/server/$TYPE-cert.der
 
 if [ ! -f "$CERT" ] || [ ! -f "$KEY" ]; then
-    echo "SKIP cert interop (test cert missing; run the cert generation step)"
+    echo "SKIP cert interop ($TYPE cert missing)"
     exit 0
 fi
 
@@ -17,11 +19,11 @@ SPID=$!
 
 sleep 1
 if ! kill -0 "$SPID" 2>/dev/null; then
-    echo "SKIP cert interop (server did not start)"
+    echo "SKIP cert interop ($TYPE server did not start)"
     exit 0
 fi
 
-./build/interop_cert_client "$PORT" test-pki/server/ec-cert.der
+./build/interop_cert_client "$PORT" "$ANCHOR"
 RC=$?
 
 kill "$SPID" 2>/dev/null

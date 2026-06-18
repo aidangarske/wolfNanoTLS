@@ -36,6 +36,10 @@
 #include <wolfssl/wolfcrypt/asn_public.h>
 #include <wolfssl/wolfcrypt/asn.h>
 #include <wolfssl/wolfcrypt/ecc.h>
+#include <wolfssl/wolfcrypt/ed25519.h>
+#ifndef NO_RSA
+    #include <wolfssl/wolfcrypt/rsa.h>
+#endif
 
 #ifndef WOLFSSL_MISC_INCLUDED
     #define WOLFSSL_MISC_INCLUDED
@@ -413,30 +417,35 @@ int wn_Connect_Psk(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv, void* ioCtx,
 
 #ifdef WOLFNANOTLS_X509
 
-#define WN_HS_CERTIFICATE    11
-#define WN_HS_CERT_VERIFY    15
-#define WN_SCHEME_ECDSA_P256 0x0403
+#define WN_HS_CERTIFICATE 11
+#define WN_HS_CERT_VERIFY 15
 
-/* Verify a TLS 1.3 server CertificateVerify (ECDSA P-256) over the transcript
- * hash using the leaf SubjectPublicKeyInfo. */
-static int wn_CertVerifyEcdsa(const byte* spki, word32 spkiLen, const byte* th,
-                              const byte* sig, word32 sigLen)
+/* Build the TLS 1.3 CertificateVerify signed content (RFC 8446 4.4.3). */
+static void wn_BuildCvTbs(byte* tbs, word32* tbsLen, const byte* th,
+                          word32 thLen)
 {
     static const char label[] = "TLS 1.3, server CertificateVerify";
-    ecc_key key;
-    byte tbs[64 + 33 + 1 + WC_SHA256_DIGEST_SIZE];
-    byte hash[WC_SHA256_DIGEST_SIZE];
-    word32 idx = 0;
-    int ret = WOLFNANOTLS_SUCCESS;
-    int res = 0;
-    int keyInit = 0;
 
     XMEMSET(tbs, 0x20, 64);
     XMEMCPY(tbs + 64, label, 33);
     tbs[97] = 0x00;
-    XMEMCPY(tbs + 98, th, WC_SHA256_DIGEST_SIZE);
+    XMEMCPY(tbs + 98, th, thLen);
+    *tbsLen = 98 + thLen;
+}
 
-    if (wc_Sha256Hash(tbs, (word32)sizeof(tbs), hash) != 0) {
+static int wn_CvEcdsa(const byte* spki, word32 spkiLen, int hashType,
+                      const byte* tbs, word32 tbsLen, const byte* sig,
+                      word32 sigLen)
+{
+    ecc_key key;
+    byte hash[WC_MAX_DIGEST_SIZE];
+    word32 idx = 0;
+    int ret = WOLFNANOTLS_SUCCESS;
+    int res = 0, keyInit = 0, hashLen;
+
+    hashLen = wc_HashGetDigestSize((enum wc_HashType)hashType);
+    if ((hashLen <= 0) || (wc_Hash((enum wc_HashType)hashType, tbs, tbsLen,
+            hash, (word32)hashLen) != 0)) {
         ret = WOLFNANOTLS_E_CRYPTO;
     }
     if (ret == WOLFNANOTLS_SUCCESS) {
@@ -453,14 +462,135 @@ static int wn_CertVerifyEcdsa(const byte* spki, word32 spkiLen, const byte* th,
         }
     }
     if (ret == WOLFNANOTLS_SUCCESS) {
-        if ((wc_ecc_verify_hash(sig, sigLen, hash, WC_SHA256_DIGEST_SIZE, &res,
+        if ((wc_ecc_verify_hash(sig, sigLen, hash, (word32)hashLen, &res,
                 &key) != 0) || (res != 1)) {
             ret = WOLFNANOTLS_E_CRYPTO;
         }
     }
-
     if (keyInit) {
         wc_ecc_free(&key);
+    }
+
+    return ret;
+}
+
+static int wn_CvEd25519(const byte* spki, word32 spkiLen, const byte* tbs,
+                        word32 tbsLen, const byte* sig, word32 sigLen)
+{
+    ed25519_key key;
+    word32 idx = 0;
+    int ret = WOLFNANOTLS_SUCCESS;
+    int res = 0, keyInit = 0;
+
+    if (wc_ed25519_init(&key) != 0) {
+        ret = WOLFNANOTLS_E_CRYPTO;
+    }
+    else {
+        keyInit = 1;
+    }
+    if (ret == WOLFNANOTLS_SUCCESS) {
+        /* DecodedCert yields the raw 32-byte Ed25519 key, not an SPKI. */
+        if (spkiLen == ED25519_PUB_KEY_SIZE) {
+            if (wc_ed25519_import_public(spki, spkiLen, &key) != 0) {
+                ret = WOLFNANOTLS_E_CRYPTO;
+            }
+        }
+        else if (wc_Ed25519PublicKeyDecode(spki, &idx, &key, spkiLen) != 0) {
+            ret = WOLFNANOTLS_E_CRYPTO;
+        }
+    }
+    if (ret == WOLFNANOTLS_SUCCESS) {
+        if ((wc_ed25519_verify_msg(sig, sigLen, tbs, tbsLen, &res, &key) != 0)
+                || (res != 1)) {
+            ret = WOLFNANOTLS_E_CRYPTO;
+        }
+    }
+    if (keyInit) {
+        wc_ed25519_free(&key);
+    }
+
+    return ret;
+}
+
+#ifndef NO_RSA
+static int wn_CvRsaPss(const byte* spki, word32 spkiLen, int hashType, int mgf,
+                       const byte* tbs, word32 tbsLen, const byte* sig,
+                       word32 sigLen)
+{
+    RsaKey key;
+    byte hash[WC_MAX_DIGEST_SIZE];
+    byte out[512];
+    word32 idx = 0;
+    int ret = WOLFNANOTLS_SUCCESS;
+    int keyInit = 0, hashLen;
+
+    hashLen = wc_HashGetDigestSize((enum wc_HashType)hashType);
+    if ((hashLen <= 0) || (wc_Hash((enum wc_HashType)hashType, tbs, tbsLen,
+            hash, (word32)hashLen) != 0)) {
+        ret = WOLFNANOTLS_E_CRYPTO;
+    }
+    if (ret == WOLFNANOTLS_SUCCESS) {
+        if (wc_InitRsaKey(&key, NULL) != 0) {
+            ret = WOLFNANOTLS_E_CRYPTO;
+        }
+        else {
+            keyInit = 1;
+        }
+    }
+    if (ret == WOLFNANOTLS_SUCCESS) {
+        if (wc_RsaPublicKeyDecode(spki, &idx, &key, spkiLen) != 0) {
+            ret = WOLFNANOTLS_E_CRYPTO;
+        }
+    }
+    if (ret == WOLFNANOTLS_SUCCESS) {
+        if (wc_RsaPSS_VerifyCheck((byte*)sig, sigLen, out, (word32)sizeof(out),
+                hash, (word32)hashLen, (enum wc_HashType)hashType, mgf, &key)
+                < 0) {
+            ret = WOLFNANOTLS_E_CRYPTO;
+        }
+    }
+    if (keyInit) {
+        wc_FreeRsaKey(&key);
+    }
+
+    return ret;
+}
+#endif /* !NO_RSA */
+
+/* Verify a TLS 1.3 server CertificateVerify over the transcript hash. */
+static int wn_CertVerify(word16 scheme, const byte* spki, word32 spkiLen,
+                         const byte* th, word32 thLen, const byte* sig,
+                         word32 sigLen)
+{
+    byte tbs[64 + 33 + 1 + WC_MAX_DIGEST_SIZE];
+    word32 tbsLen = 0;
+    int ret = WOLFNANOTLS_SUCCESS;
+
+    wn_BuildCvTbs(tbs, &tbsLen, th, thLen);
+
+    if (scheme == 0x0403) {
+        ret = wn_CvEcdsa(spki, spkiLen, WC_HASH_TYPE_SHA256, tbs, tbsLen, sig,
+                         sigLen);
+    }
+    else if (scheme == 0x0503) {
+        ret = wn_CvEcdsa(spki, spkiLen, WC_HASH_TYPE_SHA384, tbs, tbsLen, sig,
+                         sigLen);
+    }
+    else if (scheme == 0x0807) {
+        ret = wn_CvEd25519(spki, spkiLen, tbs, tbsLen, sig, sigLen);
+    }
+#ifndef NO_RSA
+    else if (scheme == 0x0804) {
+        ret = wn_CvRsaPss(spki, spkiLen, WC_HASH_TYPE_SHA256, WC_MGF1SHA256,
+                          tbs, tbsLen, sig, sigLen);
+    }
+    else if (scheme == 0x0805) {
+        ret = wn_CvRsaPss(spki, spkiLen, WC_HASH_TYPE_SHA384, WC_MGF1SHA384,
+                          tbs, tbsLen, sig, sigLen);
+    }
+#endif
+    else {
+        ret = WOLFNANOTLS_E_UNSUPPORTED;
     }
 
     return ret;
@@ -527,7 +657,7 @@ int wn_Connect_Cert(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv,
     byte mac[32];
     byte fin[36];
     byte hsacc[6144];
-    byte leafSpki[256];
+    byte leafSpki[1024];
     byte plain[2048];
     word32 chLen, recLen, thLen, pubLen, ssLen, plainLen, hsLen2, spkiLen;
     word32 accLen = 0, sSeq = 0, off = 0;
@@ -680,12 +810,11 @@ int wn_Connect_Cert(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv,
                 wn_Reader_Init(&hr, hsacc + off + 4, mLen);
                 scheme = wn_Read_U16(&hr);
                 cvLen = wn_Read_U16(&hr);
-                if ((hr.err != 0) || (scheme != WN_SCHEME_ECDSA_P256) ||
-                    (gotCert == 0)) {
+                if ((hr.err != 0) || (gotCert == 0)) {
                     ret = WOLFNANOTLS_E_CRYPTO;
                 }
                 else {
-                    ret = wn_CertVerifyEcdsa(leafSpki, spkiLen, thCert,
+                    ret = wn_CertVerify(scheme, leafSpki, spkiLen, thCert, 32,
                               hsacc + off + 4 + hr.pos, cvLen);
                 }
                 gotCv = 1;
