@@ -38,7 +38,7 @@ component first, then X25519 (draft-kwiatkowski-tls-ecdhe-mlkem).
 | `WOLFNANOTLS_HAVE_RSA_VERIFY` | RSA-signed chains | done |
 | handshake Certificate / CertVerify | cert-based (non-PSK) handshake | done, live vs OpenSSL + wolfSSL |
 | CertVerify schemes: ECDSA P-256/384, RSA-PSS SHA-256/384, Ed25519 | | done, all live vs OpenSSL + wolfSSL |
-| multi-cert chain validation (leaf -> intermediate -> pinned root) | | done, live vs OpenSSL |
+| multi-cert chain validation (leaf -> intermediate -> pinned root) | | done, live vs OpenSSL + wolfSSL |
 | validity-time + name constraint checks | | planned |
 
 **Memory note:** unlike the floor and the PSK/RPK handshake (which are true
