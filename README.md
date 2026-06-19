@@ -40,9 +40,11 @@ interop stays identical to wolfSSL.
   compile-out-able adders.
 - **Per-algorithm compile flags** (`WOLFNANOTLS_HAVE_*`): every algorithm and
   feature is behind one switch; off means no undefined references.
-- **Path to FIPS**: a `WOLFNANOTLS_CRYPTO=fips` build links a customer-supplied
-  validated wolfCrypt bundle under the byte-identical shell (TLS layer is
-  outside the boundary).
+- **FIPS 140-3**: a `WOLFNANOTLS_CRYPTO=fips` build runs all TLS 1.3 crypto through
+  the **validated wolfCrypt module** (verified against v5.2.4, Cert #4718:
+  in-core integrity self-test + CASTs pass through the seam). The TLS shell is
+  outside the boundary, so only the validated module does cryptography; see
+  [FIPS](https://github.com/aidangarske/wolfNanoTLS/wiki/FIPS).
 
 ## Supported Algorithms
 
