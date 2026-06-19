@@ -71,6 +71,8 @@ HS_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
 # it to exactly the floor algorithms.
 WCT_SRC := $(FLOOR_SRC) $(WC)/sp_int.c wolfssl/wolfcrypt/test/test.c \
   tests/wn_host_seed.c
+WCTPQC_SRC := $(WCT_SRC) $(WC)/sha3.c $(WC)/wc_mlkem.c $(WC)/wc_mlkem_poly.c \
+  $(WC)/wc_mldsa.c
 
 MLKEM_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
   $(WC)/logging.c $(WC)/random.c $(WC)/sha256.c $(WC)/sha512.c $(WC)/sha3.c \
@@ -149,8 +151,8 @@ ASM_CC    := $(CC_$(WOLFNANO_ASM))
 ASM_FLAGS := $(FLAGS_$(WOLFNANO_ASM))
 ASM_SRC   := $(SPSRC_$(WOLFNANO_ASM)) $(ASMSRC_$(WOLFNANO_ASM))
 
-.PHONY: host kstest tstest rectest ksharetest hstest wctest msgtest chtest shtest mlkemtest mldsatest hybridtest certtest fipsproof bench benchrun targets test test-core clean
-test: test-core mlkemtest mldsatest hybridtest ## build + run all local self-tests
+.PHONY: host kstest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest mlkemtest mldsatest hybridtest certtest fipsproof bench benchrun targets test test-core clean
+test: test-core mlkemtest mldsatest hybridtest wctestpqc ## build + run all local self-tests
 test-core: host kstest tstest rectest ksharetest hstest wctest msgtest chtest shtest certtest ## non-PQC suites (wolfSSL without the wc_mlkem/wc_mldsa API)
 
 host: ## build + run the crypto floor self-test locally (PORTABLE_C)
@@ -201,6 +203,14 @@ wctest: ## run wolfSSL's wolfcrypt test against the floor (config-trimmed)
 	   $(WCT_SRC) tests/wolfcrypt_test_main.c -o $(BUILD)/wctest
 	@echo "---- run ----"
 	@./$(BUILD)/wctest | tail -3
+
+wctestpqc: ## run wolfSSL's wolfcrypt KATs incl. ML-KEM/ML-DSA (lifted from wolfSSL)
+	@mkdir -p $(BUILD)
+	cc $(CFLAGS_COMMON) -DNO_MAIN_DRIVER -DWOLFNANO_TARGET_PORTABLE_C \
+	   -DWOLFNANO_MLKEM -DWOLFNANO_MLDSA -DWOLFNANO_MLDSA_SIGN -DWOLFNANO_ALLOW_MALLOC \
+	   $(WCTPQC_SRC) tests/wolfcrypt_test_main.c -o $(BUILD)/wctestpqc
+	@echo "---- run ----"
+	@./$(BUILD)/wctestpqc | tail -3
 
 msgtest: ## build + run the wire encode/decode primitive tests (PORTABLE_C)
 	@mkdir -p $(BUILD)
