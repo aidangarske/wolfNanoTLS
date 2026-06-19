@@ -389,15 +389,15 @@ QEMU_aarch64 := qemu-aarch64-static
 QEMU_riscv64 := qemu-riscv64-static
 
 test-qemu-%:
-	@cc=$(QCC_$*); q=$(QEMU_$*); \
+	@cc=$(QCC_$*); q=$(QEMU_$*); s=-static; \
 	 if ! command -v $$cc >/dev/null 2>&1; then echo "SKIP test-qemu-$* (no $$cc)"; exit 0; fi; \
 	 if ! command -v $$q  >/dev/null 2>&1; then echo "SKIP test-qemu-$* (no $$q)"; exit 0; fi; \
 	 mkdir -p $(BUILD)/qemu-$*; set -e; \
-	 $$cc $(CFLAGS_COMMON) -DWOLFNANO_TARGET_PORTABLE_C $(FLOOR_SRC) $(WC)/sp_int.c $(TEST_SRC) -o $(BUILD)/qemu-$*/floor && $$q $(BUILD)/qemu-$*/floor; \
-	 $$cc $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C $(KS_SRC) tests/keyschedule_test.c -o $(BUILD)/qemu-$*/ks && $$q $(BUILD)/qemu-$*/ks; \
-	 $$cc $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C $(KS_SRC) tests/rfc8448_test.c -o $(BUILD)/qemu-$*/rfc && $$q $(BUILD)/qemu-$*/rfc; \
-	 $$cc $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C $(HS_SRC) tests/handshake_crypto_test.c -o $(BUILD)/qemu-$*/hs && $$q $(BUILD)/qemu-$*/hs; \
-	 $$cc $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C src/wn_msg.c src/wn_serverhello.c tests/parser_negative_test.c -o $(BUILD)/qemu-$*/neg && $$q $(BUILD)/qemu-$*/neg; \
+	 $$cc $(CFLAGS_COMMON) $$s -DWOLFNANO_TARGET_PORTABLE_C $(FLOOR_SRC) $(WC)/sp_int.c $(TEST_SRC) -o $(BUILD)/qemu-$*/floor && $$q $(BUILD)/qemu-$*/floor; \
+	 $$cc $(CFLAGS_COMMON) $$s $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C $(KS_SRC) tests/keyschedule_test.c -o $(BUILD)/qemu-$*/ks && $$q $(BUILD)/qemu-$*/ks; \
+	 $$cc $(CFLAGS_COMMON) $$s $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C $(KS_SRC) tests/rfc8448_test.c -o $(BUILD)/qemu-$*/rfc && $$q $(BUILD)/qemu-$*/rfc; \
+	 $$cc $(CFLAGS_COMMON) $$s $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C $(HS_SRC) tests/handshake_crypto_test.c -o $(BUILD)/qemu-$*/hs && $$q $(BUILD)/qemu-$*/hs; \
+	 $$cc $(CFLAGS_COMMON) $$s $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C src/wn_msg.c src/wn_serverhello.c tests/parser_negative_test.c -o $(BUILD)/qemu-$*/neg && $$q $(BUILD)/qemu-$*/neg; \
 	 echo "OK test-qemu-$* (ran under $$q)"
 
 test-qemu: test-qemu-arm test-qemu-aarch64 test-qemu-riscv64 ## run the suites under qemu-user for arm/aarch64/riscv64

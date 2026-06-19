@@ -11,10 +11,15 @@ permissions:
 
 jobs:
   test:
+    name: ${{ matrix.label }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        include:
+          - { os: ubuntu-latest,    label: linux-x86_64 }
+          - { os: ubuntu-24.04-arm, label: linux-arm64 }
+          - { os: macos-13,         label: macos-x86_64 }
+          - { os: macos-latest,     label: macos-arm64 }
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
@@ -24,5 +29,5 @@ jobs:
       - if: runner.os == 'Linux'
         uses: ./.github/actions/setup
       - uses: ./.github/actions/wolfssl-checkout
-      - name: make test (13 self-test suites)
+      - name: make test (all self-test suites)
         run: make test

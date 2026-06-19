@@ -31,7 +31,8 @@ wolfSSL while `main` rides known-good master.
 ## Workflows
 
 ### Build and test
-- `build-test.yml` - `make test` (all suites), {ubuntu, macos} x {gcc, clang}.
+- `build-test.yml` - `make test` (all suites) across GitHub's runner fleet:
+  Linux x86_64, Linux arm64, macOS x86_64, macOS arm64 (OS- and arch-agnostic).
 - `wolfssl-versions.yml` - the pinned/stable/master matrix.
 - `build-matrix.yml` - feature toggles (floor, +MLKEM, +MLDSA, +X509, +RSA,
   +CHACHA, approved-FIPS) each build cleanly; off-state has no undefined refs.
