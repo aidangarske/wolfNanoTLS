@@ -47,8 +47,13 @@ SHA-256), `arm-none-eabi-gcc -Os -flto -ffunction-sections -fdata-sections
 
 | Client | wolfNano | mbedTLS (hard-min) | full wolfSSL | smaller by |
 |---|--:|--:|--:|--:|
-| PSK + ECDHE (no X.509) | **27576** | 42100 | - | 34% |
-| cert / X.509 | **61087** | 101232 | 150913 | 40% |
+| PSK + ECDHE, P-256 | **35356** | 53024 | - | 33% |
+| PSK + ECDHE, X25519 | **27576** | 42100 | - | 34% |
+| cert / X.509, P-256 | **61007** | 101232 | 150913 | 40% |
+
+P-256 and X25519 are both shown because P-256 is the FIPS-approved / widest-interop
+curve; P-256's SP math is heavier than the small Curve25519 path, so both sides
+grow. The P-256 PSK client is interop-verified live against OpenSSL and wolfSSL.
 
 The honest framing:
 

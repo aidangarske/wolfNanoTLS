@@ -28,9 +28,9 @@ interop stays identical to wolfSSL.
   entirely on caller-provided / static buffers (`WOLFSSL_NO_MALLOC`), verified
   with a malloc trap. Nothing on the heap.
 - **Tiny footprint**: a complete Cortex-M33 TLS 1.3 PSK + ECDHE client is
-  **26.9 KB** of `.text` (X25519) - **~34% smaller than a hard-minimized
-  mbedTLS** (41.1 KB), and smaller still against a stock mbedTLS (~80 KB). The
-  slim shell itself is ~8.7 KB vs wolfSSL's TLS layer at ~52 KB.
+  **34.5 KB** of `.text` (P-256) or **26.9 KB** (X25519) - **~33% smaller than a
+  hard-minimized mbedTLS**, and smaller still against a stock mbedTLS (~80 KB).
+  The slim shell itself is ~8.7 KB vs wolfSSL's TLS layer at ~52 KB.
 - **Full wolfSSL asm speed**: target assembly is linked unchanged from the
   submodule. On x86_64, AES-128-GCM hits **2.7 GB/s** and ECDSA P-256 verify
   **~72x** MbedTLS, with none of wolfSSL's configure surface.
@@ -57,15 +57,16 @@ so a `fips` build never advertises a primitive outside its boundary.
 
 ## Footprint (Cortex-M33, measured)
 
-Whole TLS 1.3 client linked from source for Cortex-M33 (X25519, AES-128-GCM,
-SHA-256), `arm-none-eabi-gcc -Os -flto --gc-sections` + nano specs, with
-wolfNano and mbedTLS 3.6 **both hard-minimized to the identical scope** (minimal
-PSA `PSA_WANT_*` config, no SHA-3, no restartable ECP, one curve). `.text`:
+Whole TLS 1.3 client linked from source for Cortex-M33 (AES-128-GCM, SHA-256),
+`arm-none-eabi-gcc -Os -flto --gc-sections` + nano specs, with wolfNano and
+mbedTLS 3.6 **both hard-minimized to the identical scope** (minimal PSA
+`PSA_WANT_*` config, no SHA-3, no restartable ECP, one curve). `.text`:
 
 | Client | wolfNano | mbedTLS (hard-min) | full wolfSSL | smaller by |
 |---|--:|--:|--:|--:|
-| PSK + ECDHE (no X.509) | **26.9 KB** | 41.1 KB | - | 34% |
-| cert / X.509 | **59.7 KB** | 98.9 KB | 147.4 KB | 40% |
+| PSK + ECDHE, **P-256** | **34.5 KB** | 51.8 KB | - | 33% |
+| PSK + ECDHE, X25519 | **26.9 KB** | 41.1 KB | - | 34% |
+| cert / X.509, P-256 | **59.6 KB** | 98.9 KB | 147.4 KB | 40% |
 
 This is the **conservative like-for-like** figure. mbedTLS's stock PSA config
 (RSA, SHA-1/3, Camellia, DES, ChaCha, restartable ECP...) builds the same PSK
