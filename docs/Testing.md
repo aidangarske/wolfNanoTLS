@@ -39,10 +39,15 @@ for the `src` floor statically (independent of any runtime malloc trap).
 | `make rectest` | record protection: seal/open, tamper rejection, sequence binding |
 | `make ksharetest` | X25519 key share / ECDHE agreement |
 | `make hstest` | end-to-end crypto handshake (ECDHE + schedule + transcript + record) |
-| `make wctest` | wolfSSL's own `wolfcrypt/test/test.c`, config-trimmed to the floor |
+| `make rfctest` | RFC 8448 record key/iv KATs (client + application write keys) |
+| `make wctest` | wolfSSL's `wolfcrypt/test/test.c` config-trimmed (29 KAT sub-tests) |
+| `make wctestpqc` | wolfSSL KATs incl. ML-KEM/ML-DSA/SHAKE (35 sub-tests) |
 | `make msgtest` | wire encode/decode primitives |
 | `make chtest` / `make shtest` | ClientHello encoder / ServerHello parser (RFC 8448) |
-| `make interop` | **live TLS 1.3 handshakes vs OpenSSL/wolfSSL: PSK + cert** |
+| `make negtest` | malformed-ServerHello rejection (runs under ASan) |
+| `make matrixtest` | data-driven negotiation matrix (cipher x group x PSK/cert) |
+| `make alloctrap` | runtime proof: zero heap calls on the handshake path (`--wrap`) |
+| `make interop` | **live TLS 1.3 handshakes vs OpenSSL/wolfSSL: PSK (X25519+P-256) + cert** |
 | `make certtest` | X.509 cert chain-link verify (ECC + RSA) |
 | `make fipsproof` | `WOLFNANO_CRYPTO=fips` seam proof vs a wolfSSL FIPS bundle (see FIPS.md) |
 | `make bench` | all-algo speed, portable C vs Intel asm (see Benchmarks.md) |
@@ -50,9 +55,11 @@ for the `src` floor statically (independent of any runtime malloc trap).
 
 `make wctest` reuses wolfSSL's comprehensive crypto test verbatim from the
 submodule. Compiled with the wolfNano config, its `#ifdef` guards trim it to
-exactly the floor algorithms (SHA-2, HMAC, HKDF, PRF, GMAC, AES-GCM, ECC,
-X25519, Ed25519, DRBG); MD4/MD5/RSA/DES3/AES-CBC and the rest compile out. This
-complements the wolfNano RFC-vector KATs rather than replacing them.
+exactly the floor algorithms - **29 KAT sub-tests** (SHA-256/384/512/512-224/256,
+HMAC x3, HKDF, PRF, GMAC, AES/192/256/GCM, ECC, X25519, Ed25519, DRBG, ASN);
+MD4/MD5/RSA-CBC/DES3 and the rest compile out. `make wctestpqc` adds the
+ML-KEM/ML-DSA/SHAKE KATs (**35 sub-tests**). This lifts wolfSSL's authoritative
+vectors directly, complementing the wolfNano RFC-vector KATs.
 
 The CVE-dense core (key schedule, transcript) is verified against RFC 8448
 vectors first, as planned.

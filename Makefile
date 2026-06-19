@@ -219,7 +219,8 @@ wctest: ## run wolfSSL's wolfcrypt test against the floor (config-trimmed)
 	$(CC) $(CFLAGS_COMMON) -DNO_MAIN_DRIVER -DWOLFNANO_TARGET_PORTABLE_C \
 	   $(WCT_SRC) tests/wolfcrypt_test_main.c -o $(BUILD)/wctest
 	@echo "---- run ----"
-	@./$(BUILD)/wctest | tail -3
+	@./$(BUILD)/wctest > $(BUILD)/wctest.out 2>&1; \
+	  echo "  $$(grep -c 'test passed' $(BUILD)/wctest.out) wolfSSL KAT sub-tests passed; $$(tail -1 $(BUILD)/wctest.out)"
 
 wctestpqc: ## run wolfSSL's wolfcrypt KATs incl. ML-KEM/ML-DSA (lifted from wolfSSL)
 	@mkdir -p $(BUILD)
@@ -227,7 +228,8 @@ wctestpqc: ## run wolfSSL's wolfcrypt KATs incl. ML-KEM/ML-DSA (lifted from wolf
 	   -DWOLFNANO_MLKEM -DWOLFNANO_MLDSA -DWOLFNANO_MLDSA_SIGN -DWOLFNANO_ALLOW_MALLOC \
 	   $(WCTPQC_SRC) tests/wolfcrypt_test_main.c -o $(BUILD)/wctestpqc
 	@echo "---- run ----"
-	@./$(BUILD)/wctestpqc | tail -3
+	@./$(BUILD)/wctestpqc > $(BUILD)/wctestpqc.out 2>&1; \
+	  echo "  $$(grep -c 'test passed' $(BUILD)/wctestpqc.out) wolfSSL KAT sub-tests passed (incl. ML-KEM/ML-DSA); $$(tail -1 $(BUILD)/wctestpqc.out)"
 
 msgtest: ## build + run the wire encode/decode primitive tests (PORTABLE_C)
 	@mkdir -p $(BUILD)
