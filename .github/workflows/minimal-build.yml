@@ -40,3 +40,7 @@ jobs:
           test "$psk"  -lt "$PSK_X25519_MAX"
           test "$p256" -lt "$PSK_P256_MAX"
           test "$cert" -lt "$CERT_MAX"
+      - name: TLS-layer footprint (informational)
+        run: sh bench/footprint.sh
+      - name: crypto-scope footprint (informational)
+        run: ARM_GNU_BIN=/usr/bin sh bench/footprint-min.sh

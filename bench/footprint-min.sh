@@ -5,11 +5,13 @@
 # sized with arm-none-eabi-size. Static code size only (no run).
 set -u
 
-BIN=/Applications/ArmGNUToolchain/14.2.rel1/arm-none-eabi/bin
+BIN=${ARM_GNU_BIN:-$(echo /Applications/ArmGNUToolchain/*/arm-none-eabi/bin 2>/dev/null)}
 CC=$BIN/arm-none-eabi-gcc
 SIZE=$BIN/arm-none-eabi-size
-OUT=/var/tmp/wntmp/fp
+OUT=${TMPDIR:-/tmp}/wn_fpmin
 mkdir -p "$OUT"
+
+command -v "$CC" >/dev/null 2>&1 || { echo "SKIP footprint-min (no arm-none-eabi-gcc; set ARM_GNU_BIN)"; exit 0; }
 
 ARCH="-mcpu=cortex-m33 -mthumb"
 OPT="-Os -ffunction-sections -fdata-sections"
