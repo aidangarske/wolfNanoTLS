@@ -151,9 +151,9 @@ ASM_CC    := $(CC_$(WOLFNANOTLS_ASM))
 ASM_FLAGS := $(FLAGS_$(WOLFNANOTLS_ASM))
 ASM_SRC   := $(SPSRC_$(WOLFNANOTLS_ASM)) $(ASMSRC_$(WOLFNANOTLS_ASM))
 
-.PHONY: host kstest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest mlkemtest mldsatest hybridtest certtest fipsproof bench benchrun targets test test-core clean
+.PHONY: host kstest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest mlkemtest mldsatest hybridtest certtest fipsproof bench benchrun targets test test-core clean
 test: test-core mlkemtest mldsatest hybridtest wctestpqc ## build + run all local self-tests
-test-core: host kstest tstest rectest ksharetest hstest wctest msgtest chtest shtest negtest certtest ## non-PQC suites (wolfSSL without the wc_mlkem/wc_mldsa API)
+test-core: host kstest rfctest tstest rectest ksharetest hstest wctest msgtest chtest shtest negtest certtest ## non-PQC suites (wolfSSL without the wc_mlkem/wc_mldsa API)
 
 host: ## build + run the crypto floor self-test locally (PORTABLE_C)
 	@mkdir -p $(BUILD)
@@ -168,6 +168,13 @@ kstest: ## build + run the TLS 1.3 key-schedule KATs (PORTABLE_C)
 	   $(KS_SRC) tests/keyschedule_test.c -o $(BUILD)/keyschedule_test
 	@echo "---- run ----"
 	@./$(BUILD)/keyschedule_test
+
+rfctest: ## build + run RFC 8448 section 3 record-key KATs (PORTABLE_C)
+	@mkdir -p $(BUILD)
+	cc $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANOTLS_TARGET_PORTABLE_C \
+	   $(KS_SRC) tests/rfc8448_test.c -o $(BUILD)/rfc8448_test
+	@echo "---- run ----"
+	@./$(BUILD)/rfc8448_test
 
 tstest: ## build + run the transcript-hash tests (PORTABLE_C)
 	@mkdir -p $(BUILD)
