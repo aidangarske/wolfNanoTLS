@@ -26,3 +26,10 @@ jobs:
       - uses: ./.github/actions/setup
       - run: make test
       - uses: github/codeql-action/analyze@v3
+        with:
+          upload: never
+          output: codeql-results
+      - uses: actions/upload-artifact@v4
+        with:
+          name: codeql-sarif
+          path: codeql-results
