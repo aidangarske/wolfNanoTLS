@@ -36,7 +36,9 @@
 #include <wolfssl/wolfcrypt/asn_public.h>
 #include <wolfssl/wolfcrypt/asn.h>
 #include <wolfssl/wolfcrypt/ecc.h>
-#include <wolfssl/wolfcrypt/ed25519.h>
+#ifdef HAVE_ED25519
+    #include <wolfssl/wolfcrypt/ed25519.h>
+#endif
 #ifndef NO_RSA
     #include <wolfssl/wolfcrypt/rsa.h>
 #endif
@@ -475,6 +477,7 @@ static int wn_CvEcdsa(const byte* spki, word32 spkiLen, int hashType,
     return ret;
 }
 
+#ifdef HAVE_ED25519
 static int wn_CvEd25519(const byte* spki, word32 spkiLen, const byte* tbs,
                         word32 tbsLen, const byte* sig, word32 sigLen)
 {
@@ -512,6 +515,7 @@ static int wn_CvEd25519(const byte* spki, word32 spkiLen, const byte* tbs,
 
     return ret;
 }
+#endif /* HAVE_ED25519 */
 
 #ifndef NO_RSA
 static int wn_CvRsaPss(const byte* spki, word32 spkiLen, int hashType, int mgf,
@@ -573,22 +577,28 @@ static int wn_CertVerify(word16 scheme, const byte* spki, word32 spkiLen,
         ret = wn_CvEcdsa(spki, spkiLen, WC_HASH_TYPE_SHA256, tbs, tbsLen, sig,
                          sigLen);
     }
+#ifdef WOLFSSL_SHA384
     else if (scheme == 0x0503) {
         ret = wn_CvEcdsa(spki, spkiLen, WC_HASH_TYPE_SHA384, tbs, tbsLen, sig,
                          sigLen);
     }
+#endif
+#ifdef HAVE_ED25519
     else if (scheme == 0x0807) {
         ret = wn_CvEd25519(spki, spkiLen, tbs, tbsLen, sig, sigLen);
     }
+#endif
 #ifndef NO_RSA
     else if (scheme == 0x0804) {
         ret = wn_CvRsaPss(spki, spkiLen, WC_HASH_TYPE_SHA256, WC_MGF1SHA256,
                           tbs, tbsLen, sig, sigLen);
     }
+#ifdef WOLFSSL_SHA384
     else if (scheme == 0x0805) {
         ret = wn_CvRsaPss(spki, spkiLen, WC_HASH_TYPE_SHA384, WC_MGF1SHA384,
                           tbs, tbsLen, sig, sigLen);
     }
+#endif
 #endif
     else {
         ret = WOLFNANOTLS_E_UNSUPPORTED;

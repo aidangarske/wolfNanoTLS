@@ -54,9 +54,33 @@ from source here; aarch64/riscv64 need a complete toolchain. **Speed numbers for
 those require the target silicon** (the Cortex-M33 / STM32H563 is the priority
 and uses the DWT cycle counter). See [HANDOFF](HANDOFF.md).
 
+## vs MbedTLS (same host, same 1 KB block)
+
+wolfNanoTLS's `intel` build (= wolfCrypt asm through the seam) vs MbedTLS 3.6.0
+stock fast config (AES-NI + `MBEDTLS_HAVE_ASM`, `-O2 -march=native`), both on the
+i7-7920HQ, 1 KB block:
+
+| Operation | wolfNanoTLS | MbedTLS | faster |
+|---|--:|--:|--:|
+| AES-128-GCM | 1682 MiB/s | 119 MiB/s | ~14x |
+| AES-256-GCM | 1402 MiB/s | 116 MiB/s | ~12x |
+| ChaCha20-Poly1305 | 391 MiB/s | 60 MiB/s | ~6.5x |
+| SHA-384 | 255 MiB/s | 78 MiB/s | ~3.3x |
+| SHA-256 | 173 MiB/s | 58 MiB/s | ~3.0x |
+| ECDSA P-256 verify | 9386 op/s | 130 op/s | ~72x |
+| RSA-2048 public | 30427 op/s | 954 op/s | ~32x |
+| ECDSA P-256 sign | 20799 op/s | 721 op/s | ~29x |
+| ECDH P-256 agree | 9472 op/s | 390 op/s | ~24x |
+| RSA-2048 private | 861 op/s | 95 op/s | ~9x |
+
+Plus a full PQC + EdDSA suite MbedTLS does not have at all. The block size
+matches MbedTLS's benchmark (1 KB) for a fair symmetric comparison; the internal
+table above uses 16 KB (ratio is unaffected since both sides use the same size).
+
 ## Method
 
 - Each op runs in a time-bounded loop (~0.3s) and reports MB/s (bulk) or ops/s.
 - The bench links `-DWOLFNANOTLS_ALLOW_MALLOC` (a measurement tool, not the
   no-alloc product) so ML-DSA keygen/sign and RSA keygen can run in-process.
-- Run it: `make bench`.
+- Run it: `make bench`. Footprint comparison: `sh bench/footprint-min.sh`
+  (see [Footprint](Footprint.md)).

@@ -8,7 +8,6 @@
 - [Algorithms](Algorithms.md)
 - [Testing](Testing.md)
 - [Benchmarks](Benchmarks.md)
-- [Comparison vs MbedTLS](Comparison.md)
 - [Footprint](Footprint.md)
 - [FIPS](FIPS.md)
 - [Positioning](Positioning.md)
