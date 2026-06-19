@@ -204,6 +204,15 @@ hstest: ## build + run the end-to-end crypto handshake (PORTABLE_C)
 	@echo "---- run ----"
 	@./$(BUILD)/handshake_crypto_test
 
+alloctrap: ## runtime proof: handshake crypto path makes zero heap calls (GNU ld)
+	@mkdir -p $(BUILD)
+	cc $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C \
+	   -Wl,--wrap=malloc,--wrap=calloc,--wrap=realloc \
+	   $(HS_SRC) tests/malloc_trap.c tests/malloc_trap_test.c \
+	   -o $(BUILD)/malloc_trap_test
+	@echo "---- run ----"
+	@./$(BUILD)/malloc_trap_test
+
 wctest: ## run wolfSSL's wolfcrypt test against the floor (config-trimmed)
 	@mkdir -p $(BUILD)
 	cc $(CFLAGS_COMMON) -DNO_MAIN_DRIVER -DWOLFNANO_TARGET_PORTABLE_C \

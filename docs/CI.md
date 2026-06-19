@@ -44,6 +44,8 @@ wolfSSL while `main` rides known-good master.
 - `house-style.yml` - no `//`, no em/en-dash, no tabs, no trailing whitespace.
 - `empty-brace-scan.yml` - no bare scope blocks.
 - `no-alloc-scan.yml` - the malloc/XMALLOC grep (zero-alloc guarantee).
+- `no-malloc-runtime.yml` - runtime proof: runs the handshake crypto path under a
+  `--wrap` heap trap and asserts zero allocations (Linux/GNU ld only).
 - `c89-compliance.yml` - compile the shell `-std=c89 -Werror`.
 
 ### Analysis
