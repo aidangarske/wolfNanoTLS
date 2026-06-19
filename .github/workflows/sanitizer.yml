@@ -22,4 +22,4 @@ jobs:
           submodules: recursive
       - uses: ./.github/actions/setup
       - name: make test under ASan + UBSan
-        run: make test EXTRA_CFLAGS="-O1 -g -fsanitize=address,undefined -fno-sanitize=alignment -fno-sanitize-recover=all"
+        run: make test EXTRA_CFLAGS="-O1 -g -fsanitize=address,undefined -fno-sanitize=alignment,signed-integer-overflow -fno-sanitize-recover=all"

@@ -1,11 +1,11 @@
 <div align="center">
 
-<img src="docs/images/wolfnano-logo.png" width="280" alt="wolfNanoTLS logo" />
+<img src="docs/images/wolfnano-logo.png" width="380" alt="wolfNanoTLS logo" />
 
 **A condensed, TLS 1.3-only, zero-allocation embedded TLS library, built as a
 thin shell on top of [wolfSSL](https://www.wolfssl.com/).**
 
-[![CI](https://img.shields.io/github/actions/workflow/status/aidangarske/wolfNanoTLS/build-test.yml?label=CI&logo=github)](https://github.com/aidangarske/wolfNanoTLS/actions)
+[![CI](https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?logo=githubactions&logoColor=white)](https://github.com/aidangarske/wolfNanoTLS/actions)
 [![License](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSING)
 [![TLS](https://img.shields.io/badge/TLS-1.3%20only-blueviolet)](https://www.rfc-editor.org/rfc/rfc8446)
 
