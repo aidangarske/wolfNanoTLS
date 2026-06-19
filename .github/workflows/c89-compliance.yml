@@ -1,6 +1,8 @@
 name: c89-compliance
 
 on:
+  push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 

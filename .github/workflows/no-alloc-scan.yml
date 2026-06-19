@@ -1,6 +1,8 @@
 name: no-alloc-scan
 
 on:
+  push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 

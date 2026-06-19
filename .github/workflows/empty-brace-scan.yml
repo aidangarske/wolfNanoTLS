@@ -1,6 +1,8 @@
 name: empty-brace-scan
 
 on:
+  push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
