@@ -49,6 +49,8 @@ wolfSSL while `main` rides known-good master.
 - `no-alloc-scan.yml` - the malloc/XMALLOC grep (zero-alloc guarantee).
 - `no-malloc-runtime.yml` - runtime proof: runs the handshake crypto path under a
   `--wrap` heap trap and asserts zero allocations (Linux/GNU ld only).
+- `consttime.yml` - the shell compares secrets (Finished MAC, PSK binder) with
+  `ConstantCompare` only; fails on any variable-time `memcmp`/`XMEMCMP` in `src/`.
 - `c89-compliance.yml` - compile the shell `-std=c89 -Werror`.
 
 ### Analysis
