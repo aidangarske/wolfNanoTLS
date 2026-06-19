@@ -1,0 +1,30 @@
+name: wolfssl-checkout
+description: >
+  Point the pinned wolfssl submodule at a given ref. wolfNanoTLS compiles the
+  submodule sources directly (no wolfSSL build), so a "version" is just a
+  checkout. The caller must run actions/checkout with submodules first.
+
+inputs:
+  ref:
+    description: "pinned (default, the committed submodule SHA), master, or a v*-stable tag"
+    required: false
+    default: pinned
+
+runs:
+  using: composite
+  steps:
+    - name: Re-point wolfssl submodule
+      if: inputs.ref != 'pinned'
+      shell: bash
+      run: |
+        set -euo pipefail
+        cd wolfssl
+        git fetch --depth 1 origin "${{ inputs.ref }}"
+        git checkout --detach FETCH_HEAD
+        git sparse-checkout set wolfcrypt/src wolfcrypt/src/port/arm \
+          wolfcrypt/src/port/riscv wolfssl/wolfcrypt wolfssl src 2>/dev/null || true
+        echo "wolfssl @ $(git rev-parse --short HEAD) (ref=${{ inputs.ref }})"
+    - name: Report pinned ref
+      if: inputs.ref == 'pinned'
+      shell: bash
+      run: echo "wolfssl @ $(git -C wolfssl rev-parse --short HEAD) (pinned)"

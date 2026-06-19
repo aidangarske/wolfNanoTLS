@@ -1,0 +1,28 @@
+name: c89-compliance
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  c89:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: ./.github/actions/setup
+      - name: shell compiles as C89 (-Werror)
+        run: |
+          set -eux
+          for f in src/shell_slim/*.c; do
+            cc -std=c89 -Wall -Wextra -Wdeclaration-after-statement -Werror -fsyntax-only \
+              -DWOLFSSL_USER_SETTINGS -DWOLFNANOTLS_TARGET_PORTABLE_C \
+              -DWOLFNANOTLS_X509 -DWOLFNANOTLS_HAVE_RSA_VERIFY -DWOLFNANOTLS_MLKEM \
+              -DWOLFNANOTLS_MLDSA -DWOLFNANOTLS_ALLOW_MALLOC \
+              -I. -Iwolfssl -Iinclude/wolfnano -Isrc/shell_slim "$f"
+          done

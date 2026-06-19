@@ -1,0 +1,19 @@
+name: codespell
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  codespell:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: codespell-project/actions-codespell@v2
+        with:
+          path: src include tests bench docs README.md
+          skip: ./wolfssl,./build,*.der,*.pem

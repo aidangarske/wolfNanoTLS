@@ -1,0 +1,28 @@
+name: coverage
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: ./.github/actions/setup
+      - run: sudo apt-get install -y lcov
+      - name: make test with coverage
+        run: make test EXTRA_CFLAGS="--coverage -O0"
+      - name: capture + report (shell + crypto floor only)
+        run: |
+          lcov --capture --directory . --output-file cov.info 2>/dev/null || true
+          lcov --remove cov.info '*/wolfssl/*' '/usr/*' '*/tests/*' \
+            --output-file cov.info 2>/dev/null || true
+          { echo '## Coverage'; echo '```'; lcov --list cov.info 2>/dev/null; echo '```'; } \
+            >> "$GITHUB_STEP_SUMMARY"

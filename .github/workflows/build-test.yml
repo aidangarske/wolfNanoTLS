@@ -1,0 +1,28 @@
+name: build-test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - if: runner.os == 'Linux'
+        uses: ./.github/actions/setup
+      - uses: ./.github/actions/wolfssl-checkout
+      - name: make test (13 self-test suites)
+        run: make test

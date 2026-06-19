@@ -1,0 +1,20 @@
+name: static-analysis
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cppcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y cppcheck
+      - run: |
+          cppcheck --enable=warning,portability --error-exitcode=1 --std=c89 \
+            --inline-suppr --suppress=missingInclude --suppress=missingIncludeSystem \
+            -Iinclude/wolfnano -Isrc/shell_slim src include

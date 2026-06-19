@@ -1,0 +1,34 @@
+name: minimal-build
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  size:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PSK_MAX: 45000
+      CERT_MAX: 95000
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: ./.github/actions/setup
+        with:
+          arm: "true"
+      - name: build minimal Cortex-M33 clients
+        run: ARM_GNU_BIN=/usr/bin TMPDIR="$RUNNER_TEMP" sh bench/footprint-clients.sh
+      - name: assert size budgets
+        run: |
+          set -eu
+          sz() { arm-none-eabi-size "$1" | awk 'NR==2{print $1}'; }
+          psk=$(sz "$RUNNER_TEMP/wn_fpc/wn_psk.elf")
+          cert=$(sz "$RUNNER_TEMP/wn_fpc/wn_cert.elf")
+          echo "wolfNanoTLS PSK .text=$psk (max $PSK_MAX), cert .text=$cert (max $CERT_MAX)"
+          test "$psk"  -lt "$PSK_MAX"
+          test "$cert" -lt "$CERT_MAX"

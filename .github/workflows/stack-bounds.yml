@@ -1,0 +1,25 @@
+name: stack-bounds
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: ./.github/actions/setup
+      - run: make host EXTRA_CFLAGS="-fstack-usage"
+      - name: largest stack frames
+        run: |
+          { echo '## Largest stack frames'; echo '```';
+            find . -name '*.su' -exec cat {} + 2>/dev/null \
+              | sort -t"$(printf '\t')" -k2 -nr | head -25;
+            echo '```'; } >> "$GITHUB_STEP_SUMMARY"

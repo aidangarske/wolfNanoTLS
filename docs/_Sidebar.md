@@ -7,6 +7,7 @@
 - [Macros](Macros.md)
 - [Algorithms](Algorithms.md)
 - [Testing](Testing.md)
+- [CI](CI.md)
 - [Benchmarks](Benchmarks.md)
 - [Footprint](Footprint.md)
 - [FIPS](FIPS.md)

@@ -1,0 +1,30 @@
+name: interop
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  interop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: ./.github/actions/setup
+        with:
+          peers: "true"
+      - name: build wolfSSL example server
+        run: |
+          set -eux
+          git clone --depth 1 https://github.com/wolfSSL/wolfssl "$RUNNER_TEMP/wolfssl-full"
+          cd "$RUNNER_TEMP/wolfssl-full"
+          ./autogen.sh
+          ./configure --enable-tls13 --enable-psk --enable-curve25519 --enable-ed25519
+          make -j"$(nproc)" examples/server/server
+      - name: make interop (vs OpenSSL + wolfSSL)
+        run: WOLFSSL_SERVER="$RUNNER_TEMP/wolfssl-full/examples/server/server" make interop

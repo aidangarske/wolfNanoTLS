@@ -11,7 +11,8 @@ ifeq ($(MALLOC),1)
 endif
 
 CFLAGS_COMMON := -Os -Wall -Wextra -Wdeclaration-after-statement \
-                 -DWOLFSSL_USER_SETTINGS -I. -I$(WOLFSSL) $(MALLOC_FLAG)
+                 -DWOLFSSL_USER_SETTINGS -I. -I$(WOLFSSL) $(MALLOC_FLAG) \
+                 $(EXTRA_CFLAGS)
 
 # Crypto floor (provider backend = src). Math file is target-specific (below).
 FLOOR_SRC := \

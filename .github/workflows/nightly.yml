@@ -1,0 +1,26 @@
+name: nightly
+
+on:
+  schedule:
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  versions:
+    uses: ./.github/workflows/wolfssl-versions.yml
+  compare:
+    uses: ./.github/workflows/compare.yml
+  coverage:
+    uses: ./.github/workflows/coverage.yml
+  stack:
+    uses: ./.github/workflows/stack-bounds.yml
+  codeql:
+    uses: ./.github/workflows/codeql.yml
+  semgrep:
+    uses: ./.github/workflows/semgrep.yml
+  fips-seam:
+    uses: ./.github/workflows/fips-seam.yml

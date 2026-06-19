@@ -1,0 +1,82 @@
+name: auto-pin-master
+
+on:
+  schedule:
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  pin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: ./.github/actions/setup
+
+      - id: refs
+        run: |
+          set -eux
+          cd wolfssl
+          git fetch --depth 1 origin master
+          master=$(git rev-parse FETCH_HEAD)
+          pin=$(git rev-parse HEAD)
+          echo "master=$master" >> "$GITHUB_OUTPUT"
+          echo "pin=$pin" >> "$GITHUB_OUTPUT"
+          [ "$master" = "$pin" ] && echo "changed=false" >> "$GITHUB_OUTPUT" \
+                                 || echo "changed=true"  >> "$GITHUB_OUTPUT"
+
+      - if: steps.refs.outputs.changed == 'true'
+        uses: ./.github/actions/wolfssl-checkout
+        with:
+          ref: master
+
+      - if: steps.refs.outputs.changed == 'true'
+        id: gate
+        continue-on-error: true
+        run: make test
+
+      - name: green - bump pin
+        if: steps.refs.outputs.changed == 'true' && steps.gate.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MASTER: ${{ steps.refs.outputs.master }}
+        run: |
+          set -eux
+          git -C wolfssl checkout --detach "$MASTER"
+          git add wolfssl
+          printf '%s  %s\n' "$MASTER" "$(date -u +%FT%TZ)" > ci/wolfssl-master-known-good.txt
+          git add ci/wolfssl-master-known-good.txt
+          git config user.name  "wolfnano-ci"
+          git config user.email "aidan@wolfssl.com"
+          git commit -m "ci: bump wolfssl pin to master ${MASTER}"
+          git push
+          gh issue list --label wolfssl-master-break --state open --json number \
+            --jq '.[].number' | xargs -r -I{} gh issue close {} \
+            -c "Green again at ${MASTER}."
+
+      - name: red - file/assign issue
+        if: steps.refs.outputs.changed == 'true' && steps.gate.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MASTER: ${{ steps.refs.outputs.master }}
+          PIN: ${{ steps.refs.outputs.pin }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -eux
+          log=$(git -C wolfssl log --oneline "${PIN}..${MASTER}" | head -40)
+          body=$(printf 'wolfNanoTLS fails against wolfSSL master \x60%s\x60.\n\nLast known-good pin: \x60%s\x60\nRun: %s\n\nUpstream commits since pin:\n%s\n' \
+            "$MASTER" "$PIN" "$RUN" "$log")
+          existing=$(gh issue list --label wolfssl-master-break --state open \
+            --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title "wolfSSL master breaks wolfNanoTLS" \
+              --body "$body" --label wolfssl-master-break --assignee aidangarske
+          fi

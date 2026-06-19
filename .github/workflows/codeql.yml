@@ -1,0 +1,25 @@
+name: codeql
+
+on:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: c-cpp
+      - uses: ./.github/actions/setup
+      - run: make test
+      - uses: github/codeql-action/analyze@v3

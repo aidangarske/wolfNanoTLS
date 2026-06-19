@@ -1,0 +1,42 @@
+name: coverity
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  coverity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: check token
+        id: gate
+        run: |
+          if [ -n "${COVERITY_TOKEN:-}" ]; then echo "run=true" >> "$GITHUB_OUTPUT";
+          else echo "run=false" >> "$GITHUB_OUTPUT"; echo "SKIP coverity (no COVERITY_TOKEN)"; fi
+        env:
+          COVERITY_TOKEN: ${{ secrets.COVERITY_TOKEN }}
+      - if: steps.gate.outputs.run == 'true'
+        uses: ./.github/actions/setup
+      - if: steps.gate.outputs.run == 'true'
+        name: download + run coverity
+        env:
+          COVERITY_TOKEN: ${{ secrets.COVERITY_TOKEN }}
+          COVERITY_EMAIL: ${{ secrets.COVERITY_EMAIL }}
+        run: |
+          set -eux
+          wget -q https://scan.coverity.com/download/cxx/linux64 \
+            --post-data "token=$COVERITY_TOKEN&project=wolfNanoTLS" -O cov.tgz
+          mkdir cov && tar xzf cov.tgz --strip-components=1 -C cov
+          export PATH="$PWD/cov/bin:$PATH"
+          cov-build --dir cov-int make test
+          tar czf wolfNanoTLS.tgz cov-int
+          curl --form token="$COVERITY_TOKEN" --form email="$COVERITY_EMAIL" \
+            --form file=@wolfNanoTLS.tgz --form version="ci" --form description="ci" \
+            "https://scan.coverity.com/builds?project=wolfNanoTLS"

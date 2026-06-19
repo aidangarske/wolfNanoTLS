@@ -1,0 +1,24 @@
+name: discover-wolfssl
+
+on:
+  workflow_call:
+    outputs:
+      matrix:
+        description: "JSON matrix include[] of wolfSSL refs"
+        value: ${{ jobs.discover.outputs.matrix }}
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.set.outputs.matrix }}
+    steps:
+      - id: set
+        run: |
+          set -euo pipefail
+          stable=$(git ls-remote --tags --refs \
+            https://github.com/wolfSSL/wolfssl 'v*-stable' \
+            | awk -F/ '{print $NF}' | sort -V | tail -1)
+          echo "latest stable: ${stable:-none}"
+          echo "matrix={\"include\":[{\"ref\":\"pinned\"},{\"ref\":\"${stable}\"},{\"ref\":\"master\"}]}" >> "$GITHUB_OUTPUT"

@@ -1,0 +1,34 @@
+name: build-matrix
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  configs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        cfg:
+          - { name: floor,    target: host }
+          - { name: keyschd,  target: kstest }
+          - { name: record,   target: rectest }
+          - { name: keyshare, target: ksharetest }
+          - { name: handshake,target: hstest }
+          - { name: mlkem,    target: mlkemtest }
+          - { name: mldsa,    target: mldsatest }
+          - { name: hybrid,   target: hybridtest }
+          - { name: cert,     target: certtest }
+          - { name: wctest,   target: wctest }
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: ./.github/actions/setup
+      - name: build+run ${{ matrix.cfg.name }}
+        run: make ${{ matrix.cfg.target }}

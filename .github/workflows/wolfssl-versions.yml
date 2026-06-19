@@ -1,0 +1,31 @@
+name: wolfssl-versions
+
+on:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    uses: ./.github/workflows/_discover-wolfssl.yml
+
+  test:
+    needs: discover
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.discover.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: ./.github/actions/setup
+      - uses: ./.github/actions/wolfssl-checkout
+        with:
+          ref: ${{ matrix.ref }}
+      - name: make test (wolfssl ${{ matrix.ref }})
+        run: make test
