@@ -1,4 +1,4 @@
-name: valgrind-msan
+name: valgrind
 
 on:
   push:
@@ -31,20 +31,3 @@ jobs:
             valgrind --error-exitcode=1 --leak-check=full --errors-for-leak-kinds=definite \
                      -q ./build/$b
           done
-
-  msan:
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    continue-on-error: true   # MemorySanitizer over wolfcrypt is FP-prone; informational
-    env:
-      MSAN: "-fsanitize=memory -fno-sanitize-recover=all -fPIE -pie -O1 -g"
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - uses: ./.github/actions/setup
-      - name: shell + floor suites under MemorySanitizer (clang)
-        run: |
-          make host kstest rfctest tstest rectest ksharetest hstest msgtest \
-               chtest shtest negtest matrixtest \
-               CC=clang EXTRA_CFLAGS="$MSAN"

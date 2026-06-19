@@ -27,7 +27,7 @@ static int fails = 0;
 
 static void check(int ok, const char* name)
 {
-    printf("%s %s\n", ok ? "PASS" : "FAIL", name);
+    printf("%s %s\n", ok ? "\033[32mPASS\033[0m" : "\033[31mFAIL\033[0m", name);
     if (!ok) {
         fails++;
     }
@@ -62,7 +62,7 @@ int main(void)
           (XMEMCMP(s.keyShare, expectKey, 32) == 0),
           "server key_share extracted correctly");
 
-    printf("\n%s (%d failure%s)\n", fails ? "FAILED" : "ALL PASS",
+    printf("\n%s (%d failure%s)\n", fails ? "\033[31mFAILED\033[0m" : "\033[32mALL PASS\033[0m",
            fails, fails == 1 ? "" : "s");
     return fails ? 1 : 0;
 }

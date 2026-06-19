@@ -17,7 +17,7 @@ else
 fi
 
 if [ ! -f "$CERT" ] || [ ! -f "$KEY" ]; then
-    echo "SKIP cert interop ($TYPE cert missing)"
+    printf "\033[33mSKIP cert interop ($TYPE cert missing)\033[0m\n"
     exit 0
 fi
 
@@ -27,7 +27,7 @@ SPID=$!
 
 sleep 1
 if ! kill -0 "$SPID" 2>/dev/null; then
-    echo "SKIP cert interop ($TYPE server did not start)"
+    printf "\033[33mSKIP cert interop ($TYPE server did not start)\033[0m\n"
     exit 0
 fi
 

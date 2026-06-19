@@ -152,9 +152,27 @@ ASM_CC    := $(CC_$(WOLFNANO_ASM))
 ASM_FLAGS := $(FLAGS_$(WOLFNANO_ASM))
 ASM_SRC   := $(SPSRC_$(WOLFNANO_ASM)) $(ASMSRC_$(WOLFNANO_ASM))
 
-.PHONY: host kstest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest matrixtest mlkemtest mldsatest hybridtest certtest fipsproof bench benchrun targets test-qemu test test-core clean
+.PHONY: host kstest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest matrixtest mlkemtest mldsatest hybridtest certtest fipsproof bench benchrun targets test-qemu test test-core check clean
 test: test-core mlkemtest mldsatest hybridtest wctestpqc ## build + run all local self-tests
 test-core: host kstest rfctest tstest rectest ksharetest hstest wctest msgtest chtest shtest negtest matrixtest certtest ## non-PQC suites (wolfSSL without the wc_mlkem/wc_mldsa API)
+
+SUITES := host kstest rfctest tstest rectest ksharetest hstest wctest wctestpqc \
+  msgtest chtest shtest negtest matrixtest mlkemtest mldsatest hybridtest certtest
+
+check: ## run every suite, continue past failures, print one colored PASS/FAIL tally
+	@pass=0; fail=0; failed=""; \
+	 if [ -t 1 ] && [ -z "$$NO_COLOR" ]; then G='\033[32m'; R='\033[31m'; Y='\033[33m'; Z='\033[0m'; else G=; R=; Y=; Z=; fi; \
+	 for s in $(SUITES); do \
+	   if $(MAKE) --no-print-directory $$s >$(BUILD)/check-$$s.log 2>&1; then \
+	     pass=$$((pass+1)); printf "$${G}PASS$${Z} %s\n" "$$s"; \
+	   else \
+	     fail=$$((fail+1)); failed="$$failed $$s"; printf "$${R}FAIL$${Z} %s\n" "$$s"; \
+	   fi; \
+	 done; \
+	 echo "================ wolfNano test summary ================"; \
+	 printf "  suites passed: %s%d / %d%s\n" "$$([ $$fail -eq 0 ] && echo $$G || echo $$R)" "$$pass" "$$((pass+fail))" "$$Z"; \
+	 [ -n "$$failed" ] && printf "  $${R}FAILED:%s$${Z} (see $(BUILD)/check-<suite>.log)\n" "$$failed"; \
+	 [ $$fail -eq 0 ] && printf "  $${G}ALL SUITES PASS$${Z}\n" || exit 1
 
 host: ## build + run the crypto floor self-test locally (PORTABLE_C)
 	@mkdir -p $(BUILD)

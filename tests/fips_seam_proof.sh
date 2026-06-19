@@ -29,7 +29,7 @@ if [ "$RC" -eq 2 ]; then
     sed "s/^\".*\";/\"$H\";/" "$FIPS_DIR/wolfcrypt/src/fips_test.c.bak" \
         > "$FIPS_DIR/wolfcrypt/src/fips_test.c"
     ( cd "$FIPS_DIR" && make ) >/tmp/wn_fips_relib.log 2>&1 || {
-        echo "FAIL rebuilding FIPS module"; exit 1; }
+        printf "\033[31mFAIL rebuilding FIPS module\033[0m\n"; exit 1; }
     build
     RESULT=$("./$OUT"); RC=$?
 fi

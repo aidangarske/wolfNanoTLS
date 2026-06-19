@@ -694,7 +694,7 @@ int wn_Connect_Cert(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv,
     byte plain[2048];
     const byte* certs[WN_MAX_CHAIN];
     word32 certLens[WN_MAX_CHAIN];
-    word32 chLen, recLen, thLen, pubLen, ssLen, plainLen, spkiLen;
+    word32 chLen, recLen, thLen, pubLen, ssLen, plainLen, spkiLen = 0;
     word32 accLen = 0, sSeq = 0, off = 0;
     byte rtype = 0, ctype = 0;
     int ret = WOLFNANO_SUCCESS;

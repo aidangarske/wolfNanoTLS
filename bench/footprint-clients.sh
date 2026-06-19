@@ -19,7 +19,7 @@ OPT="-Os -ffunction-sections -fdata-sections -flto"
 LINK="-flto -Wl,--gc-sections --specs=nano.specs --specs=nosys.specs"
 mkdir -p "$OUT"
 
-command -v "$CC" >/dev/null 2>&1 || { echo "SKIP (no complete arm-none-eabi-gcc; set ARM_GNU_BIN)"; exit 0; }
+command -v "$CC" >/dev/null 2>&1 || { printf "\033[33mSKIP (no complete arm-none-eabi-gcc; set ARM_GNU_BIN)\033[0m\n"; exit 0; }
 textsz() { "$SIZE" "$1" 2>/dev/null | awk 'NR==2{print $1}'; }
 
 # ---- wolfNano (cert: bench/min/wnc with SHA-384; PSK: bench/min/wnc-psk SHA-256 only) ----

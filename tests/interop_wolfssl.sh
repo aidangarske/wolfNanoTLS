@@ -10,7 +10,7 @@ SERVER=${WOLFSSL_SERVER:-$HOME/wolfssl/examples/server/server}
 WOLFSSL_DIR=$(dirname "$(dirname "$(dirname "$SERVER")")")
 
 if [ ! -x "$SERVER" ]; then
-    echo "SKIP wolfSSL interop (server not found at $SERVER)"
+    printf "\033[33mSKIP wolfSSL interop (server not found at $SERVER)\033[0m\n"
     exit 0
 fi
 
@@ -19,7 +19,7 @@ SPID=$!
 
 sleep 1
 if ! kill -0 "$SPID" 2>/dev/null; then
-    echo "SKIP wolfSSL interop (server not running; this wolfSSL build may be"
+    printf "\033[33mSKIP wolfSSL interop (server not running; this wolfSSL build may be\033[0m\n"
     echo "     compiled with NO_PSK). Rebuild wolfSSL with PSK enabled, or set"
     echo "     WOLFSSL_SERVER to a PSK-enabled example server."
     exit 0

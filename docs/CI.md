@@ -55,8 +55,8 @@ wolfSSL while `main` rides known-good master.
 
 ### Analysis
 - `sanitizer.yml` - ASAN/UBSAN of `make test`.
-- `valgrind-msan.yml` - Valgrind memcheck (hard gate) + MemorySanitizer
-  (informational, FP-prone over crypto) of the suites.
+- `valgrind.yml` - Valgrind memcheck of the offline suites (MSan was dropped:
+  it false-positives on wolfcrypt's DRBG seed-health read, no value over ASan).
 - `compilers.yml` - `make test` across GCC 11-14 and Clang 16-18.
 - `semgrep.yml`, `codespell.yml`, `static-analysis.yml` (cppcheck).
 - `coverage.yml` - lcov of `make test`.

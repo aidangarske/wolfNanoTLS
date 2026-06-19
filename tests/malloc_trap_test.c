@@ -98,11 +98,12 @@ int main(void)
     ok = (rc == WOLFNANO_SUCCESS) && (outLen == 4) && (type == 23) &&
          (XMEMCMP(out, ping, 4) == 0);
 
-    printf("%s handshake crypto path succeeded\n", ok ? "PASS" : "FAIL");
+    printf("%s handshake crypto path succeeded\n", ok ? "\033[32mPASS\033[0m" : "\033[31mFAIL\033[0m");
     printf("%s zero heap allocations (%lu observed)\n",
-           (wn_trap_hits == 0) ? "PASS" : "FAIL", wn_trap_hits);
+           (wn_trap_hits == 0) ? "\033[32mPASS\033[0m" : "\033[31mFAIL\033[0m",
+           wn_trap_hits);
 
-    printf("\n%s\n", (ok && (wn_trap_hits == 0)) ? "ALL PASS (0 failures)"
-                                                 : "FAILED");
+    printf("\n%s\n", (ok && (wn_trap_hits == 0)) ? "\033[32mALL PASS (0 failures)\033[0m"
+                                                 : "\033[31mFAILED\033[0m");
     return (ok && (wn_trap_hits == 0)) ? 0 : 1;
 }

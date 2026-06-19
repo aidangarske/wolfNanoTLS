@@ -17,7 +17,7 @@ else
 fi
 
 if [ ! -x "$SERVER" ] || [ ! -f "$CERT" ]; then
-    echo "SKIP wolfSSL cert interop ($TYPE: server or cert not found)"
+    printf "\033[33mSKIP wolfSSL cert interop ($TYPE: server or cert not found)\033[0m\n"
     exit 0
 fi
 
@@ -27,7 +27,7 @@ SPID=$!
 
 sleep 1
 if ! kill -0 "$SPID" 2>/dev/null; then
-    echo "SKIP wolfSSL cert interop ($TYPE: server did not start; may lack the"
+    printf "\033[33mSKIP wolfSSL cert interop ($TYPE: server did not start; may lack the\033[0m\n"
     echo "     key type). See /tmp/wn_cert_wssl.log"
     exit 0
 fi
