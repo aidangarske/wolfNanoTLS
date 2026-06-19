@@ -22,14 +22,16 @@ mkdir -p "$OUT"
 command -v "$CC" >/dev/null 2>&1 || { echo "SKIP (no complete arm-none-eabi-gcc; set ARM_GNU_BIN)"; exit 0; }
 textsz() { "$SIZE" "$1" 2>/dev/null | awk 'NR==2{print $1}'; }
 
-# ---- wolfNano (minimal config in bench/min/wnc) ----
+# ---- wolfNano (cert: bench/min/wnc with SHA-384; PSK: bench/min/wnc-psk SHA-256 only) ----
 WN_CF="$OPT $ARCH -DWOLFSSL_USER_SETTINGS -DWOLFNANO_TARGET_PORTABLE_C -Ibench/min/wnc -I. -Iwolfssl -Iinclude/wolfnano -Isrc"
+WN_CF_PSK="$OPT $ARCH -DWOLFSSL_USER_SETTINGS -DWOLFNANO_TARGET_PORTABLE_C -Ibench/min/wnc-psk -I. -Iwolfssl -Iinclude/wolfnano -Isrc"
 WN_SUP="$WC/wc_port.c $WC/memory.c $WC/error.c $WC/hash.c $WC/random.c $WC/wolfmath.c $WC/logging.c $WC/coding.c $WC/sha256.c $WC/sha512.c $WC/hmac.c $WC/kdf.c $WC/aes.c $WC/curve25519.c $WC/fe_operations.c $WC/sp_int.c"
+WN_SUP_PSK="$WC/wc_port.c $WC/memory.c $WC/error.c $WC/hash.c $WC/random.c $WC/wolfmath.c $WC/logging.c $WC/coding.c $WC/sha256.c $WC/hmac.c $WC/kdf.c $WC/aes.c $WC/curve25519.c $WC/fe_operations.c $WC/sp_int.c"
 WN_SHELL="src/wn_msg.c src/wn_keyschedule.c src/wn_transcript.c src/wn_record.c src/wn_keyshare.c src/wn_serverhello.c src/wn_connect.c"
-$CC $WN_CF $WN_SUP $WN_SHELL bench/min/wn_psk_client.c $LINK -o "$OUT/wn_psk.elf" 2>/dev/null
+$CC $WN_CF_PSK $WN_SUP_PSK $WN_SHELL bench/min/wn_psk_client.c $LINK -o "$OUT/wn_psk.elf" 2>/dev/null
 # P-256 PSK (ECDHE secp256r1): ecc + asn + sp_int, X25519 gated out of the keyshare
-WN_SUP_P256="$WC/wc_port.c $WC/memory.c $WC/error.c $WC/hash.c $WC/random.c $WC/wolfmath.c $WC/logging.c $WC/coding.c $WC/sha256.c $WC/sha512.c $WC/hmac.c $WC/kdf.c $WC/aes.c $WC/ecc.c $WC/asn.c $WC/sp_int.c"
-$CC $WN_CF -DWOLFNANO_HAVE_ECDHE_P256 $WN_SUP_P256 $WN_SHELL bench/min/wn_psk_client.c $LINK -o "$OUT/wn_psk_p256.elf" 2>/dev/null
+WN_SUP_P256="$WC/wc_port.c $WC/memory.c $WC/error.c $WC/hash.c $WC/random.c $WC/wolfmath.c $WC/logging.c $WC/coding.c $WC/sha256.c $WC/hmac.c $WC/kdf.c $WC/aes.c $WC/ecc.c $WC/asn.c $WC/sp_int.c"
+$CC $WN_CF_PSK -DWOLFNANO_HAVE_ECDHE_P256 $WN_SUP_P256 $WN_SHELL bench/min/wn_psk_client.c $LINK -o "$OUT/wn_psk_p256.elf" 2>/dev/null
 $CC $WN_CF -DWOLFNANO_X509 -DWOLFNANO_HAVE_RSA_VERIFY -DWOLFNANO_FIPS -DWOLFNANO_ALLOW_MALLOC \
    $WN_SUP $WC/ecc.c $WC/asn.c $WC/rsa.c src/wn_clienthello.c $WN_SHELL \
    bench/min/wn_client.c $LINK -o "$OUT/wn_cert.elf" 2>/dev/null

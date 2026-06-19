@@ -58,10 +58,11 @@ wolfSSL while `main` rides known-good master.
 - `stack-bounds.yml` - `-fstack-usage` report.
 - `coverity.yml` - Coverity Scan (token-gated; skips without `COVERITY_TOKEN`).
 
-### Comparison and FIPS
-- `compare.yml` - footprint + speed tables vs mbedTLS and wolfSSL in the job
-  summary.
+### FIPS
 - `fips-seam.yml` - `make fipsproof` against the FIPS-Ready bundle.
+
+Footprint/speed comparison vs mbedTLS is run locally via
+`sh bench/footprint-clients.sh` / `make bench`, not as a CI workflow.
 
 ### Orchestration
 - `nightly.yml` - cron 09:00 UTC; runs the heavy reusable workflows.

@@ -38,9 +38,11 @@ int wn_Transcript_Init(wn_Transcript* t, int digest)
         if (digest == WC_SHA256) {
             ret = wc_InitSha256(&t->h.s256);
         }
+#ifdef WOLFSSL_SHA384
         else if (digest == WC_SHA384) {
             ret = wc_InitSha384(&t->h.s384);
         }
+#endif
         else {
             ret = WOLFNANO_E_UNSUPPORTED;
         }
@@ -64,9 +66,11 @@ int wn_Transcript_Update(wn_Transcript* t, const byte* msg, word32 msgLen)
         if (t->digest == WC_SHA256) {
             ret = wc_Sha256Update(&t->h.s256, msg, msgLen);
         }
+#ifdef WOLFSSL_SHA384
         else if (t->digest == WC_SHA384) {
             ret = wc_Sha384Update(&t->h.s384, msg, msgLen);
         }
+#endif
         else {
             ret = WOLFNANO_E_UNSUPPORTED;
         }
@@ -91,10 +95,12 @@ int wn_Transcript_GetHash(wn_Transcript* t, byte* out, word32* outLen)
             ret = wc_Sha256GetHash(&t->h.s256, out);
             *outLen = WC_SHA256_DIGEST_SIZE;
         }
+#ifdef WOLFSSL_SHA384
         else if (t->digest == WC_SHA384) {
             ret = wc_Sha384GetHash(&t->h.s384, out);
             *outLen = WC_SHA384_DIGEST_SIZE;
         }
+#endif
         else {
             ret = WOLFNANO_E_UNSUPPORTED;
         }
@@ -118,9 +124,11 @@ int wn_Transcript_Free(wn_Transcript* t)
         if (t->digest == WC_SHA256) {
             wc_Sha256Free(&t->h.s256);
         }
+#ifdef WOLFSSL_SHA384
         else if (t->digest == WC_SHA384) {
             wc_Sha384Free(&t->h.s384);
         }
+#endif
     }
 
     return ret;

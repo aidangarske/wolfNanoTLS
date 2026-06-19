@@ -33,7 +33,9 @@
 typedef struct wn_Transcript {
     union {
         wc_Sha256 s256;
+#ifdef WOLFSSL_SHA384
         wc_Sha384 s384;
+#endif
     } h;
     int digest;
 } wn_Transcript;

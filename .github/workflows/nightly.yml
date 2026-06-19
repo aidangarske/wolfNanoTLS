@@ -12,8 +12,6 @@ permissions:
 jobs:
   versions:
     uses: ./.github/workflows/wolfssl-versions.yml
-  compare:
-    uses: ./.github/workflows/compare.yml
   coverage:
     uses: ./.github/workflows/coverage.yml
   stack:

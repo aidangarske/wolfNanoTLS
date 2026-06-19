@@ -38,9 +38,11 @@ static word32 wn_DigestSize(int digest)
     if (digest == WC_SHA256) {
         sz = WC_SHA256_DIGEST_SIZE;
     }
+#ifdef WOLFSSL_SHA384
     else if (digest == WC_SHA384) {
         sz = WC_SHA384_DIGEST_SIZE;
     }
+#endif
 
     return sz;
 }
@@ -106,7 +108,7 @@ int wn_Tls13_FinishedMac(byte* out, const byte* baseKey,
                          int digest)
 {
     Hmac hmac;
-    byte finishedKey[WC_SHA512_DIGEST_SIZE];
+    byte finishedKey[WC_MAX_DIGEST_SIZE];
     int ret = WOLFNANO_SUCCESS;
     int hmacInit = 0;
 

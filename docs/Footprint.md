@@ -47,13 +47,19 @@ SHA-256), `arm-none-eabi-gcc -Os -flto -ffunction-sections -fdata-sections
 
 | Client | wolfNano | mbedTLS (hard-min) | full wolfSSL | smaller by |
 |---|--:|--:|--:|--:|
-| PSK + ECDHE, P-256 | **35356** | 53024 | - | 33% |
-| PSK + ECDHE, X25519 | **27576** | 42100 | - | 34% |
+| PSK + ECDHE, X25519 | **17612** | 42100 | - | 58% |
+| PSK + ECDHE, P-256 | **25432** | 53024 | - | 52% |
 | cert / X.509, P-256 | **61007** | 101232 | 150913 | 40% |
 
-P-256 and X25519 are both shown because P-256 is the FIPS-approved / widest-interop
-curve; P-256's SP math is heavier than the small Curve25519 path, so both sides
-grow. The P-256 PSK client is interop-verified live against OpenSSL and wolfSSL.
+Both sides are hard-minimized to **SHA-256 only** (verified: zero SHA-384/512/3,
+MD5, SHA-1, DES, ChaCha, CBC/CTR, RSA, ECDSA symbols in either PSK binary).
+SHA-256 itself is mandatory in TLS 1.3 (HKDF key schedule, transcript hash,
+Finished MAC, PSK binder) and present on both. The remaining wolfNano vs mbedTLS
+gap is architectural: wolfNano uses specialized `fe_*` X25519 field arithmetic
+and direct `wc_*` calls; mbedTLS routes X25519 through its general ECP + bignum
+and the mandatory PSA dispatch layer, and links full AES tables. P-256's SP math
+is heavier than Curve25519, so both sides grow for P-256. The P-256 PSK client is
+interop-verified live against OpenSSL and wolfSSL.
 
 The honest framing:
 
@@ -80,12 +86,12 @@ The honest framing:
 
 | Build | flash + RAM budget | device classes |
 |---|---|---|
-| PSK (27 KB) | ~27 KB flash, ~8-16 KB RAM | Cortex-M0+/M3/M4 from ~64 KB flash: LoRaWAN/NB-IoT/Matter sensors, wearables (STM32L0/L4, nRF52) |
+| PSK (17 KB) | ~17 KB flash, ~8-16 KB RAM | Cortex-M0+/M3/M4 from ~32 KB flash: LoRaWAN/NB-IoT/Matter sensors, wearables (STM32L0/L4, nRF52) |
 | cert (60 KB) | ~60 KB flash, ~24-40 KB RAM | Cortex-M4/M33 from ~128 KB flash: cloud-IoT endpoints, gateways (STM32L4/U5/H5, nRF53, ESP32) |
 
-The footprint edge lands hardest on small parts: at ~27 KB the PSK client fits
-where even a hard-minimized mbedTLS (41 KB) is tighter, and a stock mbedTLS
-(~80 KB) would not fit at all.
+The footprint edge lands hardest on small parts: at ~17 KB the X25519 PSK client
+fits where even a hard-minimized mbedTLS (41 KB) cannot, and a stock mbedTLS
+(~80 KB) is out of the question.
 
 ## Notes
 
