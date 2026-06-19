@@ -151,7 +151,7 @@ ASM_CC    := $(CC_$(WOLFNANO_ASM))
 ASM_FLAGS := $(FLAGS_$(WOLFNANO_ASM))
 ASM_SRC   := $(SPSRC_$(WOLFNANO_ASM)) $(ASMSRC_$(WOLFNANO_ASM))
 
-.PHONY: host kstest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest mlkemtest mldsatest hybridtest certtest fipsproof bench benchrun targets test test-core clean
+.PHONY: host kstest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest mlkemtest mldsatest hybridtest certtest fipsproof bench benchrun targets test-qemu test test-core clean
 test: test-core mlkemtest mldsatest hybridtest wctestpqc ## build + run all local self-tests
 test-core: host kstest rfctest tstest rectest ksharetest hstest wctest msgtest chtest shtest negtest certtest ## non-PQC suites (wolfSSL without the wc_mlkem/wc_mldsa API)
 
@@ -375,6 +375,32 @@ floor-%:
 	 fi
 
 targets: floor-thumb2 floor-aarch64 floor-armv7 floor-riscv64 ## cross-compile the floor for every non-host arch
+
+# ---- Cross-arch test EXECUTION under qemu-user (Linux cross-targets) ----
+# Unlike floor-%/targets (bare-metal, compile-only), these build the portable-C
+# suites for a Linux cross target and RUN them under qemu-user, catching
+# endian / word-size / alignment bugs without silicon. Skips when the cross gcc
+# or qemu binary is absent.
+QCC_arm      := arm-linux-gnueabihf-gcc
+QCC_aarch64  := aarch64-linux-gnu-gcc
+QCC_riscv64  := riscv64-linux-gnu-gcc
+QEMU_arm     := qemu-arm-static
+QEMU_aarch64 := qemu-aarch64-static
+QEMU_riscv64 := qemu-riscv64-static
+
+test-qemu-%:
+	@cc=$(QCC_$*); q=$(QEMU_$*); \
+	 if ! command -v $$cc >/dev/null 2>&1; then echo "SKIP test-qemu-$* (no $$cc)"; exit 0; fi; \
+	 if ! command -v $$q  >/dev/null 2>&1; then echo "SKIP test-qemu-$* (no $$q)"; exit 0; fi; \
+	 mkdir -p $(BUILD)/qemu-$*; set -e; \
+	 $$cc $(CFLAGS_COMMON) -DWOLFNANO_TARGET_PORTABLE_C $(FLOOR_SRC) $(WC)/sp_int.c $(TEST_SRC) -o $(BUILD)/qemu-$*/floor && $$q $(BUILD)/qemu-$*/floor; \
+	 $$cc $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C $(KS_SRC) tests/keyschedule_test.c -o $(BUILD)/qemu-$*/ks && $$q $(BUILD)/qemu-$*/ks; \
+	 $$cc $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C $(KS_SRC) tests/rfc8448_test.c -o $(BUILD)/qemu-$*/rfc && $$q $(BUILD)/qemu-$*/rfc; \
+	 $$cc $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C $(HS_SRC) tests/handshake_crypto_test.c -o $(BUILD)/qemu-$*/hs && $$q $(BUILD)/qemu-$*/hs; \
+	 $$cc $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C src/wn_msg.c src/wn_serverhello.c tests/parser_negative_test.c -o $(BUILD)/qemu-$*/neg && $$q $(BUILD)/qemu-$*/neg; \
+	 echo "OK test-qemu-$* (ran under $$q)"
+
+test-qemu: test-qemu-arm test-qemu-aarch64 test-qemu-riscv64 ## run the suites under qemu-user for arm/aarch64/riscv64
 
 clean:
 	rm -rf $(BUILD) *.o
