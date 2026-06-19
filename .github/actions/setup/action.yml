@@ -10,6 +10,10 @@ inputs:
     description: "install OpenSSL + build deps for mbedTLS/wolfSSL interop peers"
     required: false
     default: "false"
+  qemu:
+    description: "install Linux cross toolchains + qemu-user-static for cross-arch test execution"
+    required: false
+    default: "false"
 
 runs:
   using: composite
@@ -28,3 +32,13 @@ runs:
       if: inputs.peers == 'true'
       shell: bash
       run: sudo apt-get install -y --no-install-recommends openssl libssl-dev autoconf automake libtool
+    - name: QEMU cross toolchains
+      if: inputs.qemu == 'true'
+      shell: bash
+      run: |
+        set -eux
+        sudo apt-get install -y --no-install-recommends \
+          qemu-user-static \
+          gcc-arm-linux-gnueabihf libc6-dev-armhf-cross \
+          gcc-aarch64-linux-gnu libc6-dev-arm64-cross \
+          gcc-riscv64-linux-gnu libc6-dev-riscv64-cross

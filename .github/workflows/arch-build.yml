@@ -33,3 +33,16 @@ jobs:
           arm: "true"
       - name: cross-compile floor for every non-host arch
         run: make targets
+
+  qemu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: ./.github/actions/setup
+        with:
+          qemu: "true"
+      - name: run the suites under qemu-user (arm/aarch64/riscv64)
+        run: make test-qemu

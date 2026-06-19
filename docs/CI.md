@@ -35,8 +35,10 @@ wolfSSL while `main` rides known-good master.
 - `wolfssl-versions.yml` - the pinned/stable/master matrix.
 - `build-matrix.yml` - feature toggles (floor, +MLKEM, +MLDSA, +X509, +RSA,
   +CHACHA, approved-FIPS) each build cleanly; off-state has no undefined refs.
-- `arch-build.yml` - `WOLFNANOTLS_ASM` matrix: none+intel build and run;
-  thumb2/aarch64/armv7/riscv64 cross-compile (skipped if no toolchain).
+- `arch-build.yml` - host asm bench (none+intel); bare-metal cross-compile of
+  the floor (thumb2/aarch64/armv7/riscv64); and a `qemu` job that **runs** the
+  suites under qemu-user for arm/aarch64/riscv64 Linux cross-targets (real
+  execution, catching endian/word-size/alignment bugs without silicon).
 - `minimal-build.yml` - the `bench/min` minimal clients build + size assertion.
 - `interop.yml` - `make interop`: wolfNanoTLS client vs OpenSSL, wolfSSL, mbedTLS.
 
