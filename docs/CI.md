@@ -41,7 +41,7 @@ wolfSSL while `main` rides known-good master.
   suites under qemu-user for arm/aarch64/riscv64 Linux cross-targets (real
   execution, catching endian/word-size/alignment bugs without silicon).
 - `minimal-build.yml` - the `bench/min` minimal clients build + size assertion.
-- `interop.yml` - `make interop`: wolfNanoTLS client vs OpenSSL, wolfSSL, mbedTLS.
+- `interop.yml` - `make interop`: wolfNanoTLS client vs OpenSSL, wolfSSL, and mbedTLS servers (PSK + cert).
 
 ### Standards
 - `house-style.yml` - no `//`, no em/en-dash, no tabs, no trailing whitespace.
