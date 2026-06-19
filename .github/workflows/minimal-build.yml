@@ -14,8 +14,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      PSK_MAX: 45000
-      CERT_MAX: 95000
+      # Verified Cortex-M33 .text (ArmGNU 14.2): X25519 17.2K, P-256 24.8K,
+      # cert 59.6K. Budgets allow ~15% headroom for CI's older arm-gcc; they
+      # fail loudly if the footprint regresses, keeping the headline numbers honest.
+      PSK_X25519_MAX: 20500
+      PSK_P256_MAX: 29500
+      CERT_MAX: 70000
     steps:
       - uses: actions/checkout@v4
         with:
@@ -25,12 +29,14 @@ jobs:
           arm: "true"
       - name: build minimal Cortex-M33 clients
         run: ARM_GNU_BIN=/usr/bin TMPDIR="$RUNNER_TEMP" sh bench/footprint-clients.sh
-      - name: assert size budgets
+      - name: assert footprint budgets
         run: |
           set -eu
           sz() { arm-none-eabi-size "$1" | awk 'NR==2{print $1}'; }
           psk=$(sz "$RUNNER_TEMP/wn_fpc/wn_psk.elf")
+          p256=$(sz "$RUNNER_TEMP/wn_fpc/wn_psk_p256.elf")
           cert=$(sz "$RUNNER_TEMP/wn_fpc/wn_cert.elf")
-          echo "wolfNano PSK .text=$psk (max $PSK_MAX), cert .text=$cert (max $CERT_MAX)"
-          test "$psk"  -lt "$PSK_MAX"
+          echo "wolfNano .text  PSK-X25519=$psk (max $PSK_X25519_MAX)  PSK-P256=$p256 (max $PSK_P256_MAX)  cert=$cert (max $CERT_MAX)"
+          test "$psk"  -lt "$PSK_X25519_MAX"
+          test "$p256" -lt "$PSK_P256_MAX"
           test "$cert" -lt "$CERT_MAX"
