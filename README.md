@@ -27,10 +27,10 @@ interop stays identical to wolfSSL.
 - **Zero dynamic allocation**: the product shell and `src` crypto floor run
   entirely on caller-provided / static buffers (`WOLFSSL_NO_MALLOC`), verified
   with a malloc trap. Nothing on the heap.
-- **Tiny footprint**: a complete Cortex-M33 TLS 1.3 client is **31.0 KB**
-  (PSK + ECDHE, no X.509) or **76.9 KB** (cert / X.509) of `.text`, both
-  measured against the same minimal MbedTLS config (**2.60x** and **1.59x**
-  smaller). The slim shell itself is ~8.7 KB vs wolfSSL's TLS layer at ~52 KB.
+- **Tiny footprint**: a complete Cortex-M33 TLS 1.3 PSK + ECDHE client is
+  **26.9 KB** of `.text` (X25519) - **~34% smaller than a hard-minimized
+  mbedTLS** (41.1 KB), and smaller still against a stock mbedTLS (~80 KB). The
+  slim shell itself is ~8.7 KB vs wolfSSL's TLS layer at ~52 KB.
 - **Full wolfSSL asm speed**: target assembly is linked unchanged from the
   submodule. On x86_64, AES-128-GCM hits **2.7 GB/s** and ECDSA P-256 verify
   **~72x** MbedTLS, with none of wolfSSL's configure surface.
@@ -57,16 +57,26 @@ so a `fips` build never advertises a primitive outside its boundary.
 
 ## Footprint (Cortex-M33, measured)
 
-Complete TLS 1.3 client linked from source for Cortex-M33
-(`arm-none-eabi-gcc -Os --gc-sections`), every library at the **same minimal
-scope**. `.text` bytes:
+Whole TLS 1.3 client linked from source for Cortex-M33 (X25519, AES-128-GCM,
+SHA-256), `arm-none-eabi-gcc -Os -flto --gc-sections` + nano specs, with
+wolfNano and mbedTLS 3.6 **both hard-minimized to the identical scope** (minimal
+PSA `PSA_WANT_*` config, no SHA-3, no restartable ECP, one curve). `.text`:
 
-| Build | wolfNano | MbedTLS | wolfSSL | vs MbedTLS |
+| Client | wolfNano | mbedTLS (hard-min) | full wolfSSL | smaller by |
 |---|--:|--:|--:|--:|
-| PSK + ECDHE (no X.509) | **31.0 KB** | 80.7 KB | (n/a) | **2.60x smaller** |
-| cert / X.509 | **76.9 KB** | 122.1 KB | 162.0 KB | **1.59x smaller** |
+| PSK + ECDHE (no X.509) | **26.9 KB** | 41.1 KB | - | 34% |
+| cert / X.509 | **59.7 KB** | 98.9 KB | 147.4 KB | 40% |
 
-Reproduce with `sh bench/footprint-min.sh`. See
+This is the **conservative like-for-like** figure. mbedTLS's stock PSA config
+(RSA, SHA-1/3, Camellia, DES, ChaCha, restartable ECP...) builds the same PSK
+client at ~80 KB, so against a typical mbedTLS the gap is larger; wolfNano quotes
+the hard-minimized number because it is the fair one.
+
+Reproduce with `sh bench/footprint-clients.sh`; the exact configs are
+`bench/min/mbedtls_config_psk_hardmin.h` + `bench/min/mbedtls_crypto_config_psk.h`
+(mbedTLS) and `bench/min/wnc/user_settings.h` (wolfNano). Both harness clients
+use opaque I/O stubs so LTO cannot dead-strip the handshake (which would
+understate either side). See
 [Footprint](https://github.com/aidangarske/wolfNano/wiki/Footprint).
 
 ## Speed (x86_64, vs MbedTLS, same host)

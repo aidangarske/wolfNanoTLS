@@ -40,30 +40,34 @@ SHA-256 + HKDF + DRBG) lands far lower.
 
 ## Whole TLS 1.3 client vs MbedTLS / wolfSSL (Cortex-M33, measured)
 
-The real deployment number: a complete TLS 1.3 client linked from source for
-Cortex-M33, `arm-none-eabi-gcc -Os -ffunction-sections -fdata-sections
--Wl,--gc-sections`, every library configured to the **same minimal scope**
-(ECDHE P-256 + X25519, AES-128-GCM, SHA-2, size knobs; cert build adds X.509 +
-ECDSA/RSA verify). `.text` bytes:
+Whole TLS 1.3 client linked from source for Cortex-M33 (X25519, AES-128-GCM,
+SHA-256), `arm-none-eabi-gcc -Os -flto -ffunction-sections -fdata-sections
+-Wl,--gc-sections` + nano specs (ArmGNU 14.2), with wolfNano and mbedTLS 3.6
+**both hard-minimized to the identical scope**. `.text` bytes:
 
-| Build | wolfNano | MbedTLS | wolfSSL | wolfNano vs MbedTLS |
+| Client | wolfNano | mbedTLS (hard-min) | full wolfSSL | smaller by |
 |---|--:|--:|--:|--:|
-| PSK + ECDHE (no X.509) | **31.0 KB** | 80.7 KB | (n/a) | **2.60x smaller** |
-| cert / X.509 | **76.9 KB** | 122.1 KB | 162.0 KB | **1.59x smaller** |
+| PSK + ECDHE (no X.509) | **27576** | 42100 | - | 34% |
+| cert / X.509 | **61087** | 101232 | 150913 | 40% |
 
-Reproduce with `sh bench/footprint-min.sh` (and the `bench/min/` configs +
-clients). Notes that keep this honest:
+The honest framing:
 
-- **Fair config both sides.** MbedTLS's stock default carries 13 curves + ~25
-  extra features; stripped to the same scope its PSK client falls 158 -> 81 KB
-  and cert 206 -> 122 KB. wolfNano likewise needed its shell made configurable
-  (gate Ed25519 / SHA-384) + a minimal config to drop ~55 KB of Ed25519 group
-  ops. Both then measured identically.
-- **PSK is the biggest gap (2.6x):** MbedTLS TLS 1.3 mandates the PSA crypto
-  subsystem + `ssl_tls.c`, so even a bare PSK client carries ~80 KB of floor;
-  wolfNano's PSK client is the slim shell on wolfCrypt = 31 KB.
-- **Raw crypto primitives are ~parity** (MbedTLS's compact bignum/ECP is its
-  design strength); the footprint win is the TLS layer / whole stack.
+- **Hard-minimized both sides (the fair number): 34% (PSK) / 40% (cert)
+  smaller.** Getting mbedTLS this small required a custom minimal `PSA_WANT_*`
+  crypto config (`MBEDTLS_PSA_CRYPTO_CONFIG`) and stripping restartable-ECP,
+  SHA-384/512, and the non-GCM AES modes, because mbedTLS 3.6's PSA layer pulls
+  in RSA, SHA-1/3, Camellia, DES, ChaCha by default (~80 KB stock PSK).
+- **Reproduce:** `sh bench/footprint-clients.sh`. Exact configs:
+  `bench/min/mbedtls_config_psk_hardmin.h` + `bench/min/mbedtls_crypto_config_psk.h`
+  (mbedTLS), `bench/min/wnc/user_settings.h` (wolfNano).
+- **Both harness clients use opaque (volatile) I/O stubs.** A constant-returning
+  stub lets LTO prove the handshake aborts after ClientHello and dead-strip the
+  rest, understating the footprint; the opaque stub forces the whole reachable
+  handshake to stay. Verified: making the mbedTLS bio opaque too moved its PSK
+  number by <30 bytes, so neither side is being dead-stripped.
+- **Raw crypto primitives are ~parity** (mbedTLS's compact bignum/ECP is its
+  design strength); wolfNano's win is the TLS layer plus whole-stack assembly.
+- Full wolfSSL with X.509 is ~147 KB, which is the reason a slim shell exists.
 - **Classical numbers.** Enabling PQC or asm adds flash; this is the lean
   classical floor.
 
@@ -71,11 +75,12 @@ clients). Notes that keep this honest:
 
 | Build | flash + RAM budget | device classes |
 |---|---|---|
-| PSK (31 KB) | ~31 KB flash, ~8-16 KB RAM | Cortex-M0+/M3/M4 from ~64 KB flash: LoRaWAN/NB-IoT/Matter sensors, wearables (STM32L0/L4, nRF52) |
-| cert (77 KB) | ~77 KB flash, ~24-40 KB RAM | Cortex-M4/M33 from ~128 KB flash: cloud-IoT endpoints, gateways (STM32L4/U5/H5, nRF53, ESP32) |
+| PSK (27 KB) | ~27 KB flash, ~8-16 KB RAM | Cortex-M0+/M3/M4 from ~64 KB flash: LoRaWAN/NB-IoT/Matter sensors, wearables (STM32L0/L4, nRF52) |
+| cert (60 KB) | ~60 KB flash, ~24-40 KB RAM | Cortex-M4/M33 from ~128 KB flash: cloud-IoT endpoints, gateways (STM32L4/U5/H5, nRF53, ESP32) |
 
-The footprint edge lands hardest on small parts: at 31 KB the PSK client fits
-where MbedTLS's 81 KB would not.
+The footprint edge lands hardest on small parts: at ~27 KB the PSK client fits
+where even a hard-minimized mbedTLS (41 KB) is tighter, and a stock mbedTLS
+(~80 KB) would not fit at all.
 
 ## Notes
 

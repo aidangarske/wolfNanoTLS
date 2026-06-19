@@ -15,8 +15,8 @@ OUT=${TMPDIR:-/tmp}/wn_fpc
 WC=wolfssl/wolfcrypt/src
 WS=wolfssl/src
 ARCH="-mcpu=cortex-m33 -mthumb"
-OPT="-Os -ffunction-sections -fdata-sections"
-LINK="-Wl,--gc-sections --specs=nano.specs --specs=nosys.specs"
+OPT="-Os -ffunction-sections -fdata-sections -flto"
+LINK="-flto -Wl,--gc-sections --specs=nano.specs --specs=nosys.specs"
 mkdir -p "$OUT"
 
 command -v "$CC" >/dev/null 2>&1 || { echo "SKIP (no complete arm-none-eabi-gcc; set ARM_GNU_BIN)"; exit 0; }
@@ -39,7 +39,7 @@ mb_build() { # $1=config $2=client $3=out
         $CC $cf -c "$f" -o "$d/$b.o" 2>/dev/null; done
     $CC $cf -c "$2" -o "$d/client.o" 2>/dev/null && $CC $cf "$d"/*.o $LINK -o "$3" 2>/dev/null
 }
-[ -d "$MB" ] && mb_build mbedtls_config_psk.h bench/min/mbed_psk_client.c "$OUT/mb_psk.elf"
+[ -d "$MB" ] && mb_build mbedtls_config_psk_hardmin.h bench/min/mbed_psk_client.c "$OUT/mb_psk.elf"
 [ -d "$MB" ] && mb_build mbedtls_config_tls.h bench/min/mbed_client.c "$OUT/mb_cert.elf"
 
 # ---- full wolfSSL (minimal config in bench/min/ws) ----

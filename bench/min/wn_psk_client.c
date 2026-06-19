@@ -20,10 +20,19 @@ static int io_send(void* ctx, const byte* buf, word32 len)
     return (int)len;
 }
 
+/* Opaque to the optimizer: a constant return lets LTO prove the handshake
+ * aborts after ClientHello and dead-strip the rest, understating the footprint.
+ * The volatile sink forces LTO to keep the whole reachable handshake. */
+static volatile word32 io_opaque;
+
 static int io_recv(void* ctx, byte* buf, word32 len)
 {
-    (void)ctx; (void)buf; (void)len;
-    return 0;
+    (void)ctx;
+    io_opaque = len;
+    if ((buf != NULL) && (len > 0)) {
+        buf[0] = (byte)io_opaque;
+    }
+    return (int)io_opaque;
 }
 
 static byte scratch[4096];

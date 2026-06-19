@@ -30,10 +30,18 @@ static int bio_send(void* c, const unsigned char* b, size_t n)
     return (int)n;
 }
 
+/* Opaque to the optimizer so LTO cannot prove an early WANT_READ abort and
+ * dead-strip later handshake code (kept symmetric with the wolfNano harness). */
+static volatile int bio_opaque;
+
 static int bio_recv(void* c, unsigned char* b, size_t n)
 {
-    (void)c; (void)b; (void)n;
-    return MBEDTLS_ERR_SSL_WANT_READ;
+    (void)c;
+    bio_opaque = (int)n;
+    if ((b != NULL) && (n > 0)) {
+        b[0] = (unsigned char)bio_opaque;
+    }
+    return bio_opaque ? (int)n : MBEDTLS_ERR_SSL_WANT_READ;
 }
 
 int main(void)
