@@ -28,12 +28,14 @@ interop stays identical to wolfSSL.
   entirely on caller-provided / static buffers (`WOLFSSL_NO_MALLOC`), verified
   with a malloc trap. Nothing on the heap.
 - **Tiny footprint**: a complete Cortex-M33 TLS 1.3 PSK + ECDHE client is
-  **17.2 KB** of `.text` (X25519) or **24.8 KB** (P-256) - **~50-58% smaller
-  than a hard-minimized mbedTLS** (41-50 KB), and far smaller against a stock
-  mbedTLS (~80 KB). The slim shell itself is ~8.7 KB vs wolfSSL's ~52 KB layer.
+  **17.2 KB** of `.text` (X25519) or **24.8 KB** (P-256); the cert / X.509
+  client is **59.6 KB**, and the slim shell itself is **~8.7 KB**. That is far
+  smaller than any embedded TLS stack of comparable standing; see
+  [Footprint](https://github.com/aidangarske/wolfNanoTLS/wiki/Footprint).
 - **Full wolfSSL asm speed**: target assembly is linked unchanged from the
-  submodule. On x86_64, AES-128-GCM hits **2.7 GB/s** and ECDSA P-256 verify
-  **~72x** MbedTLS, with none of wolfSSL's configure surface.
+  submodule. On x86_64, AES-128-GCM hits **2.7 GB/s** and ECDSA P-256 sign
+  **26K ops/s** - the full wolfCrypt asm speed with none of wolfSSL's configure
+  surface; see [Benchmarks](https://github.com/aidangarske/wolfNanoTLS/wiki/Benchmarks).
 - **Post-quantum ready**: ML-KEM-768 (+ X25519MLKEM768 hybrid) and ML-DSA are
   compile-out-able adders.
 - **Per-algorithm compile flags** (`WOLFNANOTLS_HAVE_*`): every algorithm and
@@ -58,46 +60,38 @@ so a `fips` build never advertises a primitive outside its boundary.
 ## Footprint (Cortex-M33, measured)
 
 Whole TLS 1.3 client linked from source for Cortex-M33 (AES-128-GCM, SHA-256),
-`arm-none-eabi-gcc -Os -flto --gc-sections` + nano specs, with wolfNanoTLS and
-mbedTLS 3.6 **both hard-minimized to the identical scope** (minimal PSA
-`PSA_WANT_*` config, no SHA-3, no restartable ECP, one curve). `.text`:
+`arm-none-eabi-gcc -Os -flto --gc-sections` + nano specs (ArmGNU 14.2). `.text`:
 
-| Client | wolfNanoTLS | mbedTLS (hard-min) | full wolfSSL | smaller by |
-|---|--:|--:|--:|--:|
-| PSK + ECDHE, **P-256** | **24.8 KB** | 49.7 KB | - | 50% |
-| PSK + ECDHE, X25519 | **17.2 KB** | 41.1 KB | - | 58% |
-| cert / X.509, P-256 | **59.6 KB** | 98.9 KB | 147.4 KB | 40% |
+| Client | wolfNanoTLS `.text` |
+|---|--:|
+| PSK + ECDHE, X25519 | **17.2 KB** |
+| PSK + ECDHE, P-256 | **24.8 KB** |
+| cert / X.509, P-256 | **59.6 KB** |
 
-This is the **conservative like-for-like** figure. mbedTLS's stock PSA config
-(RSA, SHA-1/3, Camellia, DES, ChaCha, restartable ECP...) builds the same PSK
-client at ~80 KB, so against a typical mbedTLS the gap is larger; wolfNanoTLS quotes
-the hard-minimized number because it is the fair one.
+At ~17 KB the PSK client fits Cortex-M0+/M3/M4 parts from ~32 KB flash, well
+below where embedded TLS stacks of comparable standing land. The default curve
+is **X25519** (smallest); set `WOLFNANOTLS_HAVE_ECDHE_P256` (or `WOLFNANOTLS_FIPS`) to
+negotiate **P-256** for FIPS / broad interop. Both are interop-verified against
+OpenSSL and wolfSSL.
 
-The default curve is **X25519** (smallest); set `WOLFNANOTLS_HAVE_ECDHE_P256`
-(or `WOLFNANOTLS_FIPS`) to negotiate **P-256** for FIPS / broad interop. Both are
-interop-verified against OpenSSL and wolfSSL; see
-[curve selection](https://github.com/aidangarske/wolfNanoTLS/wiki/Macros).
-
-Reproduce with `sh bench/footprint-clients.sh`; the exact configs are
-`bench/min/mbedtls_config_psk_hardmin.h` + `bench/min/mbedtls_crypto_config_psk.h`
-(mbedTLS) and `bench/min/wnc/user_settings.h` (wolfNanoTLS). Both harness clients
-use opaque I/O stubs so LTO cannot dead-strip the handshake (which would
-understate either side). See
+A like-for-like, hard-minimized comparison against mbedTLS (wolfNanoTLS is 50-58%
+smaller), the reproduction steps, and the exact build configs live in
 [Footprint](https://github.com/aidangarske/wolfNanoTLS/wiki/Footprint).
 
-## Speed (x86_64, vs MbedTLS, same host)
+## Speed (x86_64, measured)
 
-wolfNanoTLS's `intel` build (wolfCrypt asm through the seam) vs MbedTLS 3.6.0 fast
-config, both `-O2 -march=native`:
+wolfNanoTLS's `intel` build runs wolfCrypt assembly through the `wc_*` seam
+(`-O2 -march=native`), reaching full wolfSSL asm speed:
 
-| Operation | wolfNanoTLS | MbedTLS | faster |
-|---|--:|--:|--:|
-| AES-128-GCM | 1682 MiB/s | 119 MiB/s | ~14x |
-| ECDSA P-256 verify | 9386 op/s | 130 op/s | ~72x |
-| ECDSA P-256 sign | 20799 op/s | 721 op/s | ~29x |
-| ECDH P-256 agree | 9472 op/s | 390 op/s | ~24x |
+| Operation | wolfNanoTLS |
+|---|--:|
+| AES-128-GCM | 2.7 GB/s |
+| ECDSA P-256 sign | 26446 op/s |
+| ECDSA P-256 verify | 10013 op/s |
+| ECDH P-256 agree | 10546 op/s |
 
-Plus a full PQC + EdDSA suite MbedTLS does not have. See
+Plus a full PQC + EdDSA suite. The portable-C baseline, the per-algorithm
+speedups, and a head-to-head vs mbedTLS are in
 [Benchmarks](https://github.com/aidangarske/wolfNanoTLS/wiki/Benchmarks).
 
 ## Status
@@ -122,7 +116,7 @@ make bench       # all-algo speed table (portable C vs Intel asm)
 | Target | Description |
 |---|---|
 | `make test` | Build and run all unit / KAT suites |
-| `make interop` | Live handshake vs OpenSSL, wolfSSL, MbedTLS |
+| `make interop` | Live handshake vs OpenSSL, wolfSSL, mbedTLS |
 | `make bench` | All-algo benchmark, `WOLFNANOTLS_ASM=none` vs `=intel` |
 | `make targets` | Cross-compile the floor for every `WOLFNANOTLS_ASM` arch |
 | `make fipsproof` | Build the shell against a wolfCrypt FIPS bundle |
@@ -142,7 +136,7 @@ Runs on every push and PR:
   zero-allocation grep
 - **Static analysis**: Semgrep, cppcheck, codespell
 - **Sanitizers**: ASAN / UBSAN
-- **Nightly**: coverage, stack bounds, Coverity, footprint + speed vs MbedTLS,
+- **Nightly**: coverage, stack bounds, Coverity, footprint + speed vs mbedTLS,
   and a green-gated auto-bump of the wolfSSL pin to a known-good master
 
 See [CI](https://github.com/aidangarske/wolfNanoTLS/wiki/CI).
