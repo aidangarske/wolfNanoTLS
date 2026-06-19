@@ -151,9 +151,9 @@ ASM_CC    := $(CC_$(WOLFNANO_ASM))
 ASM_FLAGS := $(FLAGS_$(WOLFNANO_ASM))
 ASM_SRC   := $(SPSRC_$(WOLFNANO_ASM)) $(ASMSRC_$(WOLFNANO_ASM))
 
-.PHONY: host kstest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest mlkemtest mldsatest hybridtest certtest fipsproof bench benchrun targets test-qemu test test-core clean
+.PHONY: host kstest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest matrixtest mlkemtest mldsatest hybridtest certtest fipsproof bench benchrun targets test-qemu test test-core clean
 test: test-core mlkemtest mldsatest hybridtest wctestpqc ## build + run all local self-tests
-test-core: host kstest rfctest tstest rectest ksharetest hstest wctest msgtest chtest shtest negtest certtest ## non-PQC suites (wolfSSL without the wc_mlkem/wc_mldsa API)
+test-core: host kstest rfctest tstest rectest ksharetest hstest wctest msgtest chtest shtest negtest matrixtest certtest ## non-PQC suites (wolfSSL without the wc_mlkem/wc_mldsa API)
 
 host: ## build + run the crypto floor self-test locally (PORTABLE_C)
 	@mkdir -p $(BUILD)
@@ -258,6 +258,14 @@ negtest: ## build + run negative/malformed parser tests (PORTABLE_C)
 	   tests/parser_negative_test.c -o $(BUILD)/parser_negative_test
 	@echo "---- run ----"
 	@./$(BUILD)/parser_negative_test
+
+matrixtest: ## build + run the data-driven negotiation matrix (PORTABLE_C)
+	@mkdir -p $(BUILD)
+	cc $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C \
+	   src/wn_msg.c src/wn_serverhello.c \
+	   tests/suites_matrix.c -o $(BUILD)/suites_matrix
+	@echo "---- run ----"
+	@./$(BUILD)/suites_matrix
 
 mlkemtest: ## build + run the ML-KEM-768 KEM test (WOLFNANO_MLKEM)
 	@mkdir -p $(BUILD)
