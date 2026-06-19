@@ -53,8 +53,9 @@
 typedef struct wn_KeyShare {
 #ifdef WOLFNANO_HAVE_ECDHE_P256
     ecc_key ecc;
-#endif
+#else
     curve25519_key x25519;
+#endif
     int group;
 } wn_KeyShare;
 

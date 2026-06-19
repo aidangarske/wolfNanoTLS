@@ -138,6 +138,7 @@ static int send_ccs(wn_IoSend send, void* ctx)
  * for the binder (truncOff) and where the 32-byte binder is written. */
 static void build_client_hello(wn_Writer* w, const byte* random32,
                                const byte* sid, const byte* cliPub,
+                               word16 group, word32 pubLen,
                                const char* identity, word32 idLen,
                                word32* truncOff, word32* binderOff)
 {
@@ -166,7 +167,7 @@ static void build_client_hello(wn_Writer* w, const byte* random32,
     wn_Write_U16(w, 10);                        /* supported_groups */
     wn_Write_U16(w, 4);
     wn_Write_U16(w, 2);
-    wn_Write_U16(w, 0x001d);
+    wn_Write_U16(w, group);
 
     wn_Write_U16(w, 13);                        /* signature_algorithms */
     wn_Write_U16(w, 6);
@@ -175,11 +176,11 @@ static void build_client_hello(wn_Writer* w, const byte* random32,
     wn_Write_U16(w, 0x0403);
 
     wn_Write_U16(w, 51);                        /* key_share */
-    wn_Write_U16(w, 38);
-    wn_Write_U16(w, 36);
-    wn_Write_U16(w, 0x001d);
-    wn_Write_U16(w, 32);
-    wn_Write_Bytes(w, cliPub, 32);
+    wn_Write_U16(w, (word16)(6 + pubLen));
+    wn_Write_U16(w, (word16)(4 + pubLen));
+    wn_Write_U16(w, group);
+    wn_Write_U16(w, (word16)pubLen);
+    wn_Write_Bytes(w, cliPub, pubLen);
 
     wn_Write_U16(w, 45);                        /* psk_key_exchange_modes */
     wn_Write_U16(w, 2);
@@ -216,7 +217,7 @@ int wn_Connect_Psk(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv, void* ioCtx,
     wn_Transcript tc;
     wn_KeyShare ks;
     wn_ServerHello sh;
-    byte random32[32], sid[32], cliPub[32];
+    byte random32[32], sid[32], cliPub[WN_KEYSHARE_MAX_PUB];
     byte ecdhe[32], emptyHash[32], th[32];
     byte early[32], binderKey[32], derived[32], hs[32], cHs[32], sHs[32];
     byte cKey[16], cIv[12], sKey[16], sIv[12];
@@ -244,7 +245,7 @@ int wn_Connect_Psk(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv, void* ioCtx,
         if (ret != 0) { ret = WOLFNANO_E_CRYPTO; }
     }
     if (ret == WOLFNANO_SUCCESS) {
-        ret = wn_KeyShare_Init(&ks, WN_GROUP_X25519);
+        ret = wn_KeyShare_Init(&ks, WN_DEFAULT_GROUP);
     }
     if (ret == WOLFNANO_SUCCESS) {
         ret = wn_KeyShare_Generate(&ks, rng, cliPub, &pubLen);
@@ -256,8 +257,9 @@ int wn_Connect_Psk(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv, void* ioCtx,
     /* ----- ClientHello with PSK binder ----- */
     if (ret == WOLFNANO_SUCCESS) {
         wn_Writer_Init(&w, scratch, scratchLen);
-        build_client_hello(&w, random32, sid, cliPub, identity,
-                           (word32)XSTRLEN(identity), &truncOff, &binderOff);
+        build_client_hello(&w, random32, sid, cliPub, WN_DEFAULT_GROUP, pubLen,
+                           identity, (word32)XSTRLEN(identity),
+                           &truncOff, &binderOff);
         if (w.err != 0) { ret = WOLFNANO_E_CRYPTO; }
         chLen = w.len;
     }
@@ -301,7 +303,7 @@ int wn_Connect_Psk(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv, void* ioCtx,
         ret = wn_Transcript_Update(&tc, scratch + 5, recLen - 5);
     }
     if (ret == WOLFNANO_SUCCESS) {
-        if ((sh.keyShare == NULL) || (sh.keyShareLen != 32)) {
+        if ((sh.keyShare == NULL) || (sh.keyShareLen != WN_DEFAULT_PUB_SZ)) {
             ret = WOLFNANO_E_CRYPTO;
         }
     }
