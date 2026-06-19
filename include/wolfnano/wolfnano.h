@@ -31,10 +31,17 @@
 #define WOLFNANOTLS_API
 #define WOLFNANOTLS_LOCAL
 
-/* Return codes: success is 0, errors are negative. */
-#define WOLFNANOTLS_SUCCESS         0
-#define WOLFNANOTLS_E_INVALID_ARG (-1)
-#define WOLFNANOTLS_E_CRYPTO      (-2)
-#define WOLFNANOTLS_E_UNSUPPORTED (-3)
+/* Return codes: success is 0, errors are negative. The first four are stable;
+ * the granular handshake codes (-4..-9) map to TLS alerts (see wn_connect.c). */
+#define WOLFNANOTLS_SUCCESS          0
+#define WOLFNANOTLS_E_INVALID_ARG  (-1)
+#define WOLFNANOTLS_E_CRYPTO       (-2)
+#define WOLFNANOTLS_E_UNSUPPORTED  (-3)
+#define WOLFNANOTLS_E_BAD_STATE    (-4)   /* internal handshake-state error */
+#define WOLFNANOTLS_E_UNEXPECTED_MSG (-5) /* message not allowed in this state */
+#define WOLFNANOTLS_E_DECODE       (-6)   /* malformed handshake message */
+#define WOLFNANOTLS_E_BAD_MAC      (-7)   /* Finished / record auth failure */
+#define WOLFNANOTLS_E_ILLEGAL_PARAM (-8)  /* bad group / version / param */
+#define WOLFNANOTLS_E_BAD_CERT     (-9)   /* certificate / CertVerify failure */
 
 #endif /* WOLFNANOTLS_H */

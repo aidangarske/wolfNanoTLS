@@ -423,6 +423,7 @@ int wn_Connect_Psk(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv, void* ioCtx,
 
 #define WN_HS_CERTIFICATE 11
 #define WN_HS_CERT_VERIFY 15
+#define WN_HS_CERT_REQUEST 13
 #define WN_MAX_CHAIN      4
 
 /* Build the TLS 1.3 CertificateVerify signed content (RFC 8446 4.4.3). */
@@ -698,7 +699,7 @@ int wn_Connect_Cert(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv,
     word32 accLen = 0, sSeq = 0, off = 0;
     byte rtype = 0, ctype = 0;
     int ret = WOLFNANOTLS_SUCCESS;
-    int done = 0, gotCert = 0, gotCv = 0;
+    int done = 0, gotEE = 0, gotCert = 0, gotCv = 0;
 
     if ((rng == NULL) || (ioSend == NULL) || (ioRecv == NULL) ||
         (anchor == NULL) || (scratch == NULL) || (scratchLen < 4096)) {
@@ -815,7 +816,28 @@ int wn_Connect_Cert(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv,
             if ((off + 4 + mLen) > accLen) {
                 break;                          /* message not complete yet */
             }
-            if (mType == WN_HS_CERT_VERIFY) {
+            /* enforce the legal flight order EE [CertReq] Cert CertVerify
+             * Finished; reject out-of-order / unexpected types (RFC 8446 4.4). */
+            if (mType == WN_HS_ENCRYPTED_EXT) {
+                if (gotEE) { ret = WOLFNANOTLS_E_UNEXPECTED_MSG; }
+                gotEE = 1;
+            }
+            else if (mType == WN_HS_CERT_REQUEST) {
+                if ((gotEE == 0) || gotCert) { ret = WOLFNANOTLS_E_UNEXPECTED_MSG; }
+            }
+            else if (mType == WN_HS_CERTIFICATE) {
+                if ((gotEE == 0) || gotCert) { ret = WOLFNANOTLS_E_UNEXPECTED_MSG; }
+            }
+            else if (mType == WN_HS_CERT_VERIFY) {
+                if ((gotCert == 0) || gotCv) { ret = WOLFNANOTLS_E_UNEXPECTED_MSG; }
+            }
+            else if (mType == WN_HS_FINISHED) {
+                if (gotCv == 0) { ret = WOLFNANOTLS_E_UNEXPECTED_MSG; }
+            }
+            else {
+                ret = WOLFNANOTLS_E_UNEXPECTED_MSG;
+            }
+            if ((ret == WOLFNANOTLS_SUCCESS) && (mType == WN_HS_CERT_VERIFY)) {
                 ret = wn_Transcript_GetHash(&tc, thCert, &thLen);
             }
             if ((ret == WOLFNANOTLS_SUCCESS) && (mType == WN_HS_FINISHED)) {
@@ -843,7 +865,7 @@ int wn_Connect_Cert(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv,
                 }
                 spkiLen = (word32)sizeof(leafSpki);
                 if (hr.err != 0) {
-                    ret = WOLFNANOTLS_E_CRYPTO;
+                    ret = WOLFNANOTLS_E_DECODE;
                 }
                 else {
                     ret = wn_VerifyChain(certs, certLens, nc, anchor, anchorLen,
@@ -876,7 +898,7 @@ int wn_Connect_Cert(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv,
                 if ((ret == WOLFNANOTLS_SUCCESS) &&
                     ((mLen != 32) ||
                      (ConstantCompare(mac, hsacc + off + 4, 32) != 0))) {
-                    ret = WOLFNANOTLS_E_CRYPTO;
+                    ret = WOLFNANOTLS_E_BAD_MAC;
                 }
                 if (ret == WOLFNANOTLS_SUCCESS) {
                     done = 1;
