@@ -209,6 +209,39 @@ static void build_client_hello(wn_Writer* w, const byte* random32,
     wn_Write_LenEnd(w, hsLen, 3);
 }
 
+#ifdef WOLFNANO_SEND_ALERTS
+/* Map an internal error to a TLS 1.3 alert description (RFC 8446 6.2). */
+static byte wn_ErrToAlert(int ret)
+{
+    byte d;
+    switch (ret) {
+        case WOLFNANO_E_UNEXPECTED_MSG: d = 10; break;  /* unexpected_message */
+        case WOLFNANO_E_BAD_MAC:        d = 20; break;  /* bad_record_mac */
+        case WOLFNANO_E_DECODE:         d = 50; break;  /* decode_error */
+        case WOLFNANO_E_ILLEGAL_PARAM:  d = 47; break;  /* illegal_parameter */
+        case WOLFNANO_E_BAD_CERT:       d = 42; break;  /* bad_certificate */
+        default:                        d = 80; break;  /* internal_error */
+    }
+    return d;
+}
+
+/* Send a fatal, encrypted alert with the client handshake key (best effort). */
+static void wn_SendAlert(wn_IoSend ioSend, void* ioCtx, const byte* key,
+                         const byte* iv, int ret)
+{
+    byte body[2];
+    byte rec[WN_RECORD_HEADER_SZ + 2 + 1 + WN_RECORD_TAG_SZ];
+    word32 recLen = 0;
+
+    body[0] = 2;                                /* fatal */
+    body[1] = wn_ErrToAlert(ret);
+    if (wn_Record_Protect(rec, &recLen, key, 16, iv, 0, WN_REC_ALERT,
+                          body, sizeof(body)) == WOLFNANO_SUCCESS) {
+        (void)ioSend(ioCtx, rec, recLen);
+    }
+}
+#endif /* WOLFNANO_SEND_ALERTS */
+
 int wn_Connect_Psk(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv, void* ioCtx,
                    const byte* psk, word32 pskLen, const char* identity,
                    byte* scratch, word32 scratchLen)
@@ -700,6 +733,9 @@ int wn_Connect_Cert(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv,
     byte rtype = 0, ctype = 0;
     int ret = WOLFNANO_SUCCESS;
     int done = 0, gotEE = 0, gotCert = 0, gotCv = 0;
+#ifdef WOLFNANO_SEND_ALERTS
+    int keysReady = 0;
+#endif
 
     if ((rng == NULL) || (ioSend == NULL) || (ioRecv == NULL) ||
         (anchor == NULL) || (scratch == NULL) || (scratchLen < 4096)) {
@@ -781,6 +817,9 @@ int wn_Connect_Cert(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv,
         ret |= wn_Tls13_ExpandLabel(cIv, 12, cHs, "iv", NULL, 0, WC_SHA256);
         ret |= wn_Tls13_ExpandLabel(sKey, 16, sHs, "key", NULL, 0, WC_SHA256);
         ret |= wn_Tls13_ExpandLabel(sIv, 12, sHs, "iv", NULL, 0, WC_SHA256);
+#ifdef WOLFNANO_SEND_ALERTS
+        if (ret == WOLFNANO_SUCCESS) { keysReady = 1; }
+#endif
     }
 
     /* server flight: EncryptedExtensions, Certificate, CertVerify, Finished */
@@ -929,6 +968,12 @@ int wn_Connect_Cert(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv,
             ret = WOLFNANO_E_CRYPTO;
         }
     }
+
+#ifdef WOLFNANO_SEND_ALERTS
+    if ((ret < 0) && keysReady) {
+        wn_SendAlert(ioSend, ioCtx, cKey, cIv, ret);
+    }
+#endif
 
     wn_KeyShare_Free(&ks);
     ForceZero(early, sizeof(early));

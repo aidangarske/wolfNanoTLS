@@ -25,6 +25,7 @@ applies the standing size cuts).
 | `WOLFNANO_MLDSA` | ML-DSA-65 verify (no-malloc) | `WOLFSSL_HAVE_MLDSA`, verify-only |
 | `WOLFNANO_MLDSA_SIGN` | adds ML-DSA keygen/sign (needs memory) | drops verify-only |
 | `WOLFNANO_FIPS` | approved-mode suites (ECDHE P-256 + AES-GCM only) | drops X25519/ChaCha/Ed25519 from offers |
+| `WOLFNANO_SEND_ALERTS` | emit a fatal TLS alert on handshake failure (off by default) | RFC 8446 6.2 alert codes |
 
 When a feature is off, the build has no undefined references for it.
 
@@ -35,9 +36,9 @@ single-curve per build to keep the footprint minimal.
 
 | Build flags | Negotiated group | PSK client `.text` | Use when |
 |---|---|---|---|
-| *(default)* | X25519 (0x001d) | **26.9 KB** | smallest build; X25519 is cryptographically strong (Curve25519) |
-| `WOLFNANO_HAVE_ECDHE_P256` | secp256r1 (0x0017) | **34.5 KB** | FIPS / CNSA, or maximum enterprise interop |
-| `WOLFNANO_FIPS` | secp256r1 only | 34.5 KB | approved-mode (also drops X25519/ChaCha/Ed25519 from offers) |
+| *(default)* | X25519 (0x001d) | **17.2 KB** | smallest build; X25519 is cryptographically strong (Curve25519) |
+| `WOLFNANO_HAVE_ECDHE_P256` | secp256r1 (0x0017) | **24.8 KB** | FIPS / CNSA, or maximum enterprise interop |
+| `WOLFNANO_FIPS` | secp256r1 only | 24.8 KB | approved-mode (also drops X25519/ChaCha/Ed25519 from offers) |
 
 Both are interop-verified live against OpenSSL and wolfSSL. Note on FIPS:
 X25519 is **not** weaker than P-256 - it was simply standardized later (NIST
