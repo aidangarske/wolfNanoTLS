@@ -45,6 +45,8 @@ for the `src` floor statically (independent of any runtime malloc trap).
 | `make interop` | **live TLS 1.3 handshakes vs OpenSSL/wolfSSL: PSK + cert** |
 | `make certtest` | X.509 cert chain-link verify (ECC + RSA) |
 | `make fipsproof` | `WOLFNANOTLS_CRYPTO=fips` seam proof vs a wolfSSL FIPS bundle (see FIPS.md) |
+| `make bench` | all-algo speed, portable C vs Intel asm (see Benchmarks.md) |
+| `make targets` | cross-compile the floor for every non-host arch (build check) |
 
 `make wctest` reuses wolfSSL's comprehensive crypto test verbatim from the
 submodule. Compiled with the wolfNanoTLS config, its `#ifdef` guards trim it to

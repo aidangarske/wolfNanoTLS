@@ -41,7 +41,9 @@
 #include <stdio.h>
 #include <time.h>
 
-#define BUF_SZ 16384
+#ifndef BUF_SZ
+    #define BUF_SZ 16384
+#endif
 #define RUNSEC 0.3
 
 static byte buf[BUF_SZ];
