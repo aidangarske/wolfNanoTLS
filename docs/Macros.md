@@ -28,6 +28,23 @@ applies the standing size cuts).
 
 When a feature is off, the build has no undefined references for it.
 
+## Handshake curve selection (offer both, pick one per build)
+
+The (EC)DHE key-exchange curve is chosen at build time; the key share is
+single-curve per build to keep the footprint minimal.
+
+| Build flags | Negotiated group | PSK client `.text` | Use when |
+|---|---|---|---|
+| *(default)* | X25519 (0x001d) | **26.9 KB** | smallest build; X25519 is cryptographically strong (Curve25519) |
+| `WOLFNANOTLS_HAVE_ECDHE_P256` | secp256r1 (0x0017) | **34.5 KB** | FIPS / CNSA, or maximum enterprise interop |
+| `WOLFNANOTLS_FIPS` | secp256r1 only | 34.5 KB | approved-mode (also drops X25519/ChaCha/Ed25519 from offers) |
+
+Both are interop-verified live against OpenSSL and wolfSSL. Note on FIPS:
+X25519 is **not** weaker than P-256 - it was simply standardized later (NIST
+SP 800-186, 2023), so FIPS 140-3 boundaries historically covered only the NIST
+prime curves. Default to X25519 for size; select P-256 when a validated module
+or broad interop requires it.
+
 ## Asm / speedup selection (`WOLFNANOTLS_ASM=<arch>`)
 
 One Makefile switch bundles a target's asm macros (`wolfnano_target.h`) + asm

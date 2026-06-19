@@ -73,6 +73,11 @@ This is the **conservative like-for-like** figure. mbedTLS's stock PSA config
 client at ~80 KB, so against a typical mbedTLS the gap is larger; wolfNanoTLS quotes
 the hard-minimized number because it is the fair one.
 
+The default curve is **X25519** (smallest); set `WOLFNANOTLS_HAVE_ECDHE_P256`
+(or `WOLFNANOTLS_FIPS`) to negotiate **P-256** for FIPS / broad interop. Both are
+interop-verified against OpenSSL and wolfSSL; see
+[curve selection](https://github.com/aidangarske/wolfNanoTLS/wiki/Macros).
+
 Reproduce with `sh bench/footprint-clients.sh`; the exact configs are
 `bench/min/mbedtls_config_psk_hardmin.h` + `bench/min/mbedtls_crypto_config_psk.h`
 (mbedTLS) and `bench/min/wnc/user_settings.h` (wolfNanoTLS). Both harness clients
