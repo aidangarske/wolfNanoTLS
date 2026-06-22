@@ -48,14 +48,30 @@ typedef struct {
     word32 rxPos;
     byte tx[4096];
     word32 txLen;
+    int failSend;
 } mock_io;
 
 static int m_send(void* ctx, const byte* buf, word32 len)
 {
     mock_io* m = (mock_io*)ctx;
+    if (m->failSend) {
+        return (int)len - 1;                /* short write -> caller error */
+    }
     XMEMCPY(m->tx + m->txLen, buf, len);
     m->txLen += len;
     return (int)len;
+}
+
+/* Append a raw (unencrypted) record: 5-byte header + body. */
+static void push_raw(mock_io* m, byte ct, const byte* body, word32 len)
+{
+    m->rx[m->rxLen + 0] = ct;
+    m->rx[m->rxLen + 1] = 0x03;
+    m->rx[m->rxLen + 2] = 0x03;
+    m->rx[m->rxLen + 3] = (byte)(len >> 8);
+    m->rx[m->rxLen + 4] = (byte)(len & 0xff);
+    XMEMCPY(m->rx + m->rxLen + 5, body, len);
+    m->rxLen += 5 + len;
 }
 
 static int m_recv(void* ctx, byte* buf, word32 len)
@@ -229,6 +245,85 @@ int main(void)
     wn_Close(&s);
     check((s.cSeq == 0) && (s.flags == 0) && (s.scratch == NULL),
           "wn_Close wipes the session");
+
+    /* 9. NULL-argument and closed-session guards. */
+    setup(&s, &m);
+    check(wn_Send(NULL, out, 1) != 0, "wn_Send NULL session rejected");
+    check(wn_Send(&s, NULL, 1) != 0, "wn_Send NULL data rejected");
+    check(wn_Recv(NULL, out, sizeof(out), &got) != 0,
+          "wn_Recv NULL session rejected");
+    check(wn_Recv(&s, NULL, sizeof(out), &got) != 0,
+          "wn_Recv NULL out rejected");
+    check(wn_Close(NULL) != 0, "wn_Close NULL rejected");
+
+    setup(&s, &m);
+    s.flags |= WN_SESS_CLOSED;
+    check(wn_Send(&s, out, 1) == WOLFNANO_E_CLOSED, "wn_Send after close");
+    check(wn_Recv(&s, out, sizeof(out), &got) == WOLFNANO_E_CLOSED,
+          "wn_Recv after close");
+
+    /* 10. wn_Send oversized (> scratch) and transport failure. */
+    setup(&s, &m);
+    s.scratchLen = 64;                               /* too small for 100 bytes */
+    check(wn_Send(&s, big, 100) == WOLFNANO_E_INVALID_ARG,
+          "wn_Send oversized rejected");
+    setup(&s, &m);
+    m.failSend = 1;
+    check(wn_Send(&s, (const byte*)"x", 1) == WOLFNANO_E_CRYPTO,
+          "wn_Send transport failure");
+
+    /* 11. wn_Recv ignores a (plaintext) ChangeCipherSpec then returns app data. */
+    setup(&s, &m);
+    push_raw(&m, WN_REC_CHANGE_CIPHER, (const byte*)"\x01", 1);
+    push_rec(&m, s.sKey, s.sIv, 0, WN_REC_APPDATA, (const byte*)"ccs", 3);
+    got = 0;
+    rc = wn_Recv(&s, out, sizeof(out), &got);
+    check((rc == 0) && (got == 3), "wn_Recv skips ChangeCipherSpec");
+
+    /* 12. malformed post-handshake messages. */
+    setup(&s, &m);
+    ku[0] = 24; ku[1] = 0; ku[2] = 0; ku[3] = 1;   /* KeyUpdate, body missing */
+    push_rec(&m, s.sKey, s.sIv, 0, WN_REC_HANDSHAKE, ku, 4);
+    check(wn_Recv(&s, out, sizeof(out), &got) == WOLFNANO_E_DECODE,
+          "wn_Recv truncated KeyUpdate -> DECODE");
+
+    setup(&s, &m);
+    nst[0] = 4; nst[1] = 0; nst[2] = 0; nst[3] = 0xff; /* NST len > available */
+    push_rec(&m, s.sKey, s.sIv, 0, WN_REC_HANDSHAKE, nst, 4);
+    check(wn_Recv(&s, out, sizeof(out), &got) == WOLFNANO_E_DECODE,
+          "wn_Recv overlong post-handshake msg -> DECODE");
+
+    setup(&s, &m);
+    nst[0] = 99; nst[1] = 0; nst[2] = 0; nst[3] = 0;   /* unknown HS type */
+    push_rec(&m, s.sKey, s.sIv, 0, WN_REC_HANDSHAKE, nst, 4);
+    check(wn_Recv(&s, out, sizeof(out), &got) == WOLFNANO_E_UNEXPECTED_MSG,
+          "wn_Recv unknown post-handshake type -> UNEXPECTED_MSG");
+
+    /* 13. fatal (non-close) alert and unexpected content type. */
+    setup(&s, &m);
+    alert[0] = 2; alert[1] = 40;                    /* fatal handshake_failure */
+    push_rec(&m, s.sKey, s.sIv, 0, WN_REC_ALERT, alert, 2);
+    check(wn_Recv(&s, out, sizeof(out), &got) != 0, "wn_Recv fatal alert errors");
+
+    setup(&s, &m);
+    push_rec(&m, s.sKey, s.sIv, 0, 99, (const byte*)"z", 1); /* bad content type */
+    check(wn_Recv(&s, out, sizeof(out), &got) == WOLFNANO_E_UNEXPECTED_MSG,
+          "wn_Recv unexpected content type -> UNEXPECTED_MSG");
+
+    /* 14. bad-MAC record (tampered tag) via wn_Recv. */
+    setup(&s, &m);
+    push_rec(&m, s.sKey, s.sIv, 0, WN_REC_APPDATA, (const byte*)"hi", 2);
+    m.rx[m.rxLen - 1] ^= 0xff;                       /* corrupt the tag */
+    check(wn_Recv(&s, out, sizeof(out), &got) == WOLFNANO_E_BAD_MAC,
+          "wn_Recv tampered record -> BAD_MAC");
+
+    /* 15. KeyUpdate(update_requested) but our KeyUpdate send fails. */
+    setup(&s, &m);
+    m.failSend = 1;
+    ku[0] = 24; ku[1] = 0; ku[2] = 0; ku[3] = 1; ku[4] = 1;
+    push_rec(&m, s.sKey, s.sIv, 0, WN_REC_HANDSHAKE, ku, 5);
+    check(wn_Recv(&s, out, sizeof(out), &got) == WOLFNANO_E_CRYPTO,
+          "wn_Recv KeyUpdate reply send failure -> CRYPTO");
 
     if (fails == 0) {
         printf("session_test: all checks passed\n");

@@ -108,28 +108,30 @@ int wn_Record_Protect(byte* rec, word32* recLen, const byte* key, word32 keyLen,
         XMEMCPY(rec + WN_RECORD_HEADER_SZ, content, contentLen);
         rec[WN_RECORD_HEADER_SZ + contentLen] = contentType;
 
-        ret = wc_AesInit(&aes, NULL, INVALID_DEVID);
+        if (wc_AesInit(&aes, NULL, INVALID_DEVID) != 0) {
+            ret = WOLFNANO_E_CRYPTO;
+        }
     }
 
     if (ret == WOLFNANO_SUCCESS) {
         aesInit = 1;
-        ret = wc_AesGcmSetKey(&aes, key, keyLen);
+        if (wc_AesGcmSetKey(&aes, key, keyLen) != 0) {
+            ret = WOLFNANO_E_CRYPTO;
+        }
     }
 
     if (ret == WOLFNANO_SUCCESS) {
-        ret = wc_AesGcmEncrypt(&aes,
-                  rec + WN_RECORD_HEADER_SZ,
-                  rec + WN_RECORD_HEADER_SZ, innerLen,
-                  nonce, sizeof(nonce),
-                  rec + WN_RECORD_HEADER_SZ + innerLen, WN_RECORD_TAG_SZ,
-                  rec, WN_RECORD_HEADER_SZ);
-    }
-
-    if (ret != WOLFNANO_SUCCESS) {
-        ret = WOLFNANO_E_CRYPTO;
-    }
-    else {
-        *recLen = WN_RECORD_HEADER_SZ + ctLen;
+        if (wc_AesGcmEncrypt(&aes,
+                rec + WN_RECORD_HEADER_SZ,
+                rec + WN_RECORD_HEADER_SZ, innerLen,
+                nonce, sizeof(nonce),
+                rec + WN_RECORD_HEADER_SZ + innerLen, WN_RECORD_TAG_SZ,
+                rec, WN_RECORD_HEADER_SZ) != 0) {
+            ret = WOLFNANO_E_CRYPTO;
+        }
+        else {
+            *recLen = WN_RECORD_HEADER_SZ + ctLen;
+        }
     }
 
     if (aesInit) {
@@ -163,26 +165,29 @@ int wn_Record_Unprotect(byte* content, word32* contentLen, byte* contentType,
     if (ret == WOLFNANO_SUCCESS) {
         innerLen = recLen - WN_RECORD_HEADER_SZ - WN_RECORD_TAG_SZ;
         wn_BuildNonce(nonce, iv, seq);
-        ret = wc_AesInit(&aes, NULL, INVALID_DEVID);
+        if (wc_AesInit(&aes, NULL, INVALID_DEVID) != 0) {
+            ret = WOLFNANO_E_CRYPTO;
+        }
     }
 
     if (ret == WOLFNANO_SUCCESS) {
         aesInit = 1;
-        ret = wc_AesGcmSetKey(&aes, key, keyLen);
+        if (wc_AesGcmSetKey(&aes, key, keyLen) != 0) {
+            ret = WOLFNANO_E_CRYPTO;
+        }
     }
 
     if (ret == WOLFNANO_SUCCESS) {
-        ret = wc_AesGcmDecrypt(&aes, content,
-                  rec + WN_RECORD_HEADER_SZ, innerLen,
-                  nonce, sizeof(nonce),
-                  rec + WN_RECORD_HEADER_SZ + innerLen, WN_RECORD_TAG_SZ,
-                  rec, WN_RECORD_HEADER_SZ);
+        if (wc_AesGcmDecrypt(&aes, content,
+                rec + WN_RECORD_HEADER_SZ, innerLen,
+                nonce, sizeof(nonce),
+                rec + WN_RECORD_HEADER_SZ + innerLen, WN_RECORD_TAG_SZ,
+                rec, WN_RECORD_HEADER_SZ) != 0) {
+            ret = WOLFNANO_E_BAD_MAC;        /* AEAD tag / record auth failure */
+        }
     }
 
-    if (ret != WOLFNANO_SUCCESS) {
-        ret = WOLFNANO_E_BAD_MAC;            /* AEAD tag / record auth failure */
-    }
-    else {
+    if (ret == WOLFNANO_SUCCESS) {
         n = innerLen;
         while ((n > 0) && (content[n - 1] == 0)) {
             n--;
