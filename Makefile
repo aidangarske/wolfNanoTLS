@@ -159,11 +159,11 @@ ASM_CC    := $(CC_$(WOLFNANOTLS_ASM))
 ASM_FLAGS := $(FLAGS_$(WOLFNANOTLS_ASM))
 ASM_SRC   := $(SPSRC_$(WOLFNANOTLS_ASM)) $(ASMSRC_$(WOLFNANOTLS_ASM))
 
-.PHONY: host kstest keyupdatetest sessiontest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest hybridtest certtest fipsproof bench benchrun targets test-qemu test test-core check example coverage clean
+.PHONY: host kstest keyupdatetest sessiontest mocktest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest hybridtest certtest fipsproof bench benchrun targets test-qemu test test-core check example coverage clean
 test: test-core mlkemtest mldsatest hybridtest wctestpqc ## build + run all local self-tests
-test-core: host kstest keyupdatetest sessiontest rfctest tstest rectest ksharetest hstest wctest msgtest chtest shtest negtest flighttest alerttest matrixtest certtest ## non-PQC suites (wolfSSL without the wc_mlkem/wc_mldsa API)
+test-core: host kstest keyupdatetest sessiontest mocktest rfctest tstest rectest ksharetest hstest wctest msgtest chtest shtest negtest flighttest alerttest matrixtest certtest ## non-PQC suites (wolfSSL without the wc_mlkem/wc_mldsa API)
 
-SUITES := host kstest keyupdatetest sessiontest rfctest tstest rectest ksharetest hstest wctest wctestpqc \
+SUITES := host kstest keyupdatetest sessiontest mocktest rfctest tstest rectest ksharetest hstest wctest wctestpqc \
   msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest hybridtest certtest
 
 check: ## run every suite, continue past failures, print one colored PASS/FAIL tally
@@ -201,6 +201,13 @@ keyupdatetest: ## build + run the post-handshake KeyUpdate KAT (PORTABLE_C)
 	   $(KS_SRC) tests/keyupdate_test.c -o $(BUILD)/keyupdate_test
 	@echo "---- run ----"
 	@./$(BUILD)/keyupdate_test
+
+mocktest: ## build + run the in-process mock-server handshake test (PORTABLE_C)
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANOTLS_TARGET_PORTABLE_C \
+	   $(CONN_SRC) tests/connect_mock_test.c -o $(BUILD)/connect_mock_test
+	@echo "---- run ----"
+	@./$(BUILD)/connect_mock_test
 
 sessiontest: ## build + run the application-data session unit tests (PORTABLE_C)
 	@mkdir -p $(BUILD)
