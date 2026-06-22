@@ -1,11 +1,11 @@
 #!/bin/sh
 # Enforce per-file line coverage from an lcov tracefile (wolfCOSE-grade gate).
 # Reports coverage for every src/*.c and *.h, and fails if any file listed in
-# the enforce list (default ci/coverage-100.txt) is below 100%. Lines marked
-# /* LCOV_EXCL_LINE */ are dropped by lcov, so 100% reflects reachable code.
+# the enforce list (default .github/ci/coverage-100.txt) is below 100%. Lines
+# marked /* LCOV_EXCL_LINE */ are dropped by lcov, so 100% reflects reachable code.
 set -u
 INFO=${1:-cov.info}
-ENFORCE=${2:-ci/coverage-100.txt}
+ENFORCE=${2:-.github/ci/coverage-100.txt}
 
 if [ ! -f "$INFO" ]; then
     echo "check_coverage: tracefile $INFO not found"
