@@ -35,20 +35,26 @@ int wn_KeyShare_Init(wn_KeyShare* ks, int group)
 
     if (ret == WOLFNANO_SUCCESS) {
         ks->group = group;
-#ifndef WOLFNANO_HAVE_ECDHE_P256
+#if defined(WOLFNANO_HAVE_MLKEM_HYBRID)
+        if (group == WN_GROUP_X25519MLKEM768) {
+            /* hybrid keys are initialized in Generate (wn_Hybrid_ClientKeyShare) */
+            ret = WOLFNANO_SUCCESS;
+        }
+        else
+#elif defined(WOLFNANO_HAVE_ECDHE_P256)
+        if (group == WN_GROUP_SECP256R1) {
+            if (wc_ecc_init(&ks->ecc) != 0) {
+                ret = WOLFNANO_E_CRYPTO;
+            }
+        }
+        else
+#else
         if (group == WN_GROUP_X25519) {
             /* LCOV_EXCL_START - curve25519 init does not fail without alloc */
             if (wc_curve25519_init(&ks->x25519) != 0) {
                 ret = WOLFNANO_E_CRYPTO;
             }
             /* LCOV_EXCL_STOP */
-        }
-        else
-#else
-        if (group == WN_GROUP_SECP256R1) {
-            if (wc_ecc_init(&ks->ecc) != 0) {
-                ret = WOLFNANO_E_CRYPTO;
-            }
         }
         else
 #endif
@@ -70,23 +76,12 @@ int wn_KeyShare_Generate(wn_KeyShare* ks, WC_RNG* rng, byte* pub,
     }
 
     if (ret == WOLFNANO_SUCCESS) {
-#ifndef WOLFNANO_HAVE_ECDHE_P256
-        if (ks->group == WN_GROUP_X25519) {
-            /* LCOV_EXCL_START - keygen/export do not fail with a valid RNG */
-            if (wc_curve25519_make_key(rng, WN_X25519_KEY_SZ, &ks->x25519) != 0) {
-                ret = WOLFNANO_E_CRYPTO;
-            }
-            if (ret == WOLFNANO_SUCCESS) {
-                *pubLen = WN_X25519_KEY_SZ;
-                if (wc_curve25519_export_public_ex(&ks->x25519, pub, pubLen,
-                                               EC25519_LITTLE_ENDIAN) != 0) {
-                    ret = WOLFNANO_E_CRYPTO;
-                }
-            }
-            /* LCOV_EXCL_STOP */
+#if defined(WOLFNANO_HAVE_MLKEM_HYBRID)
+        if (ks->group == WN_GROUP_X25519MLKEM768) {
+            ret = wn_Hybrid_ClientKeyShare(&ks->hybrid, rng, pub, pubLen);
         }
         else
-#else
+#elif defined(WOLFNANO_HAVE_ECDHE_P256)
         if (ks->group == WN_GROUP_SECP256R1) {
             if (wc_ecc_make_key_ex(rng, 32, &ks->ecc, ECC_SECP256R1) != 0) {
                 ret = WOLFNANO_E_CRYPTO;
@@ -104,6 +99,22 @@ int wn_KeyShare_Generate(wn_KeyShare* ks, WC_RNG* rng, byte* pub,
             }
         }
         else
+#else
+        if (ks->group == WN_GROUP_X25519) {
+            /* LCOV_EXCL_START - keygen/export do not fail with a valid RNG */
+            if (wc_curve25519_make_key(rng, WN_X25519_KEY_SZ, &ks->x25519) != 0) {
+                ret = WOLFNANO_E_CRYPTO;
+            }
+            if (ret == WOLFNANO_SUCCESS) {
+                *pubLen = WN_X25519_KEY_SZ;
+                if (wc_curve25519_export_public_ex(&ks->x25519, pub, pubLen,
+                                               EC25519_LITTLE_ENDIAN) != 0) {
+                    ret = WOLFNANO_E_CRYPTO;
+                }
+            }
+            /* LCOV_EXCL_STOP */
+        }
+        else
 #endif
         {
             ret = WOLFNANO_E_UNSUPPORTED;
@@ -116,13 +127,16 @@ int wn_KeyShare_Generate(wn_KeyShare* ks, WC_RNG* rng, byte* pub,
 int wn_KeyShare_Shared(wn_KeyShare* ks, const byte* peerPub, word32 peerPubLen,
                        byte* out, word32* outLen)
 {
-#ifdef WOLFNANO_HAVE_ECDHE_P256
+#if defined(WOLFNANO_HAVE_MLKEM_HYBRID)
+    /* peer key handling is internal to wn_Hybrid_ClientShared */
+#elif defined(WOLFNANO_HAVE_ECDHE_P256)
     ecc_key eccPeer;
+    int peerInit = 0;
 #else
     curve25519_key peer;
+    int peerInit = 0;
 #endif
     int ret = WOLFNANO_SUCCESS;
-    int peerInit = 0;
 
     if ((ks == NULL) || (peerPub == NULL) || (out == NULL) ||
         (outLen == NULL)) {
@@ -130,7 +144,39 @@ int wn_KeyShare_Shared(wn_KeyShare* ks, const byte* peerPub, word32 peerPubLen,
     }
 
     if (ret == WOLFNANO_SUCCESS) {
-#ifndef WOLFNANO_HAVE_ECDHE_P256
+#if defined(WOLFNANO_HAVE_MLKEM_HYBRID)
+        if (ks->group == WN_GROUP_X25519MLKEM768) {
+            ret = wn_Hybrid_ClientShared(&ks->hybrid, peerPub, peerPubLen,
+                                         out, outLen);
+        }
+        else
+#elif defined(WOLFNANO_HAVE_ECDHE_P256)
+        if (ks->group == WN_GROUP_SECP256R1) {
+            if (peerPubLen != WN_SECP256R1_PUB_SZ) {
+                ret = WOLFNANO_E_INVALID_ARG;
+            }
+            if ((ret == WOLFNANO_SUCCESS) && (wc_ecc_init(&eccPeer) != 0)) {
+                ret = WOLFNANO_E_CRYPTO;
+            }
+            if (ret == WOLFNANO_SUCCESS) {
+                peerInit = 1;
+                if (wc_ecc_import_x963_ex(peerPub, peerPubLen, &eccPeer,
+                                          ECC_SECP256R1) != 0) {
+                    ret = WOLFNANO_E_CRYPTO;
+                }
+            }
+            if (ret == WOLFNANO_SUCCESS) {
+                *outLen = WN_SECP256R1_SECRET_SZ;
+                if (wc_ecc_shared_secret(&ks->ecc, &eccPeer, out, outLen) != 0) {
+                    ret = WOLFNANO_E_CRYPTO;
+                }
+            }
+            if (peerInit) {
+                wc_ecc_free(&eccPeer);
+            }
+        }
+        else
+#else
         if (ks->group == WN_GROUP_X25519) {
             if (peerPubLen != WN_X25519_KEY_SZ) {
                 ret = WOLFNANO_E_INVALID_ARG;
@@ -162,32 +208,6 @@ int wn_KeyShare_Shared(wn_KeyShare* ks, const byte* peerPub, word32 peerPubLen,
             }
         }
         else
-#else
-        if (ks->group == WN_GROUP_SECP256R1) {
-            if (peerPubLen != WN_SECP256R1_PUB_SZ) {
-                ret = WOLFNANO_E_INVALID_ARG;
-            }
-            if ((ret == WOLFNANO_SUCCESS) && (wc_ecc_init(&eccPeer) != 0)) {
-                ret = WOLFNANO_E_CRYPTO;
-            }
-            if (ret == WOLFNANO_SUCCESS) {
-                peerInit = 1;
-                if (wc_ecc_import_x963_ex(peerPub, peerPubLen, &eccPeer,
-                                          ECC_SECP256R1) != 0) {
-                    ret = WOLFNANO_E_CRYPTO;
-                }
-            }
-            if (ret == WOLFNANO_SUCCESS) {
-                *outLen = WN_SECP256R1_SECRET_SZ;
-                if (wc_ecc_shared_secret(&ks->ecc, &eccPeer, out, outLen) != 0) {
-                    ret = WOLFNANO_E_CRYPTO;
-                }
-            }
-            if (peerInit) {
-                wc_ecc_free(&eccPeer);
-            }
-        }
-        else
 #endif
         {
             ret = WOLFNANO_E_UNSUPPORTED;
@@ -204,7 +224,11 @@ int wn_KeyShare_Free(wn_KeyShare* ks)
     if (ks == NULL) {
         ret = WOLFNANO_E_INVALID_ARG;
     }
-#ifdef WOLFNANO_HAVE_ECDHE_P256
+#if defined(WOLFNANO_HAVE_MLKEM_HYBRID)
+    else if (ks->group == WN_GROUP_X25519MLKEM768) {
+        ret = wn_Hybrid_Free(&ks->hybrid);
+    }
+#elif defined(WOLFNANO_HAVE_ECDHE_P256)
     else if (ks->group == WN_GROUP_SECP256R1) {
         wc_ecc_free(&ks->ecc);
     }

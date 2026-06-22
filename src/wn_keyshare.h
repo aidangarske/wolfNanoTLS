@@ -31,6 +31,9 @@
 #ifdef WOLFNANO_HAVE_ECDHE_P256
     #include <wolfssl/wolfcrypt/ecc.h>
 #endif
+#ifdef WOLFNANO_HAVE_MLKEM_HYBRID
+    #include "wn_hybrid.h"
+#endif
 
 /* TLS supported_groups code points. */
 #define WN_GROUP_X25519    0x001d
@@ -38,20 +41,32 @@
 
 #define WN_X25519_KEY_SZ 32
 
-#ifdef WOLFNANO_HAVE_ECDHE_P256
+#if defined(WOLFNANO_HAVE_MLKEM_HYBRID)
+    #define WN_KEYSHARE_MAX_PUB    WN_HYBRID_CLIENT_SHARE
+    #define WN_DEFAULT_GROUP       WN_GROUP_X25519MLKEM768
+    #define WN_DEFAULT_PUB_SZ      WN_HYBRID_CLIENT_SHARE
+    #define WN_DEFAULT_SRV_SHARE_SZ WN_HYBRID_SERVER_SHARE
+    #define WN_DEFAULT_SECRET_SZ   WN_HYBRID_SECRET
+#elif defined(WOLFNANO_HAVE_ECDHE_P256)
     #define WN_SECP256R1_PUB_SZ    65   /* uncompressed point 0x04||X||Y */
     #define WN_SECP256R1_SECRET_SZ 32   /* X coordinate */
     #define WN_KEYSHARE_MAX_PUB    65
     #define WN_DEFAULT_GROUP       WN_GROUP_SECP256R1
     #define WN_DEFAULT_PUB_SZ      WN_SECP256R1_PUB_SZ
+    #define WN_DEFAULT_SRV_SHARE_SZ WN_SECP256R1_PUB_SZ
+    #define WN_DEFAULT_SECRET_SZ   WN_SECP256R1_SECRET_SZ
 #else
     #define WN_KEYSHARE_MAX_PUB    32
     #define WN_DEFAULT_GROUP       WN_GROUP_X25519
     #define WN_DEFAULT_PUB_SZ      WN_X25519_KEY_SZ
+    #define WN_DEFAULT_SRV_SHARE_SZ WN_X25519_KEY_SZ
+    #define WN_DEFAULT_SECRET_SZ   WN_X25519_KEY_SZ
 #endif
 
 typedef struct wn_KeyShare {
-#ifdef WOLFNANO_HAVE_ECDHE_P256
+#if defined(WOLFNANO_HAVE_MLKEM_HYBRID)
+    wn_Hybrid hybrid;
+#elif defined(WOLFNANO_HAVE_ECDHE_P256)
     ecc_key ecc;
 #else
     curve25519_key x25519;

@@ -194,14 +194,15 @@ static void wn_SendAlert(wn_IoSend ioSend, void* ioCtx, const byte* key,
 static int wn_DeriveHsKeys(byte* hs, byte* cHs, byte* sHs, byte* cKey,
                            byte* cIv, byte* sKey, byte* sIv,
                            const byte* early, const byte* ecdhe,
-                           const byte* emptyHash, const byte* th)
+                           word32 ecdheLen, const byte* emptyHash,
+                           const byte* th)
 {
     byte derived[32];
     int ret;
 
     ret  = wn_Tls13_DeriveSecret(derived, early, "derived", emptyHash, 32,
                                  WC_SHA256);
-    ret |= wn_Tls13_Extract(hs, derived, 32, ecdhe, 32, WC_SHA256);
+    ret |= wn_Tls13_Extract(hs, derived, 32, ecdhe, ecdheLen, WC_SHA256);
     ret |= wn_Tls13_DeriveSecret(cHs, hs, "c hs traffic", th, 32, WC_SHA256);
     ret |= wn_Tls13_DeriveSecret(sHs, hs, "s hs traffic", th, 32, WC_SHA256);
     ret |= wn_Tls13_ExpandLabel(cKey, 16, cHs, "key", NULL, 0, WC_SHA256);
@@ -268,7 +269,7 @@ int wn_Connect_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     wn_KeyShare ks;
     wn_ServerHello sh;
     byte random32[32], sid[32], cliPub[WN_KEYSHARE_MAX_PUB];
-    byte ecdhe[32], emptyHash[32], th[32], zeros32[32];
+    byte ecdhe[WN_DEFAULT_SECRET_SZ], emptyHash[32], th[32], zeros32[32];
     byte early[32], binderKey[32], hs[32], cHs[32], sHs[32];
     byte cKey[16], cIv[12], sKey[16], sIv[12];
     byte binder[32], mac[32], recvMac[32];
@@ -356,7 +357,7 @@ int wn_Connect_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
         ret = wn_Transcript_Update(&tc, scratch + 5, recLen - 5);
     }
     if (ret == WOLFNANO_SUCCESS) {
-        if ((sh.keyShare == NULL) || (sh.keyShareLen != WN_DEFAULT_PUB_SZ)) {
+        if ((sh.keyShare == NULL) || (sh.keyShareLen != WN_DEFAULT_SRV_SHARE_SZ)) {
             ret = WOLFNANO_E_ILLEGAL_PARAM;
         }
     }
@@ -369,7 +370,7 @@ int wn_Connect_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     if (ret == WOLFNANO_SUCCESS) {
         ret  = wn_Transcript_GetHash(&tc, th, &thLen);
         ret |= wn_DeriveHsKeys(hs, cHs, sHs, cKey, cIv, sKey, sIv, early, ecdhe,
-                               emptyHash, th);
+                               ssLen, emptyHash, th);
     }
 
     /* ----- server encrypted flight: EncryptedExtensions + Finished ----- */
@@ -760,7 +761,7 @@ int wn_Connect_Cert_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     wn_ServerHello sh;
     wn_Reader hr;
     byte random32[32], sid[32], cliPub[WN_KEYSHARE_MAX_PUB];
-    byte ecdhe[32], emptyHash[32], th[32], thCert[32];
+    byte ecdhe[WN_DEFAULT_SECRET_SZ], emptyHash[32], th[32], thCert[32];
     byte zeros[32];
     byte early[32], hs[32], cHs[32], sHs[32];
     byte cKey[16], cIv[12], sKey[16], sIv[12];
@@ -842,7 +843,7 @@ int wn_Connect_Cert_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
         ret = wn_Transcript_Update(&tc, scratch + 5, recLen - 5);
     }
     if ((ret == WOLFNANO_SUCCESS) &&
-        ((sh.keyShare == NULL) || (sh.keyShareLen != WN_DEFAULT_PUB_SZ))) {
+        ((sh.keyShare == NULL) || (sh.keyShareLen != WN_DEFAULT_SRV_SHARE_SZ))) {
         ret = WOLFNANO_E_ILLEGAL_PARAM;
     }
     if (ret == WOLFNANO_SUCCESS) {
@@ -856,7 +857,7 @@ int wn_Connect_Cert_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
         ret |= wn_Tls13_Extract(early, NULL, 0, zeros, sizeof(zeros),
                                 WC_SHA256);
         ret |= wn_DeriveHsKeys(hs, cHs, sHs, cKey, cIv, sKey, sIv, early, ecdhe,
-                               emptyHash, th);
+                               ssLen, emptyHash, th);
 #ifdef WOLFNANO_SEND_ALERTS
         if (ret == WOLFNANO_SUCCESS) { keysReady = 1; }
 #endif
