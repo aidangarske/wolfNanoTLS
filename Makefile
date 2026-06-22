@@ -159,7 +159,7 @@ ASM_CC    := $(CC_$(WOLFNANO_ASM))
 ASM_FLAGS := $(FLAGS_$(WOLFNANO_ASM))
 ASM_SRC   := $(SPSRC_$(WOLFNANO_ASM)) $(ASMSRC_$(WOLFNANO_ASM))
 
-.PHONY: host kstest keyupdatetest sessiontest mocktest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest hybridtest certtest fipsproof bench benchrun targets test-qemu test test-core check example coverage clean
+.PHONY: host kstest keyupdatetest sessiontest mocktest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest hybridtest certtest fipsproof bench benchrun targets test-qemu test test-core check example coverage stackcheck clean
 test: test-core mlkemtest mldsatest hybridtest wctestpqc ## build + run all local self-tests
 test-core: host kstest keyupdatetest sessiontest mocktest rfctest tstest rectest ksharetest hstest wctest msgtest chtest shtest negtest flighttest alerttest matrixtest certtest ## non-PQC suites (wolfSSL without the wc_mlkem/wc_mldsa API)
 
@@ -177,8 +177,10 @@ check: ## run every suite, continue past failures, print one colored PASS/FAIL t
 	     fail=$$((fail+1)); failed="$$failed $$s"; printf "$${R}FAIL$${Z} %s\n" "$$s"; \
 	   fi; \
 	 done; \
+	 checks=$$(cat $(BUILD)/check-*.log 2>/dev/null | grep -cE 'PASS'); \
 	 echo "================ wolfNano test summary ================"; \
 	 printf "  suites passed: %s%d / %d%s\n" "$$([ $$fail -eq 0 ] && echo $$G || echo $$R)" "$$pass" "$$((pass+fail))" "$$Z"; \
+	 printf "  assertions passed: %d\n" "$$checks"; \
 	 [ -n "$$failed" ] && printf "  $${R}FAILED:%s$${Z} (see $(BUILD)/check-<suite>.log)\n" "$$failed"; \
 	 [ $$fail -eq 0 ] && printf "  $${G}ALL SUITES PASS$${Z}\n" || exit 1
 
@@ -512,6 +514,17 @@ example: ## build the minimal PSK client example (examples/client.c)
 	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C \
 	   $(CONN_SRC) examples/client.c -o $(BUILD)/example_client
 	@echo "built $(BUILD)/example_client"
+
+STACK_SRC := wn_connect.c wn_session.c wn_record.c wn_keyschedule.c \
+  wn_keyshare.c wn_transcript.c wn_msg.c wn_serverhello.c wn_clienthello.c
+stackcheck: ## fail if any wolfNano function exceeds the stack budget (-fstack-usage)
+	@mkdir -p $(BUILD)/su
+	@for b in $(STACK_SRC); do \
+	  $(CC) -Os -fstack-usage -c $(SHELL_INC) -DWOLFSSL_USER_SETTINGS \
+	    -DWOLFNANO_TARGET_PORTABLE_C -DWOLFNANO_X509 -DWOLFNANO_HAVE_RSA_VERIFY \
+	    -DWOLFNANO_ALLOW_MALLOC -I. -I$(WOLFSSL) src/$$b -o $(BUILD)/su/$${b%.c}.o; \
+	done
+	@sh scripts/check_stack.sh $(BUILD)/su/*.su
 
 coverage: ## Linux: run the suites under --coverage and enforce 100% (ci/coverage-100.txt)
 	@command -v lcov >/dev/null 2>&1 || { echo "SKIP coverage (no lcov; Linux/CI only)"; exit 0; }

@@ -1,6 +1,9 @@
 name: stack-bounds
 
 on:
+  push:
+    branches: [main]
+  pull_request:
   workflow_dispatch:
   workflow_call:
 
@@ -16,10 +19,12 @@ jobs:
         with:
           submodules: recursive
       - uses: ./.github/actions/setup
-      - run: make host EXTRA_CFLAGS="-fstack-usage"
-      - name: largest stack frames
+      - name: enforce wolfNano stack budget
+        run: make stackcheck
+      - name: largest stack frames (informational)
+        if: always()
         run: |
           { echo '## Largest stack frames'; echo '```';
-            find . -name '*.su' -exec cat {} + 2>/dev/null \
+            cat build/su/*.su 2>/dev/null \
               | sort -t"$(printf '\t')" -k2 -nr | head -25;
             echo '```'; } >> "$GITHUB_STEP_SUMMARY"
