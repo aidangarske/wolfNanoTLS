@@ -1,6 +1,9 @@
 name: coverage
 
 on:
+  push:
+    branches: [main]
+  pull_request:
   workflow_dispatch:
   workflow_call:
 
@@ -19,10 +22,17 @@ jobs:
       - run: sudo apt-get install -y lcov
       - name: make test with coverage
         run: make test EXTRA_CFLAGS="--coverage -O0"
-      - name: capture + report (shell + crypto floor only)
+      - name: capture src/ line coverage
         run: |
-          lcov --capture --directory . --output-file cov.info 2>/dev/null || true
+          lcov --capture --directory . --output-file cov.info \
+            --rc lcov_branch_coverage=0 2>/dev/null || true
           lcov --remove cov.info '*/wolfssl/*' '/usr/*' '*/tests/*' \
             --output-file cov.info 2>/dev/null || true
-          { echo '## Coverage'; echo '```'; lcov --list cov.info 2>/dev/null; echo '```'; } \
-            >> "$GITHUB_STEP_SUMMARY"
+      - name: enforce 100% on completed files (ci/coverage-100.txt)
+        run: sh scripts/check_coverage.sh cov.info ci/coverage-100.txt
+      - name: report table to summary
+        if: always()
+        run: |
+          { echo '## Coverage (src/)'; echo '```';
+            sh scripts/check_coverage.sh cov.info ci/coverage-100.txt || true;
+            echo '```'; } >> "$GITHUB_STEP_SUMMARY"

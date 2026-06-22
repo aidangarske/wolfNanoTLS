@@ -109,7 +109,7 @@ int wn_Record_Protect(byte* rec, word32* recLen, const byte* key, word32 keyLen,
         rec[WN_RECORD_HEADER_SZ + contentLen] = contentType;
 
         if (wc_AesInit(&aes, NULL, INVALID_DEVID) != 0) {
-            ret = WOLFNANO_E_CRYPTO;
+            ret = WOLFNANO_E_CRYPTO; /* LCOV_EXCL_LINE */
         }
     }
 
@@ -166,7 +166,7 @@ int wn_Record_Unprotect(byte* content, word32* contentLen, byte* contentType,
         innerLen = recLen - WN_RECORD_HEADER_SZ - WN_RECORD_TAG_SZ;
         wn_BuildNonce(nonce, iv, seq);
         if (wc_AesInit(&aes, NULL, INVALID_DEVID) != 0) {
-            ret = WOLFNANO_E_CRYPTO;
+            ret = WOLFNANO_E_CRYPTO; /* LCOV_EXCL_LINE */
         }
     }
 

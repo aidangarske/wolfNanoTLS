@@ -1,0 +1,7 @@
+# Source files that must be 100% line-covered (wolfCOSE-grade gate).
+# scripts/check_coverage.sh fails CI if any file listed here is below 100%.
+# The list grows as the test-coverage sprint completes each file; the end
+# state is every src/*.c. Genuinely-unreachable defensive lines are marked
+# /* LCOV_EXCL_LINE */ in the source so 100% is real, not gamed.
+src/wn_session.c
+src/wn_record.c

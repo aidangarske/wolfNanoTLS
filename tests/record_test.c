@@ -117,6 +117,8 @@ int main(void)
           rec, recLen) == WOLFNANO_E_INVALID_ARG, "Unprotect NULL rejected");
     check(wn_Record_Unprotect(out, &outLen, &type, key, sizeof(key), iv, 0,
           rec, 10) == WOLFNANO_E_INVALID_ARG, "Unprotect short record");
+    check(wn_Record_Unprotect(out, &outLen, &type, key, 7, iv, 0, rec, recLen)
+          != WOLFNANO_SUCCESS, "Unprotect bad keyLen fails");
 
     /* all-padding (content + type byte all zero) -> no content type */
     XMEMSET(zc, 0, sizeof(zc));

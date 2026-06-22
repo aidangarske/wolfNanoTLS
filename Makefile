@@ -159,7 +159,7 @@ ASM_CC    := $(CC_$(WOLFNANO_ASM))
 ASM_FLAGS := $(FLAGS_$(WOLFNANO_ASM))
 ASM_SRC   := $(SPSRC_$(WOLFNANO_ASM)) $(ASMSRC_$(WOLFNANO_ASM))
 
-.PHONY: host kstest keyupdatetest sessiontest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest hybridtest certtest fipsproof bench benchrun targets test-qemu test test-core check example clean
+.PHONY: host kstest keyupdatetest sessiontest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest hybridtest certtest fipsproof bench benchrun targets test-qemu test test-core check example coverage clean
 test: test-core mlkemtest mldsatest hybridtest wctestpqc ## build + run all local self-tests
 test-core: host kstest keyupdatetest sessiontest rfctest tstest rectest ksharetest hstest wctest msgtest chtest shtest negtest flighttest alerttest matrixtest certtest ## non-PQC suites (wolfSSL without the wc_mlkem/wc_mldsa API)
 
@@ -495,5 +495,12 @@ example: ## build the minimal PSK client example (examples/client.c)
 	   $(CONN_SRC) examples/client.c -o $(BUILD)/example_client
 	@echo "built $(BUILD)/example_client"
 
+coverage: ## Linux: run the suites under --coverage and enforce 100% (ci/coverage-100.txt)
+	@command -v lcov >/dev/null 2>&1 || { echo "SKIP coverage (no lcov; Linux/CI only)"; exit 0; }
+	$(MAKE) test EXTRA_CFLAGS="--coverage -O0"
+	lcov --capture --directory . --output-file cov.info --rc lcov_branch_coverage=0 2>/dev/null || true
+	lcov --remove cov.info '*/wolfssl/*' '/usr/*' '*/tests/*' --output-file cov.info 2>/dev/null || true
+	sh scripts/check_coverage.sh cov.info ci/coverage-100.txt
+
 clean:
-	rm -rf $(BUILD) *.o
+	rm -rf $(BUILD) *.o *.gcda *.gcno cov.info
