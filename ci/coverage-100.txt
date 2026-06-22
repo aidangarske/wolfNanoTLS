@@ -5,3 +5,5 @@
 # /* LCOV_EXCL_LINE */ in the source so 100% is real, not gamed.
 src/wn_session.c
 src/wn_record.c
+src/wn_serverhello.c
+src/wn_alert.h
