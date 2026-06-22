@@ -189,6 +189,75 @@ static void wn_SendAlert(wn_IoSend ioSend, void* ioCtx, const byte* key,
 }
 #endif /* WOLFNANOTLS_SEND_ALERTS */
 
+/* RFC 8446 7.1: handshake secret, c/s hs traffic, and the record key/iv pair.
+ * Shared by the PSK and cert drivers; early differs per path (PSK vs zeros). */
+static int wn_DeriveHsKeys(byte* hs, byte* cHs, byte* sHs, byte* cKey,
+                           byte* cIv, byte* sKey, byte* sIv,
+                           const byte* early, const byte* ecdhe,
+                           const byte* emptyHash, const byte* th)
+{
+    byte derived[32];
+    int ret;
+
+    ret  = wn_Tls13_DeriveSecret(derived, early, "derived", emptyHash, 32,
+                                 WC_SHA256);
+    ret |= wn_Tls13_Extract(hs, derived, 32, ecdhe, 32, WC_SHA256);
+    ret |= wn_Tls13_DeriveSecret(cHs, hs, "c hs traffic", th, 32, WC_SHA256);
+    ret |= wn_Tls13_DeriveSecret(sHs, hs, "s hs traffic", th, 32, WC_SHA256);
+    ret |= wn_Tls13_ExpandLabel(cKey, 16, cHs, "key", NULL, 0, WC_SHA256);
+    ret |= wn_Tls13_ExpandLabel(cIv, 12, cHs, "iv", NULL, 0, WC_SHA256);
+    ret |= wn_Tls13_ExpandLabel(sKey, 16, sHs, "key", NULL, 0, WC_SHA256);
+    ret |= wn_Tls13_ExpandLabel(sIv, 12, sHs, "iv", NULL, 0, WC_SHA256);
+
+    ForceZero(derived, sizeof(derived));
+    return ret;
+}
+
+/* RFC 8446 7.1: master secret, c/s ap traffic, app key/iv, then populate the
+ * session for wn_Send / wn_Recv. Shared by the PSK and cert drivers. */
+static int wn_SessionEstablish(wn_Session* sess, const byte* hs,
+                               const byte* emptyHash, const byte* zeros,
+                               const byte* th, wn_IoSend ioSend,
+                               wn_IoRecv ioRecv, void* ioCtx, byte* scratch,
+                               word32 scratchLen)
+{
+    byte derived[32];
+    byte master[WN_SECRET_SZ];
+    int ret;
+
+    ret  = wn_Tls13_DeriveSecret(derived, hs, "derived", emptyHash, 32,
+                                 WC_SHA256);
+    ret |= wn_Tls13_Extract(master, derived, 32, zeros, 32, WC_SHA256);
+    ret |= wn_Tls13_DeriveSecret(sess->cAppSecret, master, "c ap traffic",
+                                 th, 32, WC_SHA256);
+    ret |= wn_Tls13_DeriveSecret(sess->sAppSecret, master, "s ap traffic",
+                                 th, 32, WC_SHA256);
+    ret |= wn_Tls13_ExpandLabel(sess->cKey, WN_AEAD_KEY_SZ, sess->cAppSecret,
+                                "key", NULL, 0, WC_SHA256);
+    ret |= wn_Tls13_ExpandLabel(sess->cIv, WN_AEAD_IV_SZ, sess->cAppSecret,
+                                "iv", NULL, 0, WC_SHA256);
+    ret |= wn_Tls13_ExpandLabel(sess->sKey, WN_AEAD_KEY_SZ, sess->sAppSecret,
+                                "key", NULL, 0, WC_SHA256);
+    ret |= wn_Tls13_ExpandLabel(sess->sIv, WN_AEAD_IV_SZ, sess->sAppSecret,
+                                "iv", NULL, 0, WC_SHA256);
+
+    if (ret == WOLFNANOTLS_SUCCESS) {
+        sess->ioSend = ioSend;
+        sess->ioRecv = ioRecv;
+        sess->ioCtx = ioCtx;
+        sess->scratch = scratch;
+        sess->scratchLen = scratchLen;
+        sess->cSeq = 0;
+        sess->sSeq = 0;
+        sess->digest = WC_SHA256;
+        sess->flags = WN_SESS_ESTABLISHED;
+    }
+
+    ForceZero(derived, sizeof(derived));
+    ForceZero(master, sizeof(master));
+    return ret;
+}
+
 int wn_Connect_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
                       wn_IoRecv ioRecv, void* ioCtx, const byte* psk,
                       word32 pskLen, const char* identity, byte* scratch,
@@ -200,8 +269,8 @@ int wn_Connect_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     wn_ServerHello sh;
     byte random32[32], sid[32], cliPub[WN_KEYSHARE_MAX_PUB];
     byte ecdhe[32], emptyHash[32], th[32], zeros32[32];
-    byte early[32], binderKey[32], derived[32], hs[32], cHs[32], sHs[32];
-    byte cKey[16], cIv[12], sKey[16], sIv[12], master[WN_SECRET_SZ];
+    byte early[32], binderKey[32], hs[32], cHs[32], sHs[32];
+    byte cKey[16], cIv[12], sKey[16], sIv[12];
     byte binder[32], mac[32], recvMac[32];
     byte fin[36];
     byte plain[512];
@@ -299,17 +368,8 @@ int wn_Connect_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     /* ----- handshake key schedule ----- */
     if (ret == WOLFNANOTLS_SUCCESS) {
         ret  = wn_Transcript_GetHash(&tc, th, &thLen);
-        ret |= wn_Tls13_DeriveSecret(derived, early, "derived", emptyHash, 32,
-                                     WC_SHA256);
-        ret |= wn_Tls13_Extract(hs, derived, 32, ecdhe, 32, WC_SHA256);
-        ret |= wn_Tls13_DeriveSecret(cHs, hs, "c hs traffic", th, 32,
-                                     WC_SHA256);
-        ret |= wn_Tls13_DeriveSecret(sHs, hs, "s hs traffic", th, 32,
-                                     WC_SHA256);
-        ret |= wn_Tls13_ExpandLabel(cKey, 16, cHs, "key", NULL, 0, WC_SHA256);
-        ret |= wn_Tls13_ExpandLabel(cIv, 12, cHs, "iv", NULL, 0, WC_SHA256);
-        ret |= wn_Tls13_ExpandLabel(sKey, 16, sHs, "key", NULL, 0, WC_SHA256);
-        ret |= wn_Tls13_ExpandLabel(sIv, 12, sHs, "iv", NULL, 0, WC_SHA256);
+        ret |= wn_DeriveHsKeys(hs, cHs, sHs, cKey, cIv, sKey, sIv, early, ecdhe,
+                               emptyHash, th);
     }
 
     /* ----- server encrypted flight: EncryptedExtensions + Finished ----- */
@@ -394,32 +454,8 @@ int wn_Connect_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     /* application traffic secrets (RFC 8446 7.1), transcript through server
      * Finished (th); retained in sess for wn_Send / wn_Recv. */
     if (ret == WOLFNANOTLS_SUCCESS) {
-        ret  = wn_Tls13_DeriveSecret(derived, hs, "derived", emptyHash, 32,
-                                     WC_SHA256);
-        ret |= wn_Tls13_Extract(master, derived, 32, zeros32, 32, WC_SHA256);
-        ret |= wn_Tls13_DeriveSecret(sess->cAppSecret, master, "c ap traffic",
-                                     th, 32, WC_SHA256);
-        ret |= wn_Tls13_DeriveSecret(sess->sAppSecret, master, "s ap traffic",
-                                     th, 32, WC_SHA256);
-        ret |= wn_Tls13_ExpandLabel(sess->cKey, WN_AEAD_KEY_SZ, sess->cAppSecret,
-                                    "key", NULL, 0, WC_SHA256);
-        ret |= wn_Tls13_ExpandLabel(sess->cIv, WN_AEAD_IV_SZ, sess->cAppSecret,
-                                    "iv", NULL, 0, WC_SHA256);
-        ret |= wn_Tls13_ExpandLabel(sess->sKey, WN_AEAD_KEY_SZ, sess->sAppSecret,
-                                    "key", NULL, 0, WC_SHA256);
-        ret |= wn_Tls13_ExpandLabel(sess->sIv, WN_AEAD_IV_SZ, sess->sAppSecret,
-                                    "iv", NULL, 0, WC_SHA256);
-    }
-    if (ret == WOLFNANOTLS_SUCCESS) {
-        sess->ioSend = ioSend;
-        sess->ioRecv = ioRecv;
-        sess->ioCtx = ioCtx;
-        sess->scratch = scratch;
-        sess->scratchLen = scratchLen;
-        sess->cSeq = 0;
-        sess->sSeq = 0;
-        sess->digest = WC_SHA256;
-        sess->flags = WN_SESS_ESTABLISHED;
+        ret = wn_SessionEstablish(sess, hs, emptyHash, zeros32, th, ioSend,
+                                  ioRecv, ioCtx, scratch, scratchLen);
     }
 
     wn_KeyShare_Free(&ks);
@@ -430,8 +466,6 @@ int wn_Connect_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     ForceZero(sHs, sizeof(sHs));
     ForceZero(cKey, sizeof(cKey));
     ForceZero(sKey, sizeof(sKey));
-    ForceZero(derived, sizeof(derived));
-    ForceZero(master, sizeof(master));
     ForceZero(binder, sizeof(binder));
     ForceZero(recvMac, sizeof(recvMac));
 
@@ -728,8 +762,8 @@ int wn_Connect_Cert_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     byte random32[32], sid[32], cliPub[WN_KEYSHARE_MAX_PUB];
     byte ecdhe[32], emptyHash[32], th[32], thCert[32];
     byte zeros[32];
-    byte early[32], derived[32], hs[32], cHs[32], sHs[32];
-    byte cKey[16], cIv[12], sKey[16], sIv[12], master[WN_SECRET_SZ];
+    byte early[32], hs[32], cHs[32], sHs[32];
+    byte cKey[16], cIv[12], sKey[16], sIv[12];
     byte mac[32];
     byte fin[36];
     byte* hsacc = NULL;
@@ -821,17 +855,8 @@ int wn_Connect_Cert_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
         ret  = wn_Transcript_GetHash(&tc, th, &thLen);
         ret |= wn_Tls13_Extract(early, NULL, 0, zeros, sizeof(zeros),
                                 WC_SHA256);
-        ret |= wn_Tls13_DeriveSecret(derived, early, "derived", emptyHash, 32,
-                                     WC_SHA256);
-        ret |= wn_Tls13_Extract(hs, derived, 32, ecdhe, 32, WC_SHA256);
-        ret |= wn_Tls13_DeriveSecret(cHs, hs, "c hs traffic", th, 32,
-                                     WC_SHA256);
-        ret |= wn_Tls13_DeriveSecret(sHs, hs, "s hs traffic", th, 32,
-                                     WC_SHA256);
-        ret |= wn_Tls13_ExpandLabel(cKey, 16, cHs, "key", NULL, 0, WC_SHA256);
-        ret |= wn_Tls13_ExpandLabel(cIv, 12, cHs, "iv", NULL, 0, WC_SHA256);
-        ret |= wn_Tls13_ExpandLabel(sKey, 16, sHs, "key", NULL, 0, WC_SHA256);
-        ret |= wn_Tls13_ExpandLabel(sIv, 12, sHs, "iv", NULL, 0, WC_SHA256);
+        ret |= wn_DeriveHsKeys(hs, cHs, sHs, cKey, cIv, sKey, sIv, early, ecdhe,
+                               emptyHash, th);
 #ifdef WOLFNANOTLS_SEND_ALERTS
         if (ret == WOLFNANOTLS_SUCCESS) { keysReady = 1; }
 #endif
@@ -966,32 +991,8 @@ int wn_Connect_Cert_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     /* application traffic secrets (RFC 8446 7.1), transcript through server
      * Finished (th); retained in sess for wn_Send / wn_Recv. */
     if (ret == WOLFNANOTLS_SUCCESS) {
-        ret  = wn_Tls13_DeriveSecret(derived, hs, "derived", emptyHash, 32,
-                                     WC_SHA256);
-        ret |= wn_Tls13_Extract(master, derived, 32, zeros, 32, WC_SHA256);
-        ret |= wn_Tls13_DeriveSecret(sess->cAppSecret, master, "c ap traffic",
-                                     th, 32, WC_SHA256);
-        ret |= wn_Tls13_DeriveSecret(sess->sAppSecret, master, "s ap traffic",
-                                     th, 32, WC_SHA256);
-        ret |= wn_Tls13_ExpandLabel(sess->cKey, WN_AEAD_KEY_SZ, sess->cAppSecret,
-                                    "key", NULL, 0, WC_SHA256);
-        ret |= wn_Tls13_ExpandLabel(sess->cIv, WN_AEAD_IV_SZ, sess->cAppSecret,
-                                    "iv", NULL, 0, WC_SHA256);
-        ret |= wn_Tls13_ExpandLabel(sess->sKey, WN_AEAD_KEY_SZ, sess->sAppSecret,
-                                    "key", NULL, 0, WC_SHA256);
-        ret |= wn_Tls13_ExpandLabel(sess->sIv, WN_AEAD_IV_SZ, sess->sAppSecret,
-                                    "iv", NULL, 0, WC_SHA256);
-    }
-    if (ret == WOLFNANOTLS_SUCCESS) {
-        sess->ioSend = ioSend;
-        sess->ioRecv = ioRecv;
-        sess->ioCtx = ioCtx;
-        sess->scratch = scratch;
-        sess->scratchLen = scratchLen;
-        sess->cSeq = 0;
-        sess->sSeq = 0;
-        sess->digest = WC_SHA256;
-        sess->flags = WN_SESS_ESTABLISHED;
+        ret = wn_SessionEstablish(sess, hs, emptyHash, zeros, th, ioSend,
+                                  ioRecv, ioCtx, scratch, scratchLen);
     }
 
 #ifdef WOLFNANOTLS_SEND_ALERTS
@@ -1007,8 +1008,6 @@ int wn_Connect_Cert_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     ForceZero(sHs, sizeof(sHs));
     ForceZero(cKey, sizeof(cKey));
     ForceZero(sKey, sizeof(sKey));
-    ForceZero(derived, sizeof(derived));
-    ForceZero(master, sizeof(master));
 
     return ret;
 }
