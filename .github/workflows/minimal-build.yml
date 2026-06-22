@@ -41,6 +41,12 @@ jobs:
           test "$psk"  -lt "$PSK_X25519_MAX"
           test "$p256" -lt "$PSK_P256_MAX"
           test "$cert" -lt "$CERT_MAX"
+      - name: symbol audit (minimal X25519 PSK excludes everything it disables)
+        run: |
+          set -eu
+          sh scripts/symbol_audit.sh arm-none-eabi-nm "$RUNNER_TEMP/wn_fpc/wn_psk.elf" \
+            'wc_ecc' 'sp_256' 'sp_384' 'ed25519' 'wc_Rsa' 'Sha384' 'Sha512' \
+            'Sha3_' 'hacha' 'Poly1305' 'AesCbc' 'Des3' 'wc_Md5' 'MlKem'
       - name: TLS-layer footprint (informational)
         run: sh bench/footprint.sh
       - name: crypto-scope footprint (informational)
