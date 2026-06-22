@@ -37,7 +37,7 @@ static int io_recv(void* ctx, byte* buf, word32 len)
     return (int)io_opaque;
 }
 
-static byte scratch[8192];
+static byte scratch[12288];
 static byte anchor[512];
 
 int main(void)

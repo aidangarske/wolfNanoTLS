@@ -29,3 +29,5 @@ jobs:
       - uses: ./.github/actions/wolfssl-checkout
       - name: make test (all self-test suites)
         run: make test
+      - name: configs-build (compile every starter template)
+        run: make configs-build

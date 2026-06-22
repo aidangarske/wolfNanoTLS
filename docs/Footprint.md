@@ -47,9 +47,13 @@ SHA-256), `arm-none-eabi-gcc -Os -flto -ffunction-sections -fdata-sections
 
 | Client | wolfNano | mbedTLS (hard-min) | full wolfSSL | smaller by |
 |---|--:|--:|--:|--:|
-| PSK + ECDHE, X25519 | **17612** | 42100 | - | 58% |
-| PSK + ECDHE, P-256 | **25432** | 50848 | - | 50% |
-| cert / X.509, P-256 | **61007** | 101232 | 150913 | 40% |
+| PSK + ECDHE, X25519 | **18000** | 42100 | - | 57% |
+| PSK + ECDHE, P-256 | **25840** | 50848 | - | 49% |
+| cert / X.509, P-256 | **62297** | 101232 | 150913 | 38% |
+
+The wolfNano column builds from the public `configs/` starter templates
+(`user_settings_minimal.h`, `user_settings_psk_p256.h`, `user_settings_cert.h`),
+so the numbers reproduce from the same `user_settings.h` a deployment ships.
 
 mbedTLS is given its smallest config too (`MBEDTLS_ECP_FIXED_POINT_OPTIM 0`,
 `ECP_WINDOW_SIZE 2`) so the comparison is not inflated in wolfNano's favor.
@@ -73,7 +77,7 @@ The honest framing:
   in RSA, SHA-1/3, Camellia, DES, ChaCha by default (~80 KB stock PSK).
 - **Reproduce:** `sh bench/footprint-clients.sh`. Exact configs:
   `bench/min/mbedtls_config_psk_hardmin.h` + `bench/min/mbedtls_crypto_config_psk.h`
-  (mbedTLS), `bench/min/wnc/user_settings.h` (wolfNano).
+  (mbedTLS), `configs/user_settings_*.h` (wolfNano).
 - **Both harness clients use opaque (volatile) I/O stubs.** A constant-returning
   stub lets LTO prove the handshake aborts after ClientHello and dead-strip the
   rest, understating the footprint; the opaque stub forces the whole reachable

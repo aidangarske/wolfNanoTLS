@@ -14,9 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      # Verified Cortex-M33 .text (ArmGNU 14.2): X25519 17.2K, P-256 24.8K,
-      # cert 59.6K. Budgets allow ~15% headroom for CI's older arm-gcc; they
-      # fail loudly if the footprint regresses, keeping the headline numbers honest.
+      # Verified Cortex-M33 .text (ArmGNU 14.2) from the configs/ templates:
+      # X25519 17.6K, P-256 25.2K, cert 60.8K. Budgets allow ~15% headroom for
+      # CI's older arm-gcc; they fail loudly if the footprint regresses, keeping
+      # the headline numbers honest.
       PSK_X25519_MAX: 20500
       PSK_P256_MAX: 29500
       CERT_MAX: 70000
