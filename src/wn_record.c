@@ -108,9 +108,11 @@ int wn_Record_Protect(byte* rec, word32* recLen, const byte* key, word32 keyLen,
         XMEMCPY(rec + WN_RECORD_HEADER_SZ, content, contentLen);
         rec[WN_RECORD_HEADER_SZ + contentLen] = contentType;
 
+        /* LCOV_EXCL_START - wc_AesInit cannot fail without an allocator */
         if (wc_AesInit(&aes, NULL, INVALID_DEVID) != 0) {
-            ret = WOLFNANO_E_CRYPTO; /* LCOV_EXCL_LINE */
+            ret = WOLFNANO_E_CRYPTO;
         }
+        /* LCOV_EXCL_STOP */
     }
 
     if (ret == WOLFNANO_SUCCESS) {
@@ -121,6 +123,8 @@ int wn_Record_Protect(byte* rec, word32* recLen, const byte* key, word32 keyLen,
     }
 
     if (ret == WOLFNANO_SUCCESS) {
+        *recLen = WN_RECORD_HEADER_SZ + ctLen;
+        /* LCOV_EXCL_START - AES-GCM encrypt does not fail on valid inputs */
         if (wc_AesGcmEncrypt(&aes,
                 rec + WN_RECORD_HEADER_SZ,
                 rec + WN_RECORD_HEADER_SZ, innerLen,
@@ -129,9 +133,7 @@ int wn_Record_Protect(byte* rec, word32* recLen, const byte* key, word32 keyLen,
                 rec, WN_RECORD_HEADER_SZ) != 0) {
             ret = WOLFNANO_E_CRYPTO;
         }
-        else {
-            *recLen = WN_RECORD_HEADER_SZ + ctLen;
-        }
+        /* LCOV_EXCL_STOP */
     }
 
     if (aesInit) {
@@ -165,9 +167,11 @@ int wn_Record_Unprotect(byte* content, word32* contentLen, byte* contentType,
     if (ret == WOLFNANO_SUCCESS) {
         innerLen = recLen - WN_RECORD_HEADER_SZ - WN_RECORD_TAG_SZ;
         wn_BuildNonce(nonce, iv, seq);
+        /* LCOV_EXCL_START - wc_AesInit cannot fail without an allocator */
         if (wc_AesInit(&aes, NULL, INVALID_DEVID) != 0) {
-            ret = WOLFNANO_E_CRYPTO; /* LCOV_EXCL_LINE */
+            ret = WOLFNANO_E_CRYPTO;
         }
+        /* LCOV_EXCL_STOP */
     }
 
     if (ret == WOLFNANO_SUCCESS) {
