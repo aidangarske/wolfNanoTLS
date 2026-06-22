@@ -336,15 +336,25 @@ matrixtest: ## build + run the data-driven negotiation matrix (PORTABLE_C)
 	@./$(BUILD)/suites_matrix
 
 FUZZ_TIME ?= 60
-fuzz: ## coverage-guided fuzz of the ServerHello parser (clang libFuzzer + ASan)
-	@mkdir -p $(BUILD)/fuzz_corpus
-	clang $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANOTLS_TARGET_PORTABLE_C \
+FUZZ_CC ?= clang
+fuzz: ## coverage-guided fuzz of the wire parsers (clang libFuzzer + ASan)
+	@mkdir -p $(BUILD)/corp_sh $(BUILD)/corp_msg $(BUILD)/corp_rec
+	$(FUZZ_CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANOTLS_TARGET_PORTABLE_C \
 	   -fsanitize=fuzzer,address -g \
 	   src/wn_msg.c src/wn_serverhello.c tests/fuzz_serverhello.c \
 	   -o $(BUILD)/fuzz_serverhello
-	@echo "---- run ($(FUZZ_TIME)s) ----"
-	@./$(BUILD)/fuzz_serverhello -max_total_time=$(FUZZ_TIME) -timeout=10 \
-	   $(BUILD)/fuzz_corpus
+	$(FUZZ_CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANOTLS_TARGET_PORTABLE_C \
+	   -fsanitize=fuzzer,address -g \
+	   src/wn_msg.c tests/fuzz_msg.c -o $(BUILD)/fuzz_msg
+	$(FUZZ_CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANOTLS_TARGET_PORTABLE_C \
+	   -fsanitize=fuzzer,address -g \
+	   $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c $(WC)/logging.c \
+	   $(WC)/random.c $(WC)/sha256.c $(WC)/sha512.c $(WC)/aes.c src/wn_record.c \
+	   tests/wn_host_seed.c tests/fuzz_record.c -o $(BUILD)/fuzz_record
+	@echo "---- run ($(FUZZ_TIME)s each) ----"
+	@./$(BUILD)/fuzz_serverhello -max_total_time=$(FUZZ_TIME) -timeout=10 $(BUILD)/corp_sh
+	@./$(BUILD)/fuzz_msg        -max_total_time=$(FUZZ_TIME) -timeout=10 $(BUILD)/corp_msg
+	@./$(BUILD)/fuzz_record     -max_total_time=$(FUZZ_TIME) -timeout=10 $(BUILD)/corp_rec
 
 mlkemtest: ## build + run the ML-KEM-768 KEM test (WOLFNANOTLS_MLKEM)
 	@mkdir -p $(BUILD)
