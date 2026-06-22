@@ -125,6 +125,7 @@ int main(void)
     byte alert[2];
     byte big[600];
     byte plain[512];
+    byte nst[8];
     byte ct;
     word32 got, pl;
     int rc;
@@ -152,13 +153,10 @@ int main(void)
 
     /* 3. wn_Recv skips a NewSessionTicket and returns the following app data. */
     setup(&s, &m);
-    {
-        byte nst[8];
-        nst[0] = 4;                 /* NewSessionTicket */
-        nst[1] = 0; nst[2] = 0; nst[3] = 4;
-        nst[4] = 0; nst[5] = 0; nst[6] = 0; nst[7] = 0;
-        push_rec(&m, s.sKey, s.sIv, 0, WN_REC_HANDSHAKE, nst, sizeof(nst));
-    }
+    nst[0] = 4;                     /* NewSessionTicket */
+    nst[1] = 0; nst[2] = 0; nst[3] = 4;
+    nst[4] = 0; nst[5] = 0; nst[6] = 0; nst[7] = 0;
+    push_rec(&m, s.sKey, s.sIv, 0, WN_REC_HANDSHAKE, nst, sizeof(nst));
     push_rec(&m, s.sKey, s.sIv, 1, WN_REC_APPDATA, (const byte*)"abc", 3);
     got = 0;
     rc = wn_Recv(&s, out, sizeof(out), &got);

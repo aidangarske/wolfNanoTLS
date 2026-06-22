@@ -732,9 +732,9 @@ int wn_Connect_Cert_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     byte cKey[16], cIv[12], sKey[16], sIv[12], master[WN_SECRET_SZ];
     byte mac[32];
     byte fin[36];
-    byte* hsacc;
-    byte* leafSpki;
-    byte* plain;
+    byte* hsacc = NULL;
+    byte* leafSpki = NULL;
+    byte* plain = NULL;
     const byte* certs[WN_MAX_CHAIN];
     word32 certLens[WN_MAX_CHAIN];
     word32 ioCap = 0;
