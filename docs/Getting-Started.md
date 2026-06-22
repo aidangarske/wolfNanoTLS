@@ -72,6 +72,25 @@ you can relax it:
 make host MALLOC=1
 ```
 
+## Starter configurations
+
+`configs/` holds ready-to-copy `user_settings.h` templates, one per build
+profile or device. Copy the one you want to your project as `user_settings.h`
+and build with `-DWOLFSSL_USER_SETTINGS`. `make configs-build` compile-tests
+every template against the shell.
+
+| Template | Profile | Cortex-M33 `.text` |
+|---|---|--:|
+| `user_settings_minimal.h` | PSK + ECDHE X25519 (smallest) | 17.6 KB |
+| `user_settings_psk_p256.h` | PSK + ECDHE P-256 (broad interop) | 25.2 KB |
+| `user_settings_cert.h` | X.509 server-cert client, ECDSA P-256 | 60.8 KB |
+| `user_settings_stm32h563.h` | STM32H563 (Cortex-M33 + Thumb2 asm) | device |
+| `user_settings_baremetal.h` | generic no-OS MCU (portable C) | device |
+
+The `.text` numbers reproduce from these exact templates with
+`sh bench/footprint-clients.sh` (ArmGNU `-Os -flto --gc-sections`, nano specs);
+see [Footprint](Footprint.md).
+
 ## Entropy
 
 The DRBG is seeded through a pluggable hook, `wn_seed`. The host self-test
