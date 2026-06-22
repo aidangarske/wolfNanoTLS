@@ -35,6 +35,32 @@ static void check(int ok, const char* name)
     }
 }
 
+typedef struct {
+    const byte* buf;
+    word32 len;
+    word32 pos;
+} buf_io;
+
+static int buf_recv(void* ctx, byte* out, word32 len)
+{
+    buf_io* b = (buf_io*)ctx;
+    word32 n = b->len - b->pos;
+    if (n > len) {
+        n = len;
+    }
+    XMEMCPY(out, b->buf + b->pos, n);
+    b->pos += n;
+    return (int)n;
+}
+
+static int zero_recv(void* ctx, byte* out, word32 len)
+{
+    (void)ctx;
+    (void)out;
+    (void)len;
+    return 0;                                   /* simulate closed connection */
+}
+
 int main(void)
 {
     static const byte key[16] = {
@@ -46,8 +72,12 @@ int main(void)
     const byte content[14] = { 'h','e','l','l','o',' ','w','o','l','f','N','a','n','o' };
     byte rec[5 + sizeof(content) + 1 + 16];
     byte out[sizeof(content) + 1];
-    word32 recLen = 0, outLen = 0;
-    byte type = 0;
+    byte big2[5 + 4 + 1 + 16];
+    byte zc[4];
+    byte hdr[5];
+    buf_io b;
+    word32 recLen = 0, outLen = 0, rl = 0;
+    byte type = 0, rtype = 0;
     int rc;
 
     printf("wolfNanoTLS TLS 1.3 record-protection tests\n");
@@ -76,6 +106,36 @@ int main(void)
     rc = wn_Record_Unprotect(out, &outLen, &type, key, sizeof(key), iv, 1,
                              rec, recLen);
     check(rc != WOLFNANOTLS_SUCCESS, "wrong sequence number is rejected");
+
+    /* --- negative / edge paths --- */
+    check(wn_Record_Protect(NULL, &recLen, key, sizeof(key), iv, 0, 22,
+          content, sizeof(content)) == WOLFNANOTLS_E_INVALID_ARG,
+          "Protect NULL rejected");
+    check(wn_Record_Protect(rec, &recLen, key, 7, iv, 0, 22, content,
+          sizeof(content)) != WOLFNANOTLS_SUCCESS, "Protect bad keyLen fails");
+    check(wn_Record_Unprotect(NULL, &outLen, &type, key, sizeof(key), iv, 0,
+          rec, recLen) == WOLFNANOTLS_E_INVALID_ARG, "Unprotect NULL rejected");
+    check(wn_Record_Unprotect(out, &outLen, &type, key, sizeof(key), iv, 0,
+          rec, 10) == WOLFNANOTLS_E_INVALID_ARG, "Unprotect short record");
+
+    /* all-padding (content + type byte all zero) -> no content type */
+    XMEMSET(zc, 0, sizeof(zc));
+    rl = 0;
+    wn_Record_Protect(big2, &rl, key, sizeof(key), iv, 0, 0, zc, sizeof(zc));
+    check(wn_Record_Unprotect(out, &outLen, &type, key, sizeof(key), iv, 0,
+          big2, rl) == WOLFNANOTLS_E_DECODE, "all-padding record -> DECODE");
+
+    /* wn_RecvRecord: zero-length fragment, oversized fragment, EOF */
+    hdr[0] = 22; hdr[1] = 0x03; hdr[2] = 0x03; hdr[3] = 0; hdr[4] = 0;
+    b.buf = hdr; b.len = 5; b.pos = 0;
+    check(wn_RecvRecord(buf_recv, &b, rec, sizeof(rec), &rtype, &rl) != 0,
+          "RecvRecord zero fragment rejected");
+    hdr[3] = 0xff; hdr[4] = 0xff;
+    b.buf = hdr; b.len = 5; b.pos = 0;
+    check(wn_RecvRecord(buf_recv, &b, rec, sizeof(rec), &rtype, &rl) != 0,
+          "RecvRecord oversized fragment rejected");
+    check(wn_RecvRecord(zero_recv, &b, rec, sizeof(rec), &rtype, &rl) != 0,
+          "RecvRecord EOF rejected");
 
     printf("\n%s (%d failure%s)\n", fails ? "\033[31mFAILED\033[0m" : "\033[32mALL PASS\033[0m",
            fails, fails == 1 ? "" : "s");
