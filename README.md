@@ -152,14 +152,18 @@ Pick the accelerated backend with `WOLFNANOTLS_ASM=intel|thumb2|aarch64|armv7|ri
 
 Runs on every push and PR:
 
-- **Build + Test**: Ubuntu + macOS, GCC + Clang, against the pinned, latest
-  stable, and master wolfSSL submodule
+- **Build + Test**: Ubuntu x86_64 + arm64, GCC + Clang, against the pinned,
+  latest stable, and master wolfSSL submodule
+- **Coverage gate**: **100% line coverage of every `src/` file**, enforced
+  (`ci/coverage-100.txt`); reachable code only, justified `LCOV_EXCL` otherwise
+- **Stack gate**: per-function stack budget (<= 5 KB), enforced
 - **Standards**: house style, no bare-scope braces, C89 `-Werror`, the
   zero-allocation grep
 - **Static analysis**: Semgrep, cppcheck, codespell
-- **Sanitizers**: ASAN / UBSAN
-- **Nightly**: coverage, stack bounds, Coverity, footprint + speed vs mbedTLS,
-  and a green-gated auto-bump of the wolfSSL pin to a known-good master
+- **Sanitizers**: ASAN / UBSAN (incl. the full handshake via the mock-server test)
+- **Fuzzing**: libFuzzer over the ServerHello, record, and wire-reader parsers
+- **Nightly**: Coverity, footprint + speed vs mbedTLS, and a green-gated
+  auto-bump of the wolfSSL pin to a known-good master
 
 See [CI](https://github.com/aidangarske/wolfNanoTLS/wiki/CI).
 

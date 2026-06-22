@@ -15,3 +15,4 @@ src/wn_transcript.c
 src/wn_keyshare.c
 src/wn_hybrid.c
 src/wn_connect.c
+src/wn_error.c
