@@ -4,6 +4,21 @@ wolfNano is built test-first, the way wolfCOSE and wolfIP are: write the failing
 test (an RFC vector, a KAT, or an interop handshake) before the code, and judge
 every feature on three axes: RFC conformance, speed, and code size.
 
+## Coverage (100%, enforced)
+
+Every wolfNano source file under `src/` is held at **100% line coverage**, the
+wolfCOSE bar. `make coverage` (Linux + lcov) builds the suites under `--coverage`
+and `scripts/check_coverage.sh` fails if any file listed in `ci/coverage-100.txt`
+drops below 100%; the `coverage` workflow runs it on every push and PR. The only
+lines excluded are genuinely-unreachable defensive branches (e.g. a `wc_*`
+primitive that cannot fail on a validated input, an allocator-failure branch in
+a no-allocator build), each marked `/* LCOV_EXCL_LINE */` or
+`LCOV_EXCL_START/STOP` with a one-line reason - never reachable code. The
+handshake driver (`wn_connect.c`) is covered offline by an in-process
+mock-server test (`make mocktest`) that drives a full PSK handshake plus injected
+failure modes, so it needs no network. A per-function **stack budget** is also
+gated (`make stackcheck`, <= 5 KB/function).
+
 ## Crypto floor self-test
 
 `tests/floor_test.c` exercises the floor against published vectors and

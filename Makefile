@@ -159,11 +159,11 @@ ASM_CC    := $(CC_$(WOLFNANO_ASM))
 ASM_FLAGS := $(FLAGS_$(WOLFNANO_ASM))
 ASM_SRC   := $(SPSRC_$(WOLFNANO_ASM)) $(ASMSRC_$(WOLFNANO_ASM))
 
-.PHONY: host kstest keyupdatetest sessiontest mocktest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest hybridtest certtest fipsproof bench benchrun targets test-qemu test test-core check example coverage stackcheck clean
+.PHONY: host kstest keyupdatetest sessiontest mocktest errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest hybridtest certtest fipsproof bench benchrun targets test-qemu test test-core check example coverage stackcheck clean
 test: test-core mlkemtest mldsatest hybridtest wctestpqc ## build + run all local self-tests
-test-core: host kstest keyupdatetest sessiontest mocktest rfctest tstest rectest ksharetest hstest wctest msgtest chtest shtest negtest flighttest alerttest matrixtest certtest ## non-PQC suites (wolfSSL without the wc_mlkem/wc_mldsa API)
+test-core: host kstest keyupdatetest sessiontest mocktest errtest rfctest tstest rectest ksharetest hstest wctest msgtest chtest shtest negtest flighttest alerttest matrixtest certtest ## non-PQC suites (wolfSSL without the wc_mlkem/wc_mldsa API)
 
-SUITES := host kstest keyupdatetest sessiontest mocktest rfctest tstest rectest ksharetest hstest wctest wctestpqc \
+SUITES := host kstest keyupdatetest sessiontest mocktest errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc \
   msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest hybridtest certtest
 
 check: ## run every suite, continue past failures, print one colored PASS/FAIL tally
@@ -204,6 +204,13 @@ keyupdatetest: ## build + run the post-handshake KeyUpdate KAT (PORTABLE_C)
 	   $(KS_SRC) tests/keyupdate_test.c -o $(BUILD)/keyupdate_test
 	@echo "---- run ----"
 	@./$(BUILD)/keyupdate_test
+
+errtest: ## build + run the wn_ErrorToString tests (PORTABLE_C)
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C \
+	   src/wn_error.c tests/error_test.c -o $(BUILD)/error_test
+	@echo "---- run ----"
+	@./$(BUILD)/error_test
 
 mocktest: ## build + run the in-process mock-server handshake test (PORTABLE_C)
 	@mkdir -p $(BUILD)

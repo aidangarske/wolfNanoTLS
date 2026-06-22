@@ -49,4 +49,7 @@
 typedef int (*wn_IoSend)(void* ctx, const byte* buf, word32 len);
 typedef int (*wn_IoRecv)(void* ctx, byte* buf, word32 len);
 
+/* Short human-readable string for a return code (static, never NULL). */
+WOLFNANO_API const char* wn_ErrorToString(int err);
+
 #endif /* WOLFNANO_H */
