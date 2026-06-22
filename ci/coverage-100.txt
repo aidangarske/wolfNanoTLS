@@ -10,3 +10,5 @@ src/wn_alert.h
 src/wn_msg.c
 src/wn_flight.h
 src/wn_clienthello.c
+src/wn_keyschedule.c
+src/wn_transcript.c

@@ -89,6 +89,24 @@ int main(void)
     check((rc == WOLFNANOTLS_SUCCESS) && (l1 == 48) && eq(h1, sha384abc, 48),
           "SHA-384 transcript of \"abc\"");
 
+    /* NULL args rejected */
+    check(wn_Transcript_Init(NULL, WC_SHA256) == WOLFNANOTLS_E_INVALID_ARG,
+          "Init NULL rejected");
+    check(wn_Transcript_Update(NULL, h1, 1) == WOLFNANOTLS_E_INVALID_ARG,
+          "Update NULL rejected");
+    check(wn_Transcript_GetHash(NULL, h1, &l1) == WOLFNANOTLS_E_INVALID_ARG,
+          "GetHash NULL rejected");
+    check(wn_Transcript_Free(NULL) == WOLFNANOTLS_E_INVALID_ARG,
+          "Free NULL rejected");
+
+    /* unsupported digest rejected in init, update, get-hash */
+    rc = wn_Transcript_Init(&t, 0x7f);
+    check(rc == WOLFNANOTLS_E_UNSUPPORTED, "Init unsupported digest");
+    check(wn_Transcript_Update(&t, h1, 1) == WOLFNANOTLS_E_UNSUPPORTED,
+          "Update unsupported digest");
+    check(wn_Transcript_GetHash(&t, h1, &l1) == WOLFNANOTLS_E_UNSUPPORTED,
+          "GetHash unsupported digest");
+
     printf("\n%s (%d failure%s)\n", fails ? "\033[31mFAILED\033[0m" : "\033[32mALL PASS\033[0m",
            fails, fails == 1 ? "" : "s");
     return fails ? 1 : 0;

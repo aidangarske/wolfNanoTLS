@@ -60,9 +60,11 @@ int wn_Tls13_Extract(byte* prk, const byte* salt, word32 saltLen,
         /* wc_ takes a non-const ikm but does not modify it for Extract. */
         ret = wc_Tls13_HKDF_Extract(prk, salt, saltLen,
                                     (byte*)ikm, ikmLen, digest);
+        /* LCOV_EXCL_START - HKDF-Extract does not fail on a validated digest */
         if (ret != 0) {
             ret = WOLFNANOTLS_E_CRYPTO;
         }
+        /* LCOV_EXCL_STOP */
     }
 
     return ret;
@@ -87,9 +89,11 @@ int wn_Tls13_ExpandLabel(byte* okm, word32 okmLen, const byte* secret,
                   protocol, (word32)sizeof(protocol),
                   (const byte*)label, (word32)XSTRLEN(label),
                   info, infoLen, digest);
+        /* LCOV_EXCL_START - HKDF-Expand-Label does not fail on a valid digest */
         if (ret != 0) {
             ret = WOLFNANOTLS_E_CRYPTO;
         }
+        /* LCOV_EXCL_STOP */
     }
 
     return ret;
@@ -123,18 +127,22 @@ int wn_Tls13_FinishedMac(byte* out, const byte* baseKey,
     }
 
     if (ret == WOLFNANOTLS_SUCCESS) {
+        /* LCOV_EXCL_START - wc_HmacInit does not fail without an allocator */
         if (wc_HmacInit(&hmac, NULL, INVALID_DEVID) != 0) {
             ret = WOLFNANOTLS_E_CRYPTO;
         }
+        /* LCOV_EXCL_STOP */
     }
 
     if (ret == WOLFNANOTLS_SUCCESS) {
         hmacInit = 1;
+        /* LCOV_EXCL_START - HMAC set/update/final does not fail on valid input */
         if ((wc_HmacSetKey(&hmac, digest, finishedKey, hashLen) != 0) ||
             (wc_HmacUpdate(&hmac, transcriptHash, hashLen) != 0) ||
             (wc_HmacFinal(&hmac, out) != 0)) {
             ret = WOLFNANOTLS_E_CRYPTO;
         }
+        /* LCOV_EXCL_STOP */
     }
 
     if (hmacInit) {

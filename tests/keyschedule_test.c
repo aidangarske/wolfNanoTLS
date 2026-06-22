@@ -121,6 +121,7 @@ int main(void)
     byte sAp[32];
     byte fmac[32];
     byte fmanual[32];
+    byte big[48];
     Hmac h;
     int rc;
 
@@ -197,6 +198,25 @@ int main(void)
     wc_HmacFree(&h);
     check((rc == WOLFNANOTLS_SUCCESS) && eq(fmac, fmanual, 32),
           "FinishedMac = HMAC(finished_key, transcript)");
+
+    /* SHA-384 path: exercise the WC_SHA384 branch in wn_DigestSize end to end */
+    rc  = wn_Tls13_Extract(big, NULL, 0, psk, 32, WC_SHA384);
+    rc |= wn_Tls13_ExpandLabel(big, 48, big, "derived", emptyHash, 32,
+                               WC_SHA384);
+    rc |= wn_Tls13_FinishedMac(big, big, emptyHash, 48, WC_SHA384);
+    check(rc == WOLFNANOTLS_SUCCESS, "SHA-384 key-schedule path runs");
+
+    /* invalid arguments and unknown digest are rejected */
+    check(wn_Tls13_Extract(NULL, NULL, 0, psk, 32, WC_SHA256)
+          == WOLFNANOTLS_E_INVALID_ARG, "Extract NULL rejected");
+    check(wn_Tls13_Extract(big, NULL, 0, psk, 32, 0x7f)
+          == WOLFNANOTLS_E_INVALID_ARG, "Extract unknown digest rejected");
+    check(wn_Tls13_ExpandLabel(NULL, 32, sHs, "key", NULL, 0, WC_SHA256)
+          == WOLFNANOTLS_E_INVALID_ARG, "ExpandLabel NULL rejected");
+    check(wn_Tls13_FinishedMac(NULL, sHs, emptyHash, 32, WC_SHA256)
+          == WOLFNANOTLS_E_INVALID_ARG, "FinishedMac NULL rejected");
+    check(wn_Tls13_KeyUpdate(NULL, sKey, sIv, WC_SHA256)
+          == WOLFNANOTLS_E_INVALID_ARG, "KeyUpdate NULL rejected");
 
     printf("\n%s (%d failure%s)\n", fails ? "\033[31mFAILED\033[0m" : "\033[32mALL PASS\033[0m",
            fails, fails == 1 ? "" : "s");
