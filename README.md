@@ -155,7 +155,7 @@ Runs on every push and PR:
 - **Build + Test**: Ubuntu x86_64 + arm64, GCC + Clang, against the pinned,
   latest stable, and master wolfSSL submodule
 - **Coverage gate**: **100% line coverage of every `src/` file**, enforced
-  (`ci/coverage-100.txt`); reachable code only, justified `LCOV_EXCL` otherwise
+  (`.github/ci/coverage-100.txt`); reachable code only, justified `LCOV_EXCL` otherwise
 - **Stack gate**: per-function stack budget (<= 5 KB), enforced
 - **Standards**: house style, no bare-scope braces, C89 `-Werror`, the
   zero-allocation grep

@@ -536,12 +536,12 @@ stackcheck: ## fail if any wolfNano function exceeds the stack budget (-fstack-u
 	done
 	@sh scripts/check_stack.sh $(BUILD)/su/*.su
 
-coverage: ## Linux: run the suites under --coverage and enforce 100% (ci/coverage-100.txt)
+coverage: ## Linux: run the suites under --coverage and enforce 100% (.github/ci/coverage-100.txt)
 	@command -v lcov >/dev/null 2>&1 || { echo "SKIP coverage (no lcov; Linux/CI only)"; exit 0; }
 	$(MAKE) test EXTRA_CFLAGS="--coverage -O0"
 	lcov --capture --directory . --output-file cov.info --rc lcov_branch_coverage=0 2>/dev/null || true
 	lcov --remove cov.info '*/wolfssl/*' '/usr/*' '*/tests/*' --output-file cov.info 2>/dev/null || true
-	sh scripts/check_coverage.sh cov.info ci/coverage-100.txt
+	sh scripts/check_coverage.sh cov.info .github/ci/coverage-100.txt
 
 clean:
 	rm -rf $(BUILD) *.o *.gcda *.gcno cov.info

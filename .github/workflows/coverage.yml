@@ -28,11 +28,11 @@ jobs:
             --rc lcov_branch_coverage=0 2>/dev/null || true
           lcov --remove cov.info '*/wolfssl/*' '/usr/*' '*/tests/*' \
             --output-file cov.info 2>/dev/null || true
-      - name: enforce 100% on completed files (ci/coverage-100.txt)
-        run: sh scripts/check_coverage.sh cov.info ci/coverage-100.txt
+      - name: enforce 100% on completed files (.github/ci/coverage-100.txt)
+        run: sh scripts/check_coverage.sh cov.info .github/ci/coverage-100.txt
       - name: report table to summary
         if: always()
         run: |
           { echo '## Coverage (src/)'; echo '```';
-            sh scripts/check_coverage.sh cov.info ci/coverage-100.txt || true;
+            sh scripts/check_coverage.sh cov.info .github/ci/coverage-100.txt || true;
             echo '```'; } >> "$GITHUB_STEP_SUMMARY"

@@ -8,7 +8,7 @@ every feature on three axes: RFC conformance, speed, and code size.
 
 Every wolfNano source file under `src/` is held at **100% line coverage**, the
 wolfCOSE bar. `make coverage` (Linux + lcov) builds the suites under `--coverage`
-and `scripts/check_coverage.sh` fails if any file listed in `ci/coverage-100.txt`
+and `scripts/check_coverage.sh` fails if any file listed in `.github/ci/coverage-100.txt`
 drops below 100%; the `coverage` workflow runs it on every push and PR. The only
 lines excluded are genuinely-unreachable defensive branches (e.g. a `wc_*`
 primitive that cannot fail on a validated input, an allocator-failure branch in
