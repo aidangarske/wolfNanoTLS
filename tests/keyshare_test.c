@@ -61,6 +61,31 @@ int main(void)
 
     rc = wn_KeyShare_Init(&a, 0x0017);
     check(rc == WOLFNANO_E_UNSUPPORTED, "unsupported group is rejected");
+    rc = wn_KeyShare_Init(&a, WN_GROUP_X25519);
+
+    /* NULL / invalid-arg paths */
+    check(wn_KeyShare_Init(NULL, WN_GROUP_X25519) == WOLFNANO_E_INVALID_ARG,
+          "Init NULL rejected");
+    check(wn_KeyShare_Generate(NULL, &rng, pubA, &pubALen)
+          == WOLFNANO_E_INVALID_ARG, "Generate NULL rejected");
+    check(wn_KeyShare_Shared(NULL, pubB, 32, sa, &saLen)
+          == WOLFNANO_E_INVALID_ARG, "Shared NULL rejected");
+    check(wn_KeyShare_Shared(&a, pubB, 31, sa, &saLen)
+          == WOLFNANO_E_INVALID_ARG, "Shared wrong peer length rejected");
+    check(wn_KeyShare_Free(NULL) == WOLFNANO_E_INVALID_ARG, "Free NULL rejected");
+
+    /* degenerate all-zero peer key must be rejected by the shared secret */
+    XMEMSET(pubB, 0, 32);
+    check(wn_KeyShare_Shared(&b, pubB, 32, sa, &saLen) != WOLFNANO_SUCCESS,
+          "degenerate all-zero peer key rejected");
+
+    /* bad group reaches the UNSUPPORTED branch in Generate and Shared */
+    a.group = 0x9999;
+    check(wn_KeyShare_Generate(&a, &rng, pubA, &pubALen)
+          == WOLFNANO_E_UNSUPPORTED, "Generate unsupported group");
+    check(wn_KeyShare_Shared(&a, pubA, 32, sa, &saLen)
+          == WOLFNANO_E_UNSUPPORTED, "Shared unsupported group");
+    a.group = WN_GROUP_X25519;
 
     wn_KeyShare_Free(&a);
     wn_KeyShare_Free(&b);
