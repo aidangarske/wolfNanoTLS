@@ -459,6 +459,15 @@ int wn_Connect_Psk(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv, void* ioCtx,
 #define WN_HS_CERT_REQUEST 13
 #define WN_MAX_CHAIN      4
 
+/* Cert-path working buffers live in the caller scratch (not the stack) to keep
+ * the frame small for embedded. scratch is partitioned [record I/O | hsacc |
+ * leafSpki]; records decrypt in place in the I/O region. WN_CERT_SCRATCH_MIN is
+ * the minimum scratchLen. */
+#define WN_HS_ACC_SZ       6144
+#define WN_LEAF_SPKI_SZ    1024
+#define WN_CERT_IO_MIN     4096
+#define WN_CERT_SCRATCH_MIN (WN_CERT_IO_MIN + WN_HS_ACC_SZ + WN_LEAF_SPKI_SZ)
+
 /* Build the TLS 1.3 CertificateVerify signed content (RFC 8446 4.4.3). */
 static void wn_BuildCvTbs(byte* tbs, word32* tbsLen, const byte* th,
                           word32 thLen)
@@ -723,11 +732,12 @@ int wn_Connect_Cert_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     byte cKey[16], cIv[12], sKey[16], sIv[12], master[WN_SECRET_SZ];
     byte mac[32];
     byte fin[36];
-    byte hsacc[6144];
-    byte leafSpki[1024];
-    byte plain[2048];
+    byte* hsacc;
+    byte* leafSpki;
+    byte* plain;
     const byte* certs[WN_MAX_CHAIN];
     word32 certLens[WN_MAX_CHAIN];
+    word32 ioCap = 0;
     word32 chLen, recLen, thLen, pubLen, ssLen, plainLen, spkiLen = 0;
     word32 accLen = 0, sSeq = 0, off = 0;
     byte rtype = 0, ctype = 0;
@@ -739,11 +749,15 @@ int wn_Connect_Cert_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
 
     if ((sess == NULL) || (rng == NULL) || (ioSend == NULL) ||
         (ioRecv == NULL) || (anchor == NULL) || (scratch == NULL) ||
-        (scratchLen < 4096)) {
+        (scratchLen < WN_CERT_SCRATCH_MIN)) {
         ret = WOLFNANO_E_INVALID_ARG;
     }
 
     if (ret == WOLFNANO_SUCCESS) {
+        ioCap = scratchLen - (WN_HS_ACC_SZ + WN_LEAF_SPKI_SZ);
+        plain = scratch + WN_RECORD_HEADER_SZ;   /* records decrypt in place */
+        hsacc = scratch + ioCap;
+        leafSpki = hsacc + WN_HS_ACC_SZ;
         XMEMSET(zeros, 0, sizeof(zeros));
         if ((wc_Sha256Hash((const byte*)"", 0, emptyHash) != 0) ||
             (wc_RNG_GenerateBlock(rng, random32, 32) != 0) ||
@@ -780,7 +794,7 @@ int wn_Connect_Cert_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     /* ServerHello */
     if (ret == WOLFNANO_SUCCESS) {
         do {
-            ret = wn_RecvRecord(ioRecv, ioCtx, scratch, scratchLen, &rtype,
+            ret = wn_RecvRecord(ioRecv, ioCtx, scratch, ioCap, &rtype,
                               &recLen);
         } while ((ret == WOLFNANO_SUCCESS) && (rtype == WN_REC_CHANGE_CIPHER));
     }
@@ -825,7 +839,7 @@ int wn_Connect_Cert_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
 
     /* server flight: EncryptedExtensions, Certificate, CertVerify, Finished */
     while ((ret == WOLFNANO_SUCCESS) && (done == 0)) {
-        ret = wn_RecvRecord(ioRecv, ioCtx, scratch, scratchLen, &rtype, &recLen);
+        ret = wn_RecvRecord(ioRecv, ioCtx, scratch, ioCap, &rtype, &recLen);
         if ((ret == WOLFNANO_SUCCESS) && (rtype == WN_REC_CHANGE_CIPHER)) {
             continue;
         }
@@ -838,7 +852,7 @@ int wn_Connect_Cert_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
             sSeq++;
         }
         if ((ret == WOLFNANO_SUCCESS) && (ctype == WN_REC_HANDSHAKE)) {
-            if ((accLen + plainLen) > sizeof(hsacc)) {
+            if ((accLen + plainLen) > WN_HS_ACC_SZ) {
                 ret = WOLFNANO_E_CRYPTO;
             }
             else {
@@ -884,7 +898,7 @@ int wn_Connect_Cert_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
                     extl = wn_Read_U16(&hr);               /* entry extensions */
                     (void)wn_Read_Bytes(&hr, extl);
                 }
-                spkiLen = (word32)sizeof(leafSpki);
+                spkiLen = WN_LEAF_SPKI_SZ;
                 if (hr.err != 0) {
                     ret = WOLFNANO_E_DECODE;
                 }

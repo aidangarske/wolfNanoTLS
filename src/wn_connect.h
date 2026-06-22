@@ -54,6 +54,8 @@ WOLFNANO_API int wn_Connect_Psk_ex(wn_Session* sess, WC_RNG* rng,
 /* Perform a TLS 1.3 ECDHE handshake with server certificate authentication.
  * anchor is a pinned trust anchor (DER); the server's leaf must verify against
  * it and the CertificateVerify signature must verify with the leaf key.
+ * The cert path keeps its large working buffers (handshake accumulator, record
+ * plaintext, leaf SPKI) in scratch, so scratchLen must be at least ~13 KB.
  * Requires WOLFNANO_X509. Returns WOLFNANO_SUCCESS on a completed handshake. */
 WOLFNANO_API int wn_Connect_Cert(WC_RNG* rng, wn_IoSend ioSend,
                                  wn_IoRecv ioRecv, void* ioCtx,
