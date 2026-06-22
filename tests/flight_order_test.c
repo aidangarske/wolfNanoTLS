@@ -67,6 +67,7 @@ int main(void)
         WN_FLIGHT_EE, WN_FLIGHT_CERT_REQ, WN_FLIGHT_CERT, WN_FLIGHT_CERT_VFY,
         WN_FLIGHT_FINISHED
     };
+    static const byte certReqEarly[] = { WN_FLIGHT_CERT_REQ };
     static const byte certNoVfy[] = { WN_FLIGHT_EE, WN_FLIGHT_CERT };
     static const byte finishedFirst[] = { WN_FLIGHT_FINISHED };
     static const byte certBeforeEE[] = { WN_FLIGHT_CERT, WN_FLIGHT_EE };
@@ -96,6 +97,8 @@ int main(void)
           "Finished before CertificateVerify rejected");
     check(run_seq(certBeforeEE, 2) == WOLFNANO_E_UNEXPECTED_MSG,
           "Certificate before EncryptedExtensions rejected");
+    check(run_seq(certReqEarly, 1) == WOLFNANO_E_UNEXPECTED_MSG,
+          "CertificateRequest before EncryptedExtensions rejected");
     check(run_seq(dupEE, 2) == WOLFNANO_E_UNEXPECTED_MSG,
           "duplicate EncryptedExtensions rejected");
     check(run_seq(dupCert, 3) == WOLFNANO_E_UNEXPECTED_MSG,

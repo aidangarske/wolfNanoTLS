@@ -84,10 +84,19 @@ int main(void)
     (void)wn_Read_U16(&r);
     check(r.err == 1, "short read sets err");
 
-    /* write overflow latches err */
+    /* write overflow latches err (each writer width) */
     wn_Writer_Init(&w, buf, 2);
     wn_Write_U24(&w, 0x010203);
-    check(w.err == 1, "write overflow sets err");
+    check(w.err == 1, "U24 overflow sets err");
+    wn_Writer_Init(&w, buf, 0);
+    wn_Write_U8(&w, 0xaa);
+    check(w.err == 1, "U8 overflow sets err");
+    wn_Writer_Init(&w, buf, 1);
+    wn_Write_U16(&w, 0xaabb);
+    check(w.err == 1, "U16 overflow sets err");
+    wn_Writer_Init(&w, buf, 2);
+    wn_Write_Bytes(&w, expect, 4);
+    check(w.err == 1, "Bytes overflow sets err");
 
     printf("\n%s (%d failure%s)\n", fails ? "\033[31mFAILED\033[0m" : "\033[32mALL PASS\033[0m",
            fails, fails == 1 ? "" : "s");

@@ -104,6 +104,12 @@ int main(void)
     check(ksFound && ksMatch && (r.err == 0),
           "key_share carries our X25519 public key");
 
+    /* invalid args + buffer too small */
+    rc = wn_ClientHello_Build(NULL, &chLen, sizeof(ch), rnd, sid, 32, pub, 32);
+    check(rc == WOLFNANO_E_INVALID_ARG, "ClientHello NULL out rejected");
+    rc = wn_ClientHello_Build(ch, &chLen, 16, rnd, sid, 32, pub, 32);
+    check(rc == WOLFNANO_E_INVALID_ARG, "ClientHello tiny buffer rejected");
+
     printf("\n%s (%d failure%s)\n", fails ? "\033[31mFAILED\033[0m" : "\033[32mALL PASS\033[0m",
            fails, fails == 1 ? "" : "s");
     return fails ? 1 : 0;

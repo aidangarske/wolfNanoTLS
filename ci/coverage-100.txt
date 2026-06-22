@@ -7,3 +7,6 @@ src/wn_session.c
 src/wn_record.c
 src/wn_serverhello.c
 src/wn_alert.h
+src/wn_msg.c
+src/wn_flight.h
+src/wn_clienthello.c
