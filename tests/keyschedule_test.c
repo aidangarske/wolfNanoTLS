@@ -122,6 +122,7 @@ int main(void)
     byte fmac[32];
     byte fmanual[32];
     byte big[48];
+    byte sec48[48];
     Hmac h;
     int rc;
 
@@ -199,11 +200,12 @@ int main(void)
     check((rc == WOLFNANOTLS_SUCCESS) && eq(fmac, fmanual, 32),
           "FinishedMac = HMAC(finished_key, transcript)");
 
-    /* SHA-384 path: exercise the WC_SHA384 branch in wn_DigestSize end to end */
-    rc  = wn_Tls13_Extract(big, NULL, 0, psk, 32, WC_SHA384);
-    rc |= wn_Tls13_ExpandLabel(big, 48, big, "derived", emptyHash, 32,
-                               WC_SHA384);
-    rc |= wn_Tls13_FinishedMac(big, big, emptyHash, 48, WC_SHA384);
+    /* SHA-384 path: exercise the WC_SHA384 branch in wn_DigestSize end to end.
+     * All inputs are 48 bytes (SHA-384 length); out is a distinct buffer. */
+    XMEMSET(sec48, 0x2b, sizeof(sec48));
+    rc  = wn_Tls13_Extract(big, NULL, 0, sec48, 48, WC_SHA384);
+    rc |= wn_Tls13_ExpandLabel(big, 48, sec48, "derived", NULL, 0, WC_SHA384);
+    rc |= wn_Tls13_FinishedMac(big, sec48, sec48, 48, WC_SHA384);
     check(rc == WOLFNANOTLS_SUCCESS, "SHA-384 key-schedule path runs");
 
     /* invalid arguments and unknown digest are rejected */

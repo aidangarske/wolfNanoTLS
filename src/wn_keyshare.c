@@ -37,9 +37,11 @@ int wn_KeyShare_Init(wn_KeyShare* ks, int group)
         ks->group = group;
 #ifndef WOLFNANOTLS_HAVE_ECDHE_P256
         if (group == WN_GROUP_X25519) {
+            /* LCOV_EXCL_START - curve25519 init does not fail without alloc */
             if (wc_curve25519_init(&ks->x25519) != 0) {
                 ret = WOLFNANOTLS_E_CRYPTO;
             }
+            /* LCOV_EXCL_STOP */
         }
         else
 #else
@@ -70,6 +72,7 @@ int wn_KeyShare_Generate(wn_KeyShare* ks, WC_RNG* rng, byte* pub,
     if (ret == WOLFNANOTLS_SUCCESS) {
 #ifndef WOLFNANOTLS_HAVE_ECDHE_P256
         if (ks->group == WN_GROUP_X25519) {
+            /* LCOV_EXCL_START - keygen/export do not fail with a valid RNG */
             if (wc_curve25519_make_key(rng, WN_X25519_KEY_SZ, &ks->x25519) != 0) {
                 ret = WOLFNANOTLS_E_CRYPTO;
             }
@@ -80,6 +83,7 @@ int wn_KeyShare_Generate(wn_KeyShare* ks, WC_RNG* rng, byte* pub,
                     ret = WOLFNANOTLS_E_CRYPTO;
                 }
             }
+            /* LCOV_EXCL_STOP */
         }
         else
 #else
@@ -131,15 +135,19 @@ int wn_KeyShare_Shared(wn_KeyShare* ks, const byte* peerPub, word32 peerPubLen,
             if (peerPubLen != WN_X25519_KEY_SZ) {
                 ret = WOLFNANOTLS_E_INVALID_ARG;
             }
+            /* LCOV_EXCL_START - peer init/import do not fail on a 32-byte key */
             if ((ret == WOLFNANOTLS_SUCCESS) && (wc_curve25519_init(&peer) != 0)) {
                 ret = WOLFNANOTLS_E_CRYPTO;
             }
+            /* LCOV_EXCL_STOP */
             if (ret == WOLFNANOTLS_SUCCESS) {
                 peerInit = 1;
+                /* LCOV_EXCL_START - import accepts any 32-byte public key */
                 if (wc_curve25519_import_public_ex(peerPub, peerPubLen, &peer,
                                                EC25519_LITTLE_ENDIAN) != 0) {
                     ret = WOLFNANOTLS_E_CRYPTO;
                 }
+                /* LCOV_EXCL_STOP */
             }
             if (ret == WOLFNANOTLS_SUCCESS) {
                 *outLen = WN_X25519_KEY_SZ;
