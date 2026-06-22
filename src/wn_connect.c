@@ -57,47 +57,7 @@
 #define WN_HS_FINISHED       20
 #define WN_HS_ENCRYPTED_EXT  8
 
-static int io_recv_exact(wn_IoRecv recv, void* ctx, byte* buf, word32 n)
-{
-    int ret = WOLFNANOTLS_SUCCESS;
-    word32 got = 0;
-    int r;
-
-    while ((got < n) && (ret == WOLFNANOTLS_SUCCESS)) {
-        r = recv(ctx, buf + got, n - got);
-        if (r <= 0) {
-            ret = WOLFNANOTLS_E_CRYPTO;
-        }
-        else {
-            got += (word32)r;
-        }
-    }
-
-    return ret;
-}
-
-/* Read one TLS record: 5-byte header then the fragment. Shared via wn_record.h. */
-int wn_RecvRecord(wn_IoRecv recv, void* ctx, byte* rec, word32 cap,
-                  byte* type, word32* recLen)
-{
-    word32 frag;
-    int ret;
-
-    ret = io_recv_exact(recv, ctx, rec, 5);
-    if (ret == WOLFNANOTLS_SUCCESS) {
-        *type = rec[0];
-        frag = ((word32)rec[3] << 8) | rec[4];
-        if ((frag == 0) || ((frag + 5) > cap)) {
-            ret = WOLFNANOTLS_E_CRYPTO;
-        }
-    }
-    if (ret == WOLFNANOTLS_SUCCESS) {
-        ret = io_recv_exact(recv, ctx, rec + 5, frag);
-        *recLen = frag + 5;
-    }
-
-    return ret;
-}
+/* wn_RecvRecord (record read) now lives in wn_record.c; declared in wn_record.h. */
 
 /* Send the TLS 1.3 middlebox-compatibility ChangeCipherSpec (RFC 8446 D.4). */
 static int send_ccs(wn_IoSend send, void* ctx);

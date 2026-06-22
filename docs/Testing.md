@@ -35,6 +35,8 @@ for the `src` floor statically (independent of any runtime malloc trap).
 |---|---|
 | `make host` | crypto floor KATs (SHA-256, HKDF, AES-GCM, X25519, ECDSA, Ed25519, DRBG) |
 | `make kstest` | TLS 1.3 key schedule, full RFC 8448 secret tree (12 KATs) |
+| `make keyupdatetest` | post-handshake KeyUpdate "traffic upd" rekey KAT (RFC 8446 4.6.3) |
+| `make sessiontest` | application-data session: wn_Send/wn_Recv/wn_Close, NST-skip, KeyUpdate rekey, close_notify, buffer bounds (mock transport, offline) |
 | `make tstest` | transcript hash: incremental + non-destructive interim, SHA-256/384 |
 | `make rectest` | record protection: seal/open, tamper rejection, sequence binding |
 | `make ksharetest` | X25519 key share / ECDHE agreement |
@@ -45,6 +47,8 @@ for the `src` floor statically (independent of any runtime malloc trap).
 | `make msgtest` | wire encode/decode primitives |
 | `make chtest` / `make shtest` | ClientHello encoder / ServerHello parser (RFC 8448) |
 | `make negtest` | malformed-ServerHello rejection (runs under ASan) |
+| `make flighttest` | adversarial encrypted-flight ordering gate (out-of-order/duplicate/unknown rejected) |
+| `make alerttest` | internal error to RFC 8446 6.2 alert-description mapping |
 | `make matrixtest` | data-driven negotiation matrix (cipher x group x PSK/cert) |
 | `make alloctrap` | runtime proof: zero heap calls on the handshake path (`--wrap`) |
 | `make interop` | **live TLS 1.3 handshakes vs OpenSSL/wolfSSL: PSK (X25519+P-256) + cert** |
@@ -86,7 +90,14 @@ server Finished, send the client Finished (preceded by the compat CCS). The
 wolfSSL server runs with `-d` (server-auth only; wolfNanoTLS does not present a
 client cert).
 
-## Still ahead
+## Application data
 
-Certificate / Raw-Public-Key authentication (Phase 4 brings X.509), a
-data-driven suite matrix, and the structured `tests/pki/`.
+After the handshake, `wn_Connect_*_ex` keeps a `wn_Session` and the client
+exchanges data with `wn_Send` / `wn_Recv` / `wn_Close`. `make sessiontest`
+drives this offline against crafted, peer-encrypted records (mock transport):
+app-data round trip, NewSessionTicket skip, KeyUpdate rekey (both
+update_not_requested and update_requested), close_notify to `WOLFNANOTLS_E_CLOSED`,
+and undersized-buffer rejection. `make interop` adds a **live app-data leg**
+against `openssl s_server -rev` (send a line, read the reversed echo, close),
+which also exercises the NewSessionTicket-skip path since OpenSSL sends tickets
+right after the TLS 1.3 handshake.
