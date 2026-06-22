@@ -82,6 +82,7 @@ int main(int argc, char** argv)
     word32 pskLen;
     struct sockaddr_in sa;
     WC_RNG rng;
+    wn_Session sess;
     byte scratch[8192];
     int fd, port, rc, tries;
 
@@ -117,14 +118,39 @@ int main(int argc, char** argv)
         return 2;
     }
 
-    rc = wn_Connect_Psk(&rng, sock_send, sock_recv, &fd, psk, pskLen,
-                        identity, scratch, sizeof(scratch));
-
-    wc_FreeRng(&rng);
-    close(fd);
+    rc = wn_Connect_Psk_ex(&sess, &rng, sock_send, sock_recv, &fd, psk, pskLen,
+                           identity, scratch, sizeof(scratch));
 
     printf("wn_Connect_Psk = %d\n", rc);
     printf("%s\n", (rc == 0) ? "PASS TLS 1.3 PSK handshake"
                              : "FAIL handshake");
+
+    /* Optional application-data round trip (WN_APPDATA=1, e.g. vs
+     * `openssl s_server -rev` which echoes each line reversed). */
+    if ((rc == 0) && (getenv("WN_APPDATA") != NULL)) {
+        static const byte msg[] = "wolfNanoTLS\n";
+        byte in[256];
+        word32 got = 0;
+        int arc;
+
+        arc = wn_Send(&sess, msg, (word32)(sizeof(msg) - 1));
+        if (arc == 0) {
+            arc = wn_Recv(&sess, in, sizeof(in), &got);
+        }
+        printf("app-data rc = %d, got %u bytes\n", arc, (unsigned)got);
+        printf("%s\n", ((arc == 0) && (got > 0)) ? "PASS app-data round trip"
+                                                 : "FAIL app-data");
+        if ((arc != 0) || (got == 0)) {
+            rc = 1;
+        }
+        (void)wn_Close(&sess);
+    }
+    else if (rc == 0) {
+        (void)wn_Close(&sess);
+    }
+
+    wc_FreeRng(&rng);
+    close(fd);
+
     return (rc == 0) ? 0 : 1;
 }

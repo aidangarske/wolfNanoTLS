@@ -29,17 +29,27 @@
 
 #include "wolfnano.h"
 #include "wolfnano_crypto.h"
+#include "wn_session.h"
 
-/* Send/recv callbacks: return bytes transferred, or < 0 on error. */
-typedef int (*wn_IoSend)(void* ctx, const byte* buf, word32 len);
-typedef int (*wn_IoRecv)(void* ctx, byte* buf, word32 len);
+/* wn_IoSend / wn_IoRecv transport callbacks are declared in wolfnano.h. */
 
 /* Perform a TLS 1.3 PSK+ECDHE handshake as a client. Returns WOLFNANOTLS_SUCCESS
- * once the server Finished verifies and the client Finished is sent. */
+ * once the server Finished verifies and the client Finished is sent. The
+ * traffic keys are wiped before returning (handshake-only; use the _ex form to
+ * keep a session for application data). */
 WOLFNANOTLS_API int wn_Connect_Psk(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv,
                                 void* ioCtx, const byte* psk, word32 pskLen,
                                 const char* identity, byte* scratch,
                                 word32 scratchLen);
+
+/* As wn_Connect_Psk, but on success fills sess with the application traffic
+ * keys, the transport callbacks, and the scratch buffer, ready for wn_Send /
+ * wn_Recv / wn_Close. */
+WOLFNANOTLS_API int wn_Connect_Psk_ex(wn_Session* sess, WC_RNG* rng,
+                                   wn_IoSend ioSend, wn_IoRecv ioRecv,
+                                   void* ioCtx, const byte* psk, word32 pskLen,
+                                   const char* identity, byte* scratch,
+                                   word32 scratchLen);
 
 /* Perform a TLS 1.3 ECDHE handshake with server certificate authentication.
  * anchor is a pinned trust anchor (DER); the server's leaf must verify against
@@ -49,5 +59,12 @@ WOLFNANOTLS_API int wn_Connect_Cert(WC_RNG* rng, wn_IoSend ioSend,
                                  wn_IoRecv ioRecv, void* ioCtx,
                                  const byte* anchor, word32 anchorLen,
                                  byte* scratch, word32 scratchLen);
+
+/* As wn_Connect_Cert, but on success fills sess for application data. */
+WOLFNANOTLS_API int wn_Connect_Cert_ex(wn_Session* sess, WC_RNG* rng,
+                                    wn_IoSend ioSend, wn_IoRecv ioRecv,
+                                    void* ioCtx, const byte* anchor,
+                                    word32 anchorLen, byte* scratch,
+                                    word32 scratchLen);
 
 #endif /* WN_CONNECT_H */

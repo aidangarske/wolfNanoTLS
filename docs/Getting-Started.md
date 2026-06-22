@@ -30,6 +30,39 @@ covers SHA-256, HKDF, AES-GCM, X25519, ECDSA P-256/P-384, Ed25519, and the
 Hash-DRBG, against published KATs (FIPS 180-4, RFC 5869, NIST GCM) and
 functional round-trips.
 
+## Writing a client
+
+A client completes a handshake into a `wn_Session`, then exchanges application
+data and closes. Crypto goes through the `wc_*` seam; transport is two callbacks
+you supply (`wn_IoSend` / `wn_IoRecv`), so wolfNanoTLS stays socket-agnostic.
+
+```c
+wn_Session sess;
+byte scratch[8192], buf[512];
+word32 got;
+
+/* PSK + ECDHE handshake; keep the session for application data */
+rc = wn_Connect_Psk_ex(&sess, &rng, mySend, myRecv, &fd, psk, pskLen,
+                       "Client_identity", scratch, sizeof(scratch));
+
+wn_Send(&sess, (const byte*)"hello", 5);   /* encrypt + send one record   */
+wn_Recv(&sess, buf, sizeof(buf), &got);    /* read one app-data record    */
+wn_Close(&sess);                           /* close_notify + wipe keys    */
+```
+
+`scratch` is a caller buffer the session reuses for record framing (no
+allocation). `wn_Recv` transparently skips post-handshake NewSessionTicket
+records and processes KeyUpdate; it returns `WOLFNANOTLS_E_CLOSED` when the peer
+sends close_notify. The handshake-only `wn_Connect_Psk` (no `_ex`) wipes the
+keys and returns when you do not need an application-data session.
+
+Build and run the complete example:
+
+```sh
+make example
+./build/example_client 127.0.0.1 4433
+```
+
 ## Memory model
 
 The default build is true no-allocator (`WOLFSSL_NO_MALLOC`). During bring-up

@@ -144,3 +144,32 @@ int wn_Tls13_FinishedMac(byte* out, const byte* baseKey,
 
     return ret;
 }
+
+int wn_Tls13_KeyUpdate(byte* secret, byte* key, byte* iv, int digest)
+{
+    byte newSecret[WC_MAX_DIGEST_SIZE];
+    word32 hashLen;
+    int ret = WOLFNANOTLS_SUCCESS;
+
+    hashLen = wn_DigestSize(digest);
+    if ((secret == NULL) || (key == NULL) || (iv == NULL) || (hashLen == 0) ||
+        (hashLen > sizeof(newSecret))) {
+        ret = WOLFNANOTLS_E_INVALID_ARG;
+    }
+
+    if (ret == WOLFNANOTLS_SUCCESS) {
+        ret = wn_Tls13_ExpandLabel(newSecret, hashLen, secret, "traffic upd",
+                                   NULL, 0, digest);
+    }
+    if (ret == WOLFNANOTLS_SUCCESS) {
+        XMEMCPY(secret, newSecret, hashLen);
+        ret = wn_Tls13_ExpandLabel(key, 16, secret, "key", NULL, 0, digest);
+    }
+    if (ret == WOLFNANOTLS_SUCCESS) {
+        ret = wn_Tls13_ExpandLabel(iv, 12, secret, "iv", NULL, 0, digest);
+    }
+
+    ForceZero(newSecret, sizeof(newSecret));
+
+    return ret;
+}

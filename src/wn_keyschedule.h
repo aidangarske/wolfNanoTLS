@@ -52,4 +52,10 @@ WOLFNANOTLS_API int wn_Tls13_FinishedMac(byte* out, const byte* baseKey,
                                       const byte* transcriptHash,
                                       word32 hashLen, int digest);
 
+/* Post-handshake key update (RFC 8446 7.2): secret is replaced in place with
+ * HKDF-Expand-Label(secret, "traffic upd", "", Hash.length), then the
+ * AES-128-GCM key (16) and iv (12) are re-derived from the new secret. */
+WOLFNANOTLS_API int wn_Tls13_KeyUpdate(byte* secret, byte* key, byte* iv,
+                                    int digest);
+
 #endif /* WN_KEYSCHEDULE_H */

@@ -98,12 +98,32 @@ speedups, and a head-to-head vs mbedTLS are in
 
 ## Status
 
-Early development, but functional. The wolfNanoTLS TLS 1.3 client completes a
-**live PSK + ECDHE handshake against both OpenSSL and wolfSSL**; the crypto
-floor is validated by RFC-vector KATs and wolfSSL's own crypto test, true
-no-allocation is verified, and side-channel hardening is on. PQC, X.509, and the
-FIPS backend are wired and proven; the handshake state machine continues to
-fill in.
+Early development, but functional end-to-end. The wolfNanoTLS client completes a
+**live TLS 1.3 PSK + ECDHE handshake against OpenSSL, wolfSSL, and mbedTLS**,
+then exchanges application data and closes cleanly via `wn_Send` / `wn_Recv` /
+`wn_Close` (post-handshake NewSessionTicket and KeyUpdate are handled
+transparently). The crypto floor is validated by RFC-vector KATs and wolfSSL's
+own crypto test, true no-allocation is verified, and side-channel hardening is
+on. PQC, X.509, and the FIPS 140-3 backend are wired and proven.
+
+## Usage
+
+```c
+wn_Session sess;
+byte scratch[8192], buf[512];
+word32 got;
+
+/* PSK + ECDHE handshake, keeping a session for application data */
+wn_Connect_Psk_ex(&sess, &rng, mySend, myRecv, &fd, psk, pskLen,
+                  "Client_identity", scratch, sizeof(scratch));
+wn_Send(&sess, (const byte*)"hello", 5);
+wn_Recv(&sess, buf, sizeof(buf), &got);
+wn_Close(&sess);
+```
+
+`mySend` / `myRecv` are your transport callbacks (`wn_IoSend` / `wn_IoRecv`).
+See [examples/client.c](examples/client.c) for a complete runnable client and
+`make example`.
 
 ## Build
 

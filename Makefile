@@ -34,21 +34,21 @@ CONN_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
   src/wn_msg.c src/wn_keyschedule.c \
   src/wn_transcript.c src/wn_record.c \
   src/wn_keyshare.c src/wn_serverhello.c \
-  src/wn_connect.c tests/wn_host_seed.c
+  src/wn_connect.c src/wn_session.c tests/wn_host_seed.c
 
 # P-256 PSK handshake build (ECDHE secp256r1; FLOOR_SRC links ecc/asn/sp).
 CONN_P256_SRC := $(FLOOR_SRC) $(WC)/sp_int.c \
   src/wn_msg.c src/wn_keyschedule.c \
   src/wn_transcript.c src/wn_record.c \
   src/wn_keyshare.c src/wn_serverhello.c \
-  src/wn_connect.c tests/wn_host_seed.c
+  src/wn_connect.c src/wn_session.c tests/wn_host_seed.c
 
 # Cert handshake build (adds ECDHE non-PSK ClientHello + cert/CertVerify deps).
 CONN_CERT_SRC := $(FLOOR_SRC) $(WC)/sp_int.c \
   src/wn_msg.c src/wn_keyschedule.c \
   src/wn_transcript.c src/wn_record.c \
   src/wn_keyshare.c src/wn_serverhello.c \
-  src/wn_clienthello.c src/wn_connect.c \
+  src/wn_clienthello.c src/wn_connect.c src/wn_session.c \
   tests/wn_host_seed.c
 KS_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
   $(WC)/logging.c $(WC)/random.c $(WC)/sha256.c $(WC)/sha512.c \
@@ -159,11 +159,11 @@ ASM_CC    := $(CC_$(WOLFNANOTLS_ASM))
 ASM_FLAGS := $(FLAGS_$(WOLFNANOTLS_ASM))
 ASM_SRC   := $(SPSRC_$(WOLFNANOTLS_ASM)) $(ASMSRC_$(WOLFNANOTLS_ASM))
 
-.PHONY: host kstest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest hybridtest certtest fipsproof bench benchrun targets test-qemu test test-core check clean
+.PHONY: host kstest keyupdatetest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest hybridtest certtest fipsproof bench benchrun targets test-qemu test test-core check example clean
 test: test-core mlkemtest mldsatest hybridtest wctestpqc ## build + run all local self-tests
-test-core: host kstest rfctest tstest rectest ksharetest hstest wctest msgtest chtest shtest negtest flighttest alerttest matrixtest certtest ## non-PQC suites (wolfSSL without the wc_mlkem/wc_mldsa API)
+test-core: host kstest keyupdatetest rfctest tstest rectest ksharetest hstest wctest msgtest chtest shtest negtest flighttest alerttest matrixtest certtest ## non-PQC suites (wolfSSL without the wc_mlkem/wc_mldsa API)
 
-SUITES := host kstest rfctest tstest rectest ksharetest hstest wctest wctestpqc \
+SUITES := host kstest keyupdatetest rfctest tstest rectest ksharetest hstest wctest wctestpqc \
   msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest hybridtest certtest
 
 check: ## run every suite, continue past failures, print one colored PASS/FAIL tally
@@ -194,6 +194,13 @@ kstest: ## build + run the TLS 1.3 key-schedule KATs (PORTABLE_C)
 	   $(KS_SRC) tests/keyschedule_test.c -o $(BUILD)/keyschedule_test
 	@echo "---- run ----"
 	@./$(BUILD)/keyschedule_test
+
+keyupdatetest: ## build + run the post-handshake KeyUpdate KAT (PORTABLE_C)
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANOTLS_TARGET_PORTABLE_C \
+	   $(KS_SRC) tests/keyupdate_test.c -o $(BUILD)/keyupdate_test
+	@echo "---- run ----"
+	@./$(BUILD)/keyupdate_test
 
 rfctest: ## build + run RFC 8448 section 3 record-key KATs (PORTABLE_C)
 	@mkdir -p $(BUILD)
@@ -363,6 +370,7 @@ interop: ## live TLS 1.3 PSK handshake vs OpenSSL and wolfSSL
 	@echo "== PSK (X25519) vs OpenSSL =="; sh tests/interop_psk.sh
 	@echo "== PSK (X25519) vs wolfSSL =="; sh tests/interop_wolfssl.sh
 	@echo "== PSK (X25519) vs mbedTLS =="; sh tests/interop_mbedtls.sh
+	@echo "== app-data (wn_Send/wn_Recv/wn_Close) vs OpenSSL =="; sh tests/interop_psk_appdata.sh
 	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANOTLS_HAVE_ECDHE_P256 \
 	   -DWOLFNANOTLS_TARGET_PORTABLE_C \
 	   $(CONN_P256_SRC) tests/interop_psk_test.c -o $(BUILD)/interop_psk_p256_client
@@ -469,6 +477,12 @@ test-qemu-%:
 	 echo "OK test-qemu-$* (ran under $$q)"
 
 test-qemu: test-qemu-arm test-qemu-aarch64 test-qemu-riscv64 ## run the suites under qemu-user for arm/aarch64/riscv64
+
+example: ## build the minimal PSK client example (examples/client.c)
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANOTLS_TARGET_PORTABLE_C \
+	   $(CONN_SRC) examples/client.c -o $(BUILD)/example_client
+	@echo "built $(BUILD)/example_client"
 
 clean:
 	rm -rf $(BUILD) *.o
