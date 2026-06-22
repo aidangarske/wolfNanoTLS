@@ -34,6 +34,7 @@ int wn_Hybrid_ClientKeyShare(wn_Hybrid* h, WC_RNG* rng, byte* out,
     if ((h == NULL) || (rng == NULL) || (out == NULL) || (outLen == NULL)) {
         ret = WOLFNANOTLS_E_INVALID_ARG;
     }
+    /* LCOV_EXCL_START - ML-KEM/curve25519 init+keygen do not fail on valid RNG */
     if (ret == WOLFNANOTLS_SUCCESS) {
         if (wc_MlKemKey_Init(&h->kem, WC_ML_KEM_768, NULL, INVALID_DEVID) != 0) {
             ret = WOLFNANOTLS_E_CRYPTO;
@@ -58,6 +59,7 @@ int wn_Hybrid_ClientKeyShare(wn_Hybrid* h, WC_RNG* rng, byte* out,
             ret = WOLFNANOTLS_E_CRYPTO;
         }
     }
+    /* LCOV_EXCL_STOP */
     if (ret == WOLFNANOTLS_SUCCESS) {
         *outLen = WN_HYBRID_CLIENT_SHARE;
     }
@@ -77,6 +79,8 @@ int wn_Hybrid_ClientShared(wn_Hybrid* h, const byte* srvShare, word32 srvLen,
         (srvLen != WN_HYBRID_SERVER_SHARE)) {
         ret = WOLFNANOTLS_E_INVALID_ARG;
     }
+    /* LCOV_EXCL_START - ML-KEM decap (implicit reject) + curve25519 init/import/
+     * shared do not fail on a well-formed server share */
     if (ret == WOLFNANOTLS_SUCCESS) {
         if (wc_MlKemKey_Decapsulate(&h->kem, ss, srvShare, WN_HYBRID_MLKEM_CT)
                 != 0) {
@@ -97,6 +101,7 @@ int wn_Hybrid_ClientShared(wn_Hybrid* h, const byte* srvShare, word32 srvLen,
             ret = WOLFNANOTLS_E_CRYPTO;
         }
     }
+    /* LCOV_EXCL_STOP */
     if (ret == WOLFNANOTLS_SUCCESS) {
         *ssLen = WN_HYBRID_SECRET;
     }
@@ -124,12 +129,14 @@ int wn_Hybrid_ServerRespond(const byte* cliShare, word32 cliLen, WC_RNG* rng,
         ret = WOLFNANOTLS_E_INVALID_ARG;
     }
     if (ret == WOLFNANOTLS_SUCCESS) {
+        /* LCOV_EXCL_START - ML-KEM init does not fail without an allocator */
         if (wc_MlKemKey_Init(&kem, WC_ML_KEM_768, NULL, INVALID_DEVID) != 0) {
             ret = WOLFNANOTLS_E_CRYPTO;
         }
         else {
             kemInit = 1;
         }
+        /* LCOV_EXCL_STOP */
     }
     if (ret == WOLFNANOTLS_SUCCESS) {
         if ((wc_MlKemKey_DecodePublicKey(&kem, cliShare, WN_HYBRID_MLKEM_PUB)
@@ -138,6 +145,8 @@ int wn_Hybrid_ServerRespond(const byte* cliShare, word32 cliLen, WC_RNG* rng,
             ret = WOLFNANOTLS_E_CRYPTO;
         }
     }
+    /* LCOV_EXCL_START - curve25519 init/keygen/import/shared do not fail on a
+     * valid RNG and a well-formed client share */
     if (ret == WOLFNANOTLS_SUCCESS) {
         if (wc_curve25519_init(&srv) != 0) {
             ret = WOLFNANOTLS_E_CRYPTO;
@@ -170,6 +179,7 @@ int wn_Hybrid_ServerRespond(const byte* cliShare, word32 cliLen, WC_RNG* rng,
             ret = WOLFNANOTLS_E_CRYPTO;
         }
     }
+    /* LCOV_EXCL_STOP */
     if (ret == WOLFNANOTLS_SUCCESS) {
         *srvLen = WN_HYBRID_SERVER_SHARE;
         *ssLen = WN_HYBRID_SECRET;

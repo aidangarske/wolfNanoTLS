@@ -13,3 +13,4 @@ src/wn_clienthello.c
 src/wn_keyschedule.c
 src/wn_transcript.c
 src/wn_keyshare.c
+src/wn_hybrid.c

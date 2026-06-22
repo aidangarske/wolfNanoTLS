@@ -65,6 +65,22 @@ int main(void)
     check((ssCLen == ssSLen) && (XMEMCMP(ssC, ssS, WN_HYBRID_SECRET) == 0),
           "hybrid secrets agree (64 bytes)");
 
+    /* NULL / invalid-arg paths */
+    check(wn_Hybrid_ClientKeyShare(NULL, &rng, cliShare, &cliLen)
+          == WOLFNANOTLS_E_INVALID_ARG, "ClientKeyShare NULL rejected");
+    check(wn_Hybrid_ClientShared(&h, srvShare, 1, ssC, &ssCLen)
+          == WOLFNANOTLS_E_INVALID_ARG, "ClientShared bad length rejected");
+    check(wn_Hybrid_ServerRespond(cliShare, 1, &rng, srvShare, &srvLen,
+          ssS, &ssSLen) == WOLFNANOTLS_E_INVALID_ARG,
+          "ServerRespond bad length rejected");
+    check(wn_Hybrid_Free(NULL) == WOLFNANOTLS_E_INVALID_ARG, "Free NULL rejected");
+
+    /* malformed client ML-KEM public key: decode rejects it */
+    XMEMSET(cliShare, 0xff, WN_HYBRID_MLKEM_PUB);
+    check(wn_Hybrid_ServerRespond(cliShare, WN_HYBRID_CLIENT_SHARE, &rng,
+          srvShare, &srvLen, ssS, &ssSLen) != WOLFNANOTLS_SUCCESS,
+          "ServerRespond rejects malformed client ML-KEM key");
+
     wn_Hybrid_Free(&h);
     wc_FreeRng(&rng);
 
