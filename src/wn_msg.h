@@ -43,21 +43,21 @@ typedef struct wn_Reader {
     int err;
 } wn_Reader;
 
-WOLFNANO_API void wn_Writer_Init(wn_Writer* w, byte* buf, word32 cap);
-WOLFNANO_API void wn_Write_U8(wn_Writer* w, byte v);
-WOLFNANO_API void wn_Write_U16(wn_Writer* w, word16 v);
-WOLFNANO_API void wn_Write_U24(wn_Writer* w, word32 v);
-WOLFNANO_API void wn_Write_Bytes(wn_Writer* w, const byte* p, word32 n);
+WOLFNANO_LOCAL void wn_Writer_Init(wn_Writer* w, byte* buf, word32 cap);
+WOLFNANO_LOCAL void wn_Write_U8(wn_Writer* w, byte v);
+WOLFNANO_LOCAL void wn_Write_U16(wn_Writer* w, word16 v);
+WOLFNANO_LOCAL void wn_Write_U24(wn_Writer* w, word32 v);
+WOLFNANO_LOCAL void wn_Write_Bytes(wn_Writer* w, const byte* p, word32 n);
 /* Reserve a 1/2/3-byte length, returning the offset to backfill later. */
-WOLFNANO_API word32 wn_Write_LenStart(wn_Writer* w, int lenBytes);
+WOLFNANO_LOCAL word32 wn_Write_LenStart(wn_Writer* w, int lenBytes);
 /* Backfill the length at offset to span everything written since. */
-WOLFNANO_API void wn_Write_LenEnd(wn_Writer* w, word32 offset, int lenBytes);
+WOLFNANO_LOCAL void wn_Write_LenEnd(wn_Writer* w, word32 offset, int lenBytes);
 
-WOLFNANO_API void wn_Reader_Init(wn_Reader* r, const byte* buf, word32 len);
-WOLFNANO_API byte wn_Read_U8(wn_Reader* r);
-WOLFNANO_API word16 wn_Read_U16(wn_Reader* r);
-WOLFNANO_API word32 wn_Read_U24(wn_Reader* r);
+WOLFNANO_LOCAL void wn_Reader_Init(wn_Reader* r, const byte* buf, word32 len);
+WOLFNANO_LOCAL byte wn_Read_U8(wn_Reader* r);
+WOLFNANO_LOCAL word16 wn_Read_U16(wn_Reader* r);
+WOLFNANO_LOCAL word32 wn_Read_U24(wn_Reader* r);
 /* Return a pointer to n bytes and advance, or NULL (and set err) if short. */
-WOLFNANO_API const byte* wn_Read_Bytes(wn_Reader* r, word32 n);
+WOLFNANO_LOCAL const byte* wn_Read_Bytes(wn_Reader* r, word32 n);
 
 #endif /* WN_MSG_H */
