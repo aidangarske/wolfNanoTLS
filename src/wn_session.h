@@ -49,8 +49,8 @@ typedef struct wn_Session {
     byte      cIv[WN_AEAD_IV_SZ];
     byte      sKey[WN_AEAD_KEY_SZ];
     byte      sIv[WN_AEAD_IV_SZ];
-    word32    cSeq;                       /* our write record counter */
-    word32    sSeq;                       /* peer read record counter */
+    word64    cSeq;                       /* our write record counter */
+    word64    sSeq;                       /* peer read record counter */
     int       digest;
     int       flags;
 } wn_Session;
