@@ -103,8 +103,16 @@ int wn_Tls13_DeriveSecret(byte* out, const byte* secret, const char* label,
                           const byte* transcriptHash, word32 hashLen,
                           int digest)
 {
-    return wn_Tls13_ExpandLabel(out, hashLen, secret, label,
-                                transcriptHash, hashLen, digest);
+    int ret = WOLFNANO_SUCCESS;
+
+    if (hashLen != wn_DigestSize(digest)) {
+        ret = WOLFNANO_E_INVALID_ARG;
+    }
+    if (ret == WOLFNANO_SUCCESS) {
+        ret = wn_Tls13_ExpandLabel(out, hashLen, secret, label,
+                                   transcriptHash, hashLen, digest);
+    }
+    return ret;
 }
 
 int wn_Tls13_FinishedMac(byte* out, const byte* baseKey,
@@ -117,7 +125,8 @@ int wn_Tls13_FinishedMac(byte* out, const byte* baseKey,
     int hmacInit = 0;
 
     if ((out == NULL) || (baseKey == NULL) || (transcriptHash == NULL) ||
-        (hashLen == 0) || (hashLen > sizeof(finishedKey))) {
+        (hashLen == 0) || (hashLen != wn_DigestSize(digest)) ||
+        (hashLen > sizeof(finishedKey))) {
         ret = WOLFNANO_E_INVALID_ARG;
     }
 

@@ -293,8 +293,8 @@ int wn_Connect_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     XMEMSET(zeros32, 0, sizeof(zeros32));
 
     if ((sess == NULL) || (rng == NULL) || (ioSend == NULL) ||
-        (ioRecv == NULL) || (psk == NULL) || (identity == NULL) ||
-        (scratch == NULL) || (scratchLen < 2048)) {
+        (ioRecv == NULL) || (psk == NULL) || (pskLen == 0) ||
+        (identity == NULL) || (scratch == NULL) || (scratchLen < 2048)) {
         ret = WOLFNANO_E_INVALID_ARG;
     }
 
@@ -393,6 +393,12 @@ int wn_Connect_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
         }
         if ((ret == WOLFNANO_SUCCESS) && (rtype != WN_REC_APPDATA)) {
             ret = WOLFNANO_E_UNEXPECTED_MSG;
+        }
+        if ((ret == WOLFNANO_SUCCESS) &&
+            ((recLen < (WN_RECORD_HEADER_SZ + WN_RECORD_TAG_SZ)) ||
+             ((recLen - WN_RECORD_HEADER_SZ - WN_RECORD_TAG_SZ) >
+                 sizeof(plain)))) {
+            ret = WOLFNANO_E_DECODE;        /* inner record must fit plain[] */
         }
         if (ret == WOLFNANO_SUCCESS) {
             ret = wn_Record_Unprotect(plain, &plainLen, &ctype, sKey, 16, sIv,
@@ -1005,8 +1011,9 @@ int wn_Connect_Cert_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
                 wn_Reader_Init(&hr, hsacc + off + 4, mLen);
                 scheme = wn_Read_U16(&hr);
                 cvLen = wn_Read_U16(&hr);
-                if ((hr.err != 0) || (gotCert == 0)) {
-                    ret = WOLFNANO_E_DECODE;
+                if ((hr.err != 0) || (gotCert == 0) ||
+                    ((hr.pos + cvLen) != mLen)) {
+                    ret = WOLFNANO_E_DECODE;   /* signature must span the message */
                 }
                 else {
                     ret = wn_CertVerify(scheme, leafSpki, spkiLen, thCert, 32,

@@ -130,6 +130,9 @@ int wn_Send(wn_Session* s, const byte* data, word32 len)
     if ((ret == WOLFNANO_SUCCESS) && ((s->flags & WN_SESS_CLOSED) != 0)) {
         ret = WOLFNANO_E_CLOSED;
     }
+    if ((ret == WOLFNANO_SUCCESS) && ((s->flags & WN_SESS_ESTABLISHED) == 0)) {
+        ret = WOLFNANO_E_BAD_STATE;
+    }
     if (ret == WOLFNANO_SUCCESS) {
         need = WN_RECORD_HEADER_SZ + len + 1 + WN_RECORD_TAG_SZ;
         if (need > s->scratchLen) {
@@ -165,6 +168,9 @@ int wn_Recv(wn_Session* s, byte* out, word32 outCap, word32* outLen)
     }
     if ((ret == WOLFNANO_SUCCESS) && ((s->flags & WN_SESS_CLOSED) != 0)) {
         ret = WOLFNANO_E_CLOSED;
+    }
+    if ((ret == WOLFNANO_SUCCESS) && ((s->flags & WN_SESS_ESTABLISHED) == 0)) {
+        ret = WOLFNANO_E_BAD_STATE;
     }
     if (ret == WOLFNANO_SUCCESS) {
         *outLen = 0;
