@@ -269,6 +269,13 @@ int main(void)
     check(wn_Recv(&s, out, sizeof(out), &got) == WOLFNANOTLS_E_BAD_STATE,
           "wn_Recv on non-established session rejected");
 
+    setup(&s, &m);
+    check(wn_Send(&s, out, 0xfffffff0u) == WOLFNANOTLS_E_INVALID_ARG,
+          "wn_Send rejects length that would overflow the size check");
+
+    XMEMSET(&s, 0, sizeof(s));                        /* never-established, ioSend NULL */
+    check(wn_Close(&s) == WOLFNANOTLS_SUCCESS, "wn_Close on zero-init session is safe");
+
     /* 10. wn_Send oversized (> scratch) and transport failure. */
     setup(&s, &m);
     s.scratchLen = 64;                               /* too small for 100 bytes */

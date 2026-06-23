@@ -113,6 +113,9 @@ int main(void)
           "Protect NULL rejected");
     check(wn_Record_Protect(rec, &recLen, key, 7, iv, 0, 22, content,
           sizeof(content)) != WOLFNANOTLS_SUCCESS, "Protect bad keyLen fails");
+    check(wn_Record_Protect(rec, &recLen, key, sizeof(key), iv, 0, 22, content,
+          WN_MAX_PLAINTEXT + 1) == WOLFNANOTLS_E_INVALID_ARG,
+          "Protect rejects content over the record limit");
     check(wn_Record_Unprotect(NULL, &outLen, &type, key, sizeof(key), iv, 0,
           rec, recLen) == WOLFNANOTLS_E_INVALID_ARG, "Unprotect NULL rejected");
     check(wn_Record_Unprotect(out, &outLen, &type, key, sizeof(key), iv, 0,

@@ -121,7 +121,7 @@ static int wn_session_posths(wn_Session* s, const byte* msg, word32 msgLen)
 int wn_Send(wn_Session* s, const byte* data, word32 len)
 {
     word32 recLen = 0;
-    word32 need;
+    word32 overhead = WN_RECORD_HEADER_SZ + 1 + WN_RECORD_TAG_SZ;
     int ret = WOLFNANOTLS_SUCCESS;
 
     if ((s == NULL) || (data == NULL)) {
@@ -134,9 +134,9 @@ int wn_Send(wn_Session* s, const byte* data, word32 len)
         ret = WOLFNANOTLS_E_BAD_STATE;
     }
     if (ret == WOLFNANOTLS_SUCCESS) {
-        need = WN_RECORD_HEADER_SZ + len + 1 + WN_RECORD_TAG_SZ;
-        if (need > s->scratchLen) {
-            ret = WOLFNANOTLS_E_INVALID_ARG;
+        if ((len > WN_MAX_PLAINTEXT) || (s->scratchLen < overhead) ||
+            (len > (s->scratchLen - overhead))) {
+            ret = WOLFNANOTLS_E_INVALID_ARG;   /* avoid word32 wrap on len */
         }
     }
     if (ret == WOLFNANOTLS_SUCCESS) {
@@ -231,7 +231,8 @@ int wn_Close(wn_Session* s)
         ret = WOLFNANOTLS_E_INVALID_ARG;
     }
 
-    if ((ret == WOLFNANOTLS_SUCCESS) && ((s->flags & WN_SESS_CLOSED) == 0)) {
+    if ((ret == WOLFNANOTLS_SUCCESS) && ((s->flags & WN_SESS_CLOSED) == 0) &&
+        ((s->flags & WN_SESS_ESTABLISHED) != 0) && (s->ioSend != NULL)) {
         body[0] = 1;                            /* warning */
         body[1] = 0;                            /* close_notify */
         ret = wn_Record_Protect(rec, &recLen, s->cKey, WN_AEAD_KEY_SZ, s->cIv,
@@ -242,7 +243,7 @@ int wn_Close(wn_Session* s)
     }
 
     if (s != NULL) {
-        ForceZero(s, sizeof(*s));
+        ForceZero(s, sizeof(*s));   /* wipe even a non-established session */
     }
 
     return ret;

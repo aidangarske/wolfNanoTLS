@@ -30,6 +30,7 @@
 
 #define WN_RECORD_HEADER_SZ 5
 #define WN_RECORD_TAG_SZ    16
+#define WN_MAX_PLAINTEXT    16384u   /* TLS 1.3 max record plaintext (RFC 8446 5.2) */
 
 /* TLS record content types (RFC 8446 5.1). */
 #define WN_REC_CHANGE_CIPHER 20
