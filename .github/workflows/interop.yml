@@ -28,6 +28,15 @@ jobs:
           ./autogen.sh
           ./configure --enable-tls13 --enable-psk --enable-curve25519 --enable-ed25519
           make -j"$(nproc)" examples/server/server
+      - name: build wolfSSL PQC server (separate, --enable-mlkem)
+        run: |
+          set -eux
+          git clone --depth 1 https://github.com/wolfSSL/wolfssl "$RUNNER_TEMP/wolfssl-pqc"
+          cd "$RUNNER_TEMP/wolfssl-pqc"
+          ./autogen.sh
+          ./configure --enable-tls13 --enable-psk --enable-curve25519 \
+            --enable-mlkem --enable-experimental
+          make -j"$(nproc)" examples/server/server
       - name: build mbedTLS ssl_server2 (best-effort)
         run: |
           set -eux
@@ -39,6 +48,7 @@ jobs:
       - name: make interop (vs OpenSSL + wolfSSL + mbedTLS)
         run: |
           export WOLFSSL_SERVER="$RUNNER_TEMP/wolfssl-full/examples/server/server"
+          export WOLFSSL_PQC_SERVER="$RUNNER_TEMP/wolfssl-pqc/examples/server/server"
           MB="$RUNNER_TEMP/mbedtls/b/programs/ssl/ssl_server2"
           [ -x "$MB" ] && export MBEDTLS_SERVER="$MB"
           make interop
