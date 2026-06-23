@@ -47,7 +47,7 @@ WOLFNANO_LOCAL int wn_RecvRecord(wn_IoRecv recv, void* ctx, byte* rec,
 /* Build a TLSCiphertext record into rec (header + AEAD ciphertext + tag).
  * rec must hold WN_RECORD_HEADER_SZ + contentLen + 1 + WN_RECORD_TAG_SZ bytes.
  * iv is the 12-byte write IV; the nonce is iv XOR seq. */
-WOLFNANO_API int wn_Record_Protect(byte* rec, word32* recLen,
+WOLFNANO_LOCAL int wn_Record_Protect(byte* rec, word32* recLen,
                                    const byte* key, word32 keyLen,
                                    const byte* iv, word64 seq,
                                    byte contentType,
@@ -55,7 +55,7 @@ WOLFNANO_API int wn_Record_Protect(byte* rec, word32* recLen,
 
 /* Decrypt a TLSCiphertext record. content receives the inner content,
  * contentType the recovered type. content may alias rec + header. */
-WOLFNANO_API int wn_Record_Unprotect(byte* content, word32* contentLen,
+WOLFNANO_LOCAL int wn_Record_Unprotect(byte* content, word32* contentLen,
                                      byte* contentType,
                                      const byte* key, word32 keyLen,
                                      const byte* iv, word64 seq,
