@@ -29,6 +29,9 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
       - if: steps.check.outputs.exists == 'true'
+        name: strip .md from intra-wiki links (wiki resolves bare page names)
+        run: sed -i -E 's/\]\(([A-Za-z0-9_-]+)\.md\)/](\1)/g' docs/*.md
+      - if: steps.check.outputs.exists == 'true'
         uses: Andrew-Chen-Wang/github-wiki-action@v4
         with:
           path: docs/

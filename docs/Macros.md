@@ -65,7 +65,7 @@ opt-in (larger code, the speed/size trade is the customer's, as in wolfSSL).
 
 `make bench` runs the all-algo benchmark for `none` then `intel`. `make targets`
 cross-compiles the floor for every non-host arch (skips cleanly without a
-toolchain). See [Benchmarks](Benchmarks.md) and [HANDOFF](HANDOFF.md).
+toolchain). See [Benchmarks](Benchmarks.md).
 
 ## Backend selection
 

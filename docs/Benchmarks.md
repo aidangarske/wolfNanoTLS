@@ -52,7 +52,7 @@ SP file is what lifts it to the thousands.
 targets, but they cannot run on an x86_64 host. thumb2 and armv7 cross-compile
 from source here; aarch64/riscv64 need a complete toolchain. **Speed numbers for
 those require the target silicon** (the Cortex-M33 / STM32H563 is the priority
-and uses the DWT cycle counter). See [HANDOFF](HANDOFF.md).
+and uses the DWT cycle counter).
 
 ## vs MbedTLS (same host, same 1 KB block)
 
