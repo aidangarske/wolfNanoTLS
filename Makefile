@@ -94,6 +94,15 @@ HYBRID_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
 
 CERT_SRC := $(FLOOR_SRC) $(WC)/sp_int.c tests/wn_host_seed.c
 
+# X25519MLKEM768 hybrid handshake (PSK path): adds ML-KEM-768 + SHA3 + wn_hybrid.
+MOCKHYB_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
+  $(WC)/logging.c $(WC)/random.c $(WC)/sha256.c $(WC)/sha512.c $(WC)/sha3.c \
+  $(WC)/hmac.c $(WC)/kdf.c $(WC)/aes.c $(WC)/curve25519.c $(WC)/fe_operations.c \
+  $(WC)/wc_mlkem.c $(WC)/wc_mlkem_poly.c $(WC)/sp_int.c \
+  src/wn_msg.c src/wn_keyschedule.c src/wn_transcript.c src/wn_record.c \
+  src/wn_keyshare.c src/wn_serverhello.c src/wn_hybrid.c src/wn_connect.c \
+  src/wn_session.c tests/wn_host_seed.c
+
 # WOLFNANO_CRYPTO=fips backend (Phase 5 seam proof). Override with the path to
 # your own built wolfSSL FIPS bundle (FIPS Ready or a licensed validated module).
 WOLFNANO_FIPS_DIR ?= $(HOME)/wolfssl-fips
@@ -159,11 +168,11 @@ ASM_CC    := $(CC_$(WOLFNANO_ASM))
 ASM_FLAGS := $(FLAGS_$(WOLFNANO_ASM))
 ASM_SRC   := $(SPSRC_$(WOLFNANO_ASM)) $(ASMSRC_$(WOLFNANO_ASM))
 
-.PHONY: host kstest keyupdatetest sessiontest mocktest errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest hybridtest certtest fipsproof bench benchrun targets test-qemu test test-core check example configs-build coverage stackcheck clean
-test: test-core mlkemtest mldsatest hybridtest wctestpqc ## build + run all local self-tests
+.PHONY: host kstest keyupdatetest sessiontest mocktest mockhybridtest errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest hybridtest certtest fipsproof bench benchrun targets test-qemu test test-core check example configs-build coverage stackcheck clean
+test: test-core mlkemtest mldsatest hybridtest mockhybridtest wctestpqc ## build + run all local self-tests
 test-core: host kstest keyupdatetest sessiontest mocktest errtest rfctest tstest rectest ksharetest hstest wctest msgtest chtest shtest negtest flighttest alerttest matrixtest certtest ## non-PQC suites (wolfSSL without the wc_mlkem/wc_mldsa API)
 
-SUITES := host kstest keyupdatetest sessiontest mocktest errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc \
+SUITES := host kstest keyupdatetest sessiontest mocktest mockhybridtest errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc \
   msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest hybridtest certtest
 
 check: ## run every suite, continue past failures, print one colored PASS/FAIL tally
@@ -218,6 +227,15 @@ mocktest: ## build + run the in-process mock-server handshake test (PORTABLE_C)
 	   $(CONN_SRC) tests/connect_mock_test.c -o $(BUILD)/connect_mock_test
 	@echo "---- run ----"
 	@./$(BUILD)/connect_mock_test
+
+mockhybridtest: ## build + run the X25519MLKEM768 hybrid mock-server handshake test
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C \
+	   -DWOLFNANO_HAVE_MLKEM_HYBRID \
+	   $(MOCKHYB_SRC) tests/connect_mock_hybrid_test.c \
+	   -o $(BUILD)/connect_mock_hybrid_test
+	@echo "---- run ----"
+	@./$(BUILD)/connect_mock_hybrid_test
 
 sessiontest: ## build + run the application-data session unit tests (PORTABLE_C)
 	@mkdir -p $(BUILD)
