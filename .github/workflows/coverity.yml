@@ -1,6 +1,8 @@
 name: coverity
 
 on:
+  schedule:
+    - cron: '0 0 * * *'
   workflow_dispatch:
   workflow_call:
 
@@ -11,6 +13,7 @@ jobs:
   coverity:
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    if: github.repository == 'aidangarske/wolfNano'
     steps:
       - uses: actions/checkout@v4
         with:
