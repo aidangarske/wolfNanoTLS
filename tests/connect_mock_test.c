@@ -224,10 +224,17 @@ static void run_server(int fd, int mode)
     ext = wn_Write_LenStart(&w, 2);
     wn_Write_U16(&w, 43); wn_Write_U16(&w, 2); wn_Write_U16(&w, 0x0304);
     wn_Write_U16(&w, 51);                        /* key_share */
-    wn_Write_U16(&w, (mode == 2) ? 20 : 36);
-    wn_Write_U16(&w, 0x001d);
-    wn_Write_U16(&w, (mode == 2) ? 16 : 32);
-    wn_Write_Bytes(&w, srvPub, (mode == 2) ? 16 : 32);
+    if (mode == 8) {
+        /* real HelloRetryRequest: key_share is just the 2-byte selected_group */
+        wn_Write_U16(&w, 2);
+        wn_Write_U16(&w, 0x001d);
+    }
+    else {
+        wn_Write_U16(&w, (mode == 2) ? 20 : 36);
+        wn_Write_U16(&w, 0x001d);
+        wn_Write_U16(&w, (mode == 2) ? 16 : 32);
+        wn_Write_Bytes(&w, srvPub, (mode == 2) ? 16 : 32);
+    }
     wn_Write_U16(&w, 41); wn_Write_U16(&w, 2); wn_Write_U16(&w, 0); /* psk sel 0 */
     wn_Write_LenEnd(&w, ext, 2);
     wn_Write_LenEnd(&w, body, 3);
