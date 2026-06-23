@@ -25,7 +25,6 @@
 
 #include "wn_serverhello.h"
 #include "wn_msg.h"
-#include "wolfnano_crypto.h"
 
 #define WN_HS_SERVER_HELLO   2
 #define WN_EXT_SUPPORTED_VER 43
@@ -106,8 +105,13 @@ int wn_ServerHello_Parse(const byte* msg, word32 msgLen, wn_ServerHello* out)
     }
 
     if (ret == WOLFNANO_SUCCESS) {
-        if (ConstantCompare(out->random, wn_hrr_random,
-                            (int)sizeof(wn_hrr_random)) == 0) {
+        byte diff = 0;
+        word32 i;
+        /* constant-time match of the RFC 8446 4.1.3 HRR random sentinel */
+        for (i = 0; i < sizeof(wn_hrr_random); i++) {
+            diff |= (byte)(out->random[i] ^ wn_hrr_random[i]);
+        }
+        if (diff == 0) {
             out->isHelloRetry = 1;
         }
     }
