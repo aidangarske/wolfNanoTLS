@@ -82,6 +82,8 @@ int main(void)
           "ServerRespond rejects malformed client ML-KEM key");
 
     wn_Hybrid_Free(&h);
+    check(wn_Hybrid_Free(&h) == WOLFNANO_SUCCESS,
+          "second Free on an already-freed hybrid is a safe no-op");
     wc_FreeRng(&rng);
 
     printf("\n%s (%d failure%s)\n", fails ? "\033[31mFAILED\033[0m" : "\033[32mALL PASS\033[0m",

@@ -37,8 +37,8 @@ int wn_KeyShare_Init(wn_KeyShare* ks, int group)
         ks->group = group;
 #if defined(WOLFNANO_HAVE_MLKEM_HYBRID)
         if (group == WN_GROUP_X25519MLKEM768) {
-            /* hybrid keys are initialized in Generate (wn_Hybrid_ClientKeyShare) */
-            ret = WOLFNANO_SUCCESS;
+            /* subkeys init in Generate; zero so Free is safe before then */
+            XMEMSET(&ks->hybrid, 0, sizeof(ks->hybrid));
         }
         else
 #elif defined(WOLFNANO_HAVE_ECDHE_P256)
