@@ -53,6 +53,9 @@ int wn_ServerHello_Parse(const byte* msg, word32 msgLen, wn_ServerHello* out)
     byte type;
     byte sidLen;
     byte comp = 0;
+    byte seenKs = 0;
+    byte seenVer = 0;
+    byte seenPsk = 0;
     int ret = WOLFNANO_SUCCESS;
 
     if ((msg == NULL) || (out == NULL)) {
@@ -111,6 +114,8 @@ int wn_ServerHello_Parse(const byte* msg, word32 msgLen, wn_ServerHello* out)
                     r.err = 1;
                 }
                 else if (et == WN_EXT_KEY_SHARE) {
+                    if (seenKs != 0) { r.err = 1; }   /* RFC 8446: no duplicates */
+                    seenKs = 1;
                     out->group = wn_Read_U16(&r);
                     klen = wn_Read_U16(&r);
                     out->keyShare = wn_Read_Bytes(&r, klen);
@@ -118,10 +123,14 @@ int wn_ServerHello_Parse(const byte* msg, word32 msgLen, wn_ServerHello* out)
                     if (r.pos != eEnd) { r.err = 1; }
                 }
                 else if (et == WN_EXT_SUPPORTED_VER) {
+                    if (seenVer != 0) { r.err = 1; }
+                    seenVer = 1;
                     out->version = wn_Read_U16(&r);
                     if (r.pos != eEnd) { r.err = 1; }
                 }
                 else if (et == WN_EXT_PRE_SHARED) {
+                    if (seenPsk != 0) { r.err = 1; }
+                    seenPsk = 1;
                     out->pskSelected = (int)wn_Read_U16(&r);
                     if (r.pos != eEnd) { r.err = 1; }
                 }
@@ -132,8 +141,8 @@ int wn_ServerHello_Parse(const byte* msg, word32 msgLen, wn_ServerHello* out)
 
             if ((r.err != 0) || (type != WN_HS_SERVER_HELLO) ||
                 (hsLen != (msgLen - 4)) || (out->random == NULL) ||
-                (lver != 0x0303u) || (comp != 0u)) {
-                ret = WOLFNANO_E_INVALID_ARG;
+                (lver != 0x0303u) || (comp != 0u) || (extEnd != msgLen)) {
+                ret = WOLFNANO_E_INVALID_ARG;   /* no trailing after extensions */
             }
         }
     }

@@ -373,7 +373,8 @@ int wn_Connect_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
         if ((sh.keyShare == NULL) ||
             (sh.keyShareLen != WN_DEFAULT_SRV_SHARE_SZ) ||
             (sh.cipher != WN_CIPHER_AES_128_GCM_SHA256) ||
-            (sh.version != 0x0304u) || (sh.group != WN_DEFAULT_GROUP)) {
+            (sh.version != 0x0304u) || (sh.group != WN_DEFAULT_GROUP) ||
+            (sh.pskSelected != 0)) {   /* one identity offered => must select 0 */
             ret = WOLFNANO_E_ILLEGAL_PARAM;
         }
     }
@@ -408,6 +409,9 @@ int wn_Connect_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
             ret = wn_Record_Unprotect(plain, &plainLen, &ctype, sKey, 16, sIv,
                                       sSeq, scratch, recLen);
             sSeq++;
+        }
+        if ((ret == WOLFNANO_SUCCESS) && (ctype != WN_REC_HANDSHAKE)) {
+            ret = WOLFNANO_E_UNEXPECTED_MSG;   /* flight is handshake records only */
         }
         if ((ret == WOLFNANO_SUCCESS) && (ctype == WN_REC_HANDSHAKE)) {
             wn_Reader hr;
@@ -1081,6 +1085,9 @@ static int wn_connect_cert_impl(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
             ret = wn_Record_Unprotect(plain, &plainLen, &ctype, sKey, 16, sIv,
                                       sSeq, scratch, recLen);
             sSeq++;
+        }
+        if ((ret == WOLFNANO_SUCCESS) && (ctype != WN_REC_HANDSHAKE)) {
+            ret = WOLFNANO_E_UNEXPECTED_MSG;   /* flight is handshake records only */
         }
         if ((ret == WOLFNANO_SUCCESS) && (ctype == WN_REC_HANDSHAKE)) {
             if ((accLen + plainLen) > WN_HS_ACC_SZ) {
