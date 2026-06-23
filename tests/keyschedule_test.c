@@ -219,6 +219,11 @@ int main(void)
           == WOLFNANO_E_INVALID_ARG, "FinishedMac NULL rejected");
     check(wn_Tls13_KeyUpdate(NULL, sKey, sIv, WC_SHA256)
           == WOLFNANO_E_INVALID_ARG, "KeyUpdate NULL rejected");
+    check(wn_Tls13_DeriveSecret(derived2, hsSecret, "derived", emptyHash, 16,
+          WC_SHA256) == WOLFNANO_E_INVALID_ARG,
+          "DeriveSecret hashLen mismatch rejected");
+    check(wn_Tls13_FinishedMac(fmac, sHs, emptyHash, 16, WC_SHA256)
+          == WOLFNANO_E_INVALID_ARG, "FinishedMac hashLen mismatch rejected");
 
     printf("\n%s (%d failure%s)\n", fails ? "\033[31mFAILED\033[0m" : "\033[32mALL PASS\033[0m",
            fails, fails == 1 ? "" : "s");

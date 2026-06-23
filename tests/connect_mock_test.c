@@ -188,7 +188,7 @@ static void run_server(int fd, int mode)
     byte random32[32], emptyHash[32], th[32];
     byte early[32], derived[32], hs[32], cHs[32], sHs[32];
     byte sKey[16], sIv[12], mac[32];
-    byte sh[256], ee[64], plainFlight[256], encRec[512];
+    byte sh[256], ee[64], plainFlight[1024], encRec[1100];
     wn_Writer w;
     word32 chLen, recLen, pubLen, ssLen, thLen, encLen, flightLen;
     byte rtype = 0;
@@ -279,6 +279,48 @@ static void run_server(int fd, int mode)
         encLen = 0;
         wn_Record_Protect(encRec, &encLen, sKey, 16, sIv, 0, WN_REC_HANDSHAKE,
                           plainFlight, 4);
+        (void)send(fd, encRec, encLen, 0);
+        wn_KeyShare_Free(&ks); wc_FreeRng(&rng); return;
+    }
+
+    if (mode == 9) {
+        /* inner record larger than the client's plain[512] decrypt buffer */
+        byte pad[600];
+        XMEMSET(pad, 0, sizeof(pad));
+        wn_Writer_Init(&w, plainFlight, sizeof(plainFlight));
+        wn_Write_U8(&w, 8);
+        ext = wn_Write_LenStart(&w, 3);
+        wn_Write_U16(&w, (word16)sizeof(pad));
+        wn_Write_Bytes(&w, pad, sizeof(pad));
+        wn_Write_LenEnd(&w, ext, 3);
+        encLen = 0;
+        wn_Record_Protect(encRec, &encLen, sKey, 16, sIv, 0, WN_REC_HANDSHAKE,
+                          plainFlight, w.len);
+        (void)send(fd, encRec, encLen, 0);
+        wn_KeyShare_Free(&ks); wc_FreeRng(&rng); return;
+    }
+
+    if (mode == 10) {
+        /* two EncryptedExtensions in the flight (RFC 8446 allows one) */
+        wn_Writer_Init(&w, plainFlight, sizeof(plainFlight));
+        wn_Write_U8(&w, 8); wn_Write_U24(&w, 0);
+        wn_Write_U8(&w, 8); wn_Write_U24(&w, 0);
+        encLen = 0;
+        wn_Record_Protect(encRec, &encLen, sKey, 16, sIv, 0, WN_REC_HANDSHAKE,
+                          plainFlight, w.len);
+        (void)send(fd, encRec, encLen, 0);
+        wn_KeyShare_Free(&ks); wc_FreeRng(&rng); return;
+    }
+
+    if (mode == 11) {
+        /* Finished before any EncryptedExtensions */
+        XMEMSET(mac, 0, 32);
+        wn_Writer_Init(&w, plainFlight, sizeof(plainFlight));
+        wn_Write_U8(&w, 20); wn_Write_U24(&w, 32);
+        wn_Write_Bytes(&w, mac, 32);
+        encLen = 0;
+        wn_Record_Protect(encRec, &encLen, sKey, 16, sIv, 0, WN_REC_HANDSHAKE,
+                          plainFlight, w.len);
         (void)send(fd, encRec, encLen, 0);
         wn_KeyShare_Free(&ks); wc_FreeRng(&rng); return;
     }
@@ -383,6 +425,11 @@ int main(void)
           "unexpected flight message rejected (PSK grammar)");
     check(drive(7) == WOLFNANO_E_UNEXPECTED_MSG, "non-appdata record in flight rejected");
     check(drive(8) == WOLFNANO_E_UNSUPPORTED, "HelloRetryRequest detected and rejected");
+    check(drive(9) == WOLFNANO_E_DECODE, "oversized server flight record rejected");
+    check(drive(10) == WOLFNANO_E_UNEXPECTED_MSG,
+          "duplicate EncryptedExtensions rejected");
+    check(drive(11) == WOLFNANO_E_BAD_MAC,
+          "Finished before EncryptedExtensions rejected");
 
     /* transport send failures: ClientHello header, ClientHello body, Finished */
     check(drive_ex(0, 1, 0) != WOLFNANO_SUCCESS, "ClientHello header send failure");

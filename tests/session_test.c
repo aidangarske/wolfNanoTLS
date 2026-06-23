@@ -262,6 +262,13 @@ int main(void)
     check(wn_Recv(&s, out, sizeof(out), &got) == WOLFNANO_E_CLOSED,
           "wn_Recv after close");
 
+    setup(&s, &m);
+    s.flags &= ~WN_SESS_ESTABLISHED;
+    check(wn_Send(&s, out, 1) == WOLFNANO_E_BAD_STATE,
+          "wn_Send on non-established session rejected");
+    check(wn_Recv(&s, out, sizeof(out), &got) == WOLFNANO_E_BAD_STATE,
+          "wn_Recv on non-established session rejected");
+
     /* 10. wn_Send oversized (> scratch) and transport failure. */
     setup(&s, &m);
     s.scratchLen = 64;                               /* too small for 100 bytes */

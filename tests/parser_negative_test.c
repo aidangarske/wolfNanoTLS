@@ -95,6 +95,12 @@ int main(void)
     buf[38] = 0xFF;                             /* legacy_session_id_echo len = 255 */
     check(wn_ServerHello_Parse(buf, n, &s) < 0, "reject overlong session_id echo");
 
+    memset(buf, 0, sizeof(buf));
+    memcpy(buf, shGood, n);
+    buf[46] = 0xFF; buf[47] = 0xFF;            /* first extension body overruns block */
+    check(wn_ServerHello_Parse(buf, n, &s) < 0,
+          "reject extension body overrunning block");
+
     printf("\n%s (%d failure%s)\n", fails ? "\033[31mFAILED\033[0m" : "\033[32mALL PASS\033[0m",
            fails, fails == 1 ? "" : "s");
     return fails ? 1 : 0;
