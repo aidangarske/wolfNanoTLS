@@ -59,6 +59,7 @@ int main(void)
         0x4e,0x75,0x1f,0x0f,0x00,0x2b,0x00,0x02,0x03,0x04
     };
     wn_ServerHello s;
+    byte buf[sizeof(sh)];
     int rc;
 
     printf("wolfNanoTLS ServerHello parser test (RFC 8448 section 3)\n");
@@ -76,6 +77,12 @@ int main(void)
     rc = wn_ServerHello_Parse(hrr, (word32)sizeof(hrr), &s);
     check((rc == WOLFNANOTLS_SUCCESS) && (s.isHelloRetry == 1),
           "HelloRetryRequest sentinel detected");
+
+    XMEMCPY(buf, sh, sizeof(sh));
+    buf[sizeof(sh) - 5] = 0x4a;                 /* supported_versions -> unknown type */
+    rc = wn_ServerHello_Parse(buf, (word32)sizeof(buf), &s);
+    check((rc == WOLFNANOTLS_SUCCESS) && (s.version == 0) && (s.group == 0x001d),
+          "unknown extension skipped");
 
     printf("\n%s (%d failure%s)\n", fails ? "\033[31mFAILED\033[0m" : "\033[32mALL PASS\033[0m",
            fails, fails == 1 ? "" : "s");

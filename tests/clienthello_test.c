@@ -83,6 +83,9 @@ int main(void)
 
     extLen = wn_Read_U16(&r);
     extEnd = r.pos + extLen;
+    if (extEnd > chLen) {                       /* bound the loop to the input */
+        extEnd = chLen;
+    }
     while ((r.pos < extEnd) && (r.err == 0)) {
         et = wn_Read_U16(&r);
         el = wn_Read_U16(&r);

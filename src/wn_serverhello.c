@@ -96,6 +96,10 @@ int wn_ServerHello_Parse(const byte* msg, word32 msgLen, wn_ServerHello* out)
 
             extLen = wn_Read_U16(&r);
             extEnd = r.pos + extLen;
+            if (extEnd > msgLen) {      /* extensions overrun the message: reject */
+                extEnd = msgLen;        /* and bound the loop to the buffer */
+                r.err = 1;
+            }
             while ((r.pos < extEnd) && (r.err == 0)) {
                 et = wn_Read_U16(&r);
                 el = wn_Read_U16(&r);

@@ -81,7 +81,8 @@ static int read_exact(int fd, byte* buf, word32 n)
     return 0;
 }
 
-static int srv_read_rec(int fd, byte* rec, byte* type, word32* recLen)
+static int srv_read_rec(int fd, byte* rec, word32 cap, byte* type,
+                        word32* recLen)
 {
     word32 frag;
     if (read_exact(fd, rec, 5) != 0) {
@@ -89,6 +90,9 @@ static int srv_read_rec(int fd, byte* rec, byte* type, word32* recLen)
     }
     *type = rec[0];
     frag = ((word32)rec[3] << 8) | rec[4];
+    if (frag > cap - 5) {                       /* bound fragment to caller buffer */
+        return -1;
+    }
     if (read_exact(fd, rec + 5, frag) != 0) {
         return -1;
     }
@@ -128,6 +132,9 @@ static int parse_client_share(const byte* ch, word32 chLen, byte* share)
     (void)wn_Read_Bytes(&r, compLen);
     extLen = wn_Read_U16(&r);
     extEnd = r.pos + extLen;
+    if (extEnd > chLen) {                       /* bound the loop to the input */
+        extEnd = chLen;
+    }
     while ((r.pos < extEnd) && (r.err == 0) && (found == 0)) {
         et = wn_Read_U16(&r);
         el = wn_Read_U16(&r);
@@ -171,7 +178,7 @@ static void run_server(int fd)
     wc_Sha256Hash((const byte*)"", 0, emptyHash);
     wc_RNG_GenerateBlock(&rng, random32, 32);
 
-    srv_read_rec(fd, rec, &rtype, &recLen);
+    srv_read_rec(fd, rec, sizeof(rec), &rtype, &recLen);
     chLen = recLen - 5;
     parse_client_share(rec + 5, chLen, cliShare);
     wn_Transcript_Update(&tc, rec + 5, chLen);
@@ -233,8 +240,8 @@ static void run_server(int fd)
                       plainFlight, flightLen);
     (void)send(fd, encRec, encLen, 0);
 
-    (void)srv_read_rec(fd, rec, &rtype, &recLen);
-    (void)srv_read_rec(fd, rec, &rtype, &recLen);
+    (void)srv_read_rec(fd, rec, sizeof(rec), &rtype, &recLen);
+    (void)srv_read_rec(fd, rec, sizeof(rec), &rtype, &recLen);
 
     wc_FreeRng(&rng);
 }
