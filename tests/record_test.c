@@ -107,6 +107,20 @@ int main(void)
                              rec, recLen);
     check(rc != WOLFNANO_SUCCESS, "wrong sequence number is rejected");
 
+    /* 64-bit sequence: a value above 2^32 round-trips (upper nonce bytes used) */
+    rc = wn_Record_Protect(rec, &recLen, key, sizeof(key), iv,
+                           (word64)0x0000000123456789ULL, 22,
+                           content, sizeof(content));
+    if (rc == WOLFNANO_SUCCESS) {
+        rc = wn_Record_Unprotect(out, &outLen, &type, key, sizeof(key), iv,
+                                 (word64)0x0000000123456789ULL, rec, recLen);
+    }
+    check((rc == WOLFNANO_SUCCESS) && (outLen == sizeof(content)),
+          "64-bit sequence number round-trips");
+    rc = wn_Record_Unprotect(out, &outLen, &type, key, sizeof(key), iv,
+                             (word64)0x0000000023456789ULL, rec, recLen);
+    check(rc != WOLFNANO_SUCCESS, "differing high sequence word is rejected");
+
     /* --- negative / edge paths --- */
     check(wn_Record_Protect(NULL, &recLen, key, sizeof(key), iv, 0, 22,
           content, sizeof(content)) == WOLFNANO_E_INVALID_ARG,

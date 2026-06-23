@@ -72,18 +72,18 @@ int wn_RecvRecord(wn_IoRecv recv, void* ctx, byte* rec, word32 cap,
     return ret;
 }
 
-static void wn_BuildNonce(byte* nonce, const byte* iv, word32 seq)
+static void wn_BuildNonce(byte* nonce, const byte* iv, word64 seq)
 {
     int i;
 
     XMEMCPY(nonce, iv, 12);
-    for (i = 0; i < 4; i++) {
+    for (i = 0; i < 8; i++) {        /* RFC 8446 5.3: 64-bit sequence number */
         nonce[11 - i] ^= (byte)(seq >> (8 * i));
     }
 }
 
 int wn_Record_Protect(byte* rec, word32* recLen, const byte* key, word32 keyLen,
-                      const byte* iv, word32 seq, byte contentType,
+                      const byte* iv, word64 seq, byte contentType,
                       const byte* content, word32 contentLen)
 {
     Aes aes;
@@ -154,7 +154,7 @@ int wn_Record_Protect(byte* rec, word32* recLen, const byte* key, word32 keyLen,
 
 int wn_Record_Unprotect(byte* content, word32* contentLen, byte* contentType,
                         const byte* key, word32 keyLen, const byte* iv,
-                        word32 seq, const byte* rec, word32 recLen)
+                        word64 seq, const byte* rec, word32 recLen)
 {
     Aes aes;
     byte nonce[12];
