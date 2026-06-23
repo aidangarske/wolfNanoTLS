@@ -94,6 +94,13 @@ HYBRID_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
 
 CERT_SRC := $(FLOOR_SRC) $(WC)/sp_int.c tests/wn_host_seed.c
 
+# ML-DSA-65 CertVerify test: full client connect deps (the test #includes
+# wn_connect.c, so it is omitted here) plus SHA3 + wc_mldsa.
+CERTMLDSA_SRC := $(FLOOR_SRC) $(WC)/sp_int.c $(WC)/sha3.c $(WC)/wc_mldsa.c \
+  $(WC)/rsa.c src/wn_msg.c src/wn_keyschedule.c src/wn_transcript.c \
+  src/wn_record.c src/wn_keyshare.c src/wn_serverhello.c \
+  src/wn_clienthello.c src/wn_session.c tests/wn_host_seed.c
+
 # X25519MLKEM768 hybrid handshake (PSK path): adds ML-KEM-768 + SHA3 + wn_hybrid.
 MOCKHYB_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
   $(WC)/logging.c $(WC)/random.c $(WC)/sha256.c $(WC)/sha512.c $(WC)/sha3.c \
@@ -168,12 +175,12 @@ ASM_CC    := $(CC_$(WOLFNANOTLS_ASM))
 ASM_FLAGS := $(FLAGS_$(WOLFNANOTLS_ASM))
 ASM_SRC   := $(SPSRC_$(WOLFNANOTLS_ASM)) $(ASMSRC_$(WOLFNANOTLS_ASM))
 
-.PHONY: host kstest keyupdatetest sessiontest mocktest mockhybridtest errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest hybridtest certtest fipsproof bench benchrun targets test-qemu test test-core check example example-cert example-pqc configs-build m33mu coverage stackcheck clean
-test: test-core mlkemtest mldsatest hybridtest mockhybridtest wctestpqc ## build + run all local self-tests
+.PHONY: host kstest keyupdatetest sessiontest mocktest mockhybridtest errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest certmldsatest hybridtest certtest fipsproof bench benchrun targets test-qemu test test-core check example example-cert example-pqc configs-build m33mu coverage stackcheck clean
+test: test-core mlkemtest mldsatest certmldsatest hybridtest mockhybridtest wctestpqc ## build + run all local self-tests
 test-core: host kstest keyupdatetest sessiontest mocktest errtest rfctest tstest rectest ksharetest hstest wctest msgtest chtest shtest negtest flighttest alerttest matrixtest certtest ## non-PQC suites (wolfSSL without the wc_mlkem/wc_mldsa API)
 
 SUITES := host kstest keyupdatetest sessiontest mocktest mockhybridtest errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc \
-  msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest hybridtest certtest
+  msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest certmldsatest hybridtest certtest
 
 check: ## run every suite, continue past failures, print one colored PASS/FAIL tally
 	@mkdir -p $(BUILD)
@@ -403,6 +410,15 @@ mldsatest: ## build + run ML-DSA-65 round-trip + verify-only no-malloc proof
 	@nm $(BUILD)/wc_mldsa_vo.o | grep -E ' U _(malloc|calloc|realloc|free)$$' \
 	   && echo "  FAIL: verify-only references heap" \
 	   || echo "  PASS: verify-only ML-DSA is allocation-free"
+
+certmldsatest: ## build + run the ML-DSA-65 CertificateVerify test (scheme 0x0905)
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANOTLS_X509 \
+	   -DWOLFNANOTLS_HAVE_RSA_VERIFY -DWOLFNANOTLS_MLDSA -DWOLFNANOTLS_MLDSA_SIGN \
+	   -DWOLFNANOTLS_ALLOW_MALLOC -DWOLFNANOTLS_TARGET_PORTABLE_C \
+	   $(CERTMLDSA_SRC) tests/cert_mldsa_test.c -o $(BUILD)/cert_mldsa_test
+	@echo "---- run ----"
+	@./$(BUILD)/cert_mldsa_test
 
 hybridtest: ## build + run the X25519MLKEM768 hybrid key-share test
 	@mkdir -p $(BUILD)

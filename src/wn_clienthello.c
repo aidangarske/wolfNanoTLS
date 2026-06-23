@@ -89,6 +89,13 @@ int wn_ClientHello_Build(byte* out, word32* outLen, word32 outCap,
         wn_Write_U16(&w, 4);
         wn_Write_U16(&w, 0x0403);              /* ecdsa_secp256r1_sha256 */
         wn_Write_U16(&w, 0x0804);              /* rsa_pss_rsae_sha256 */
+#elif defined(WOLFSSL_HAVE_MLDSA)
+        wn_Write_U16(&w, 10);
+        wn_Write_U16(&w, 8);
+        wn_Write_U16(&w, 0x0905);              /* mldsa65 */
+        wn_Write_U16(&w, 0x0807);              /* ed25519 */
+        wn_Write_U16(&w, 0x0403);              /* ecdsa_secp256r1_sha256 */
+        wn_Write_U16(&w, 0x0804);              /* rsa_pss_rsae_sha256 */
 #else
         wn_Write_U16(&w, 8);
         wn_Write_U16(&w, 6);

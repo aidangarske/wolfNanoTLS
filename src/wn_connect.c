@@ -48,6 +48,9 @@
 #ifndef NO_RSA
     #include <wolfssl/wolfcrypt/rsa.h>
 #endif
+#ifdef WOLFSSL_HAVE_MLDSA
+    #include <wolfssl/wolfcrypt/wc_mldsa.h>
+#endif
 
 #ifndef WOLFSSL_MISC_INCLUDED
     #define WOLFSSL_MISC_INCLUDED
@@ -132,8 +135,14 @@ static void build_client_hello(wn_Writer* w, const byte* random32,
     wn_Write_U16(w, group);
 
     wn_Write_U16(w, 13);                        /* signature_algorithms */
+#ifdef WOLFSSL_HAVE_MLDSA
+    wn_Write_U16(w, 8);
+    wn_Write_U16(w, 6);
+    wn_Write_U16(w, 0x0905);                    /* mldsa65 */
+#else
     wn_Write_U16(w, 6);
     wn_Write_U16(w, 4);
+#endif
     wn_Write_U16(w, 0x0807);
     wn_Write_U16(w, 0x0403);
 
@@ -642,6 +651,45 @@ static int wn_CvRsaPss(const byte* spki, word32 spkiLen, int hashType, int mgf,
 }
 #endif /* !NO_RSA */
 
+#ifdef WOLFSSL_HAVE_MLDSA
+static int wn_CvMlDsa(const byte* spki, word32 spkiLen, const byte* tbs,
+                      word32 tbsLen, const byte* sig, word32 sigLen)
+{
+    wc_MlDsaKey key;
+    word32 idx = 0;
+    int ret = WOLFNANOTLS_SUCCESS;
+    int res = 0, keyInit = 0;
+
+    if (wc_MlDsaKey_Init(&key, NULL, INVALID_DEVID) != 0) {
+        ret = WOLFNANOTLS_E_CRYPTO;
+    }
+    else {
+        keyInit = 1;
+    }
+    if (ret == WOLFNANOTLS_SUCCESS) {
+        if (wc_MlDsaKey_SetParams(&key, WC_ML_DSA_65) != 0) {
+            ret = WOLFNANOTLS_E_CRYPTO;
+        }
+    }
+    if (ret == WOLFNANOTLS_SUCCESS) {
+        if (wc_MlDsaKey_PublicKeyDecode(&key, spki, spkiLen, &idx) != 0) {
+            ret = WOLFNANOTLS_E_BAD_CERT;
+        }
+    }
+    if (ret == WOLFNANOTLS_SUCCESS) {
+        if ((wc_MlDsaKey_VerifyCtx(&key, sig, sigLen, NULL, 0, tbs, tbsLen,
+                &res) != 0) || (res != 1)) {
+            ret = WOLFNANOTLS_E_BAD_CERT;
+        }
+    }
+    if (keyInit) {
+        wc_MlDsaKey_Free(&key);
+    }
+
+    return ret;
+}
+#endif /* WOLFSSL_HAVE_MLDSA */
+
 /* Verify a TLS 1.3 server CertificateVerify over the transcript hash. */
 static int wn_CertVerify(word16 scheme, const byte* spki, word32 spkiLen,
                          const byte* th, word32 thLen, const byte* sig,
@@ -679,6 +727,11 @@ static int wn_CertVerify(word16 scheme, const byte* spki, word32 spkiLen,
                           tbs, tbsLen, sig, sigLen);
     }
 #endif
+#endif
+#ifdef WOLFSSL_HAVE_MLDSA
+    else if (scheme == 0x0905) {
+        ret = wn_CvMlDsa(spki, spkiLen, tbs, tbsLen, sig, sigLen);
+    }
 #endif
     else {
         ret = WOLFNANOTLS_E_UNSUPPORTED;
