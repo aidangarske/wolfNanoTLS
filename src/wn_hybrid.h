@@ -44,8 +44,8 @@
 typedef struct wn_Hybrid {
     MlKemKey kem;
     curve25519_key x;
-    int kemInit;                /* kem initialized (free-safe gate) */
-    int xInit;                  /* x initialized  (free-safe gate) */
+    int kemInit;                /* kem initialized (cleanup gate) */
+    int xInit;                  /* x initialized  (cleanup gate) */
 } wn_Hybrid;
 
 /* Client: produce the key_share (ML-KEM public || X25519 public) and keep the
