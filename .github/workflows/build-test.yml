@@ -35,5 +35,7 @@ jobs:
         run: make certnegtest
       - name: X.509 SPKI-pin-only tier (hostname compiled out)
         run: make certnegpintest
+      - name: X.509 generated-PKI chain-constraint test (CA flag, keyUsage, EKU)
+        run: make certgentest
       - name: configs-build (compile every starter template)
         run: make configs-build

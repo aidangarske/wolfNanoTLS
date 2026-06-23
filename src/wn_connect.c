@@ -914,6 +914,10 @@ static int wn_VerifyChain(const byte** certs, const word32* certLens, int n,
                     issuer.publicKey, issuer.pubKeySize, issuer.keyOID) != 0) {
                 ret = WOLFNANO_E_BAD_CERT;
             }
+            if ((ret == WOLFNANO_SUCCESS) && ((i + 1) < n) &&
+                (issuer.isCA == 0)) {
+                ret = WOLFNANO_E_BAD_CERT;   /* presented intermediate must be a CA */
+            }
             wc_FreeDecodedCert(&issuer);
         }
     }
@@ -931,6 +935,14 @@ static int wn_VerifyChain(const byte** certs, const word32* certLens, int n,
             else {
                 XMEMCPY(spki, leaf.publicKey, leaf.pubKeySize);
                 *spkiLen = leaf.pubKeySize;
+            }
+            if ((ret == WOLFNANO_SUCCESS) && (leaf.extKeyUsageSet != 0) &&
+                ((leaf.extKeyUsage & KEYUSE_DIGITAL_SIG) == 0)) {
+                ret = WOLFNANO_E_BAD_CERT;   /* leaf must allow digitalSignature */
+            }
+            if ((ret == WOLFNANO_SUCCESS) && (leaf.extExtKeyUsageSet != 0) &&
+                ((leaf.extExtKeyUsage & EXTKEYUSE_SERVER_AUTH) == 0)) {
+                ret = WOLFNANO_E_BAD_CERT;   /* leaf EKU must allow serverAuth */
             }
             if ((ret == WOLFNANO_SUCCESS) && (pinnedKey != NULL)) {
                 ret = wn_CheckKeyPin(&leaf, pinnedKey, pinnedKeyLen);

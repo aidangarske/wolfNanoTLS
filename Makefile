@@ -175,12 +175,12 @@ ASM_CC    := $(CC_$(WOLFNANO_ASM))
 ASM_FLAGS := $(FLAGS_$(WOLFNANO_ASM))
 ASM_SRC   := $(SPSRC_$(WOLFNANO_ASM)) $(ASMSRC_$(WOLFNANO_ASM))
 
-.PHONY: host kstest keyupdatetest sessiontest mocktest mockhybridtest errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest certmldsatest certnegtest certnegpintest hybridtest certtest fipsproof bench benchrun targets test-qemu test test-core check example example-cert example-pqc configs-build m33mu coverage stackcheck clean
+.PHONY: host kstest keyupdatetest sessiontest mocktest mockhybridtest errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest certmldsatest certnegtest certnegpintest certgentest hybridtest certtest fipsproof bench benchrun targets test-qemu test test-core check example example-cert example-pqc configs-build m33mu coverage stackcheck clean
 test: test-core mlkemtest mldsatest hybridtest mockhybridtest wctestpqc ## build + run all local self-tests (certmldsatest runs separately; compiling X509 here would drag the interop-only cert path into the coverage build)
 test-core: host kstest keyupdatetest sessiontest mocktest errtest rfctest tstest rectest ksharetest hstest wctest msgtest chtest shtest negtest flighttest alerttest matrixtest certtest ## non-PQC suites (wolfSSL without the wc_mlkem/wc_mldsa API)
 
 SUITES := host kstest keyupdatetest sessiontest mocktest mockhybridtest errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc \
-  msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest certmldsatest certnegtest certnegpintest hybridtest certtest
+  msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest certmldsatest certnegtest certnegpintest certgentest hybridtest certtest
 
 check: ## run every suite, continue past failures, print one colored PASS/FAIL tally
 	@mkdir -p $(BUILD)
@@ -428,6 +428,16 @@ certnegtest: ## build + run X.509 negative auth tests (chain + hostname + ECDSA 
 	   $(CERTMLDSA_SRC) tests/cert_neg_test.c -o $(BUILD)/cert_neg_test
 	@echo "---- run ----"
 	@./$(BUILD)/cert_neg_test
+
+certgentest: ## build + run generated-PKI chain-constraint tests (CA flag, keyUsage, EKU)
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_X509 \
+	   -DWOLFNANO_HAVE_RSA_VERIFY -DWOLFNANO_RSA_FULL \
+	   -DWOLFSSL_CERT_GEN -DWOLFSSL_CERT_EXT -DWOLFSSL_KEY_GEN \
+	   -DWOLFNANO_ALLOW_MALLOC -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(CERTMLDSA_SRC) tests/cert_gen_test.c -o $(BUILD)/cert_gen_test
+	@echo "---- run ----"
+	@./$(BUILD)/cert_gen_test
 
 certnegpintest: ## build + run the key-pin-only cert tier (WOLFNANO_X509_HOSTNAME=0)
 	@mkdir -p $(BUILD)

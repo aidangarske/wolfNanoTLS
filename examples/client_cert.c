@@ -22,7 +22,7 @@
  * Minimal wolfNano TLS 1.3 client: ECDHE handshake with X.509 server-cert
  * authentication, then one application-data round trip and a clean close.
  * The server leaf must verify against the pinned trust anchor (DER). Shows
- * the cert lifecycle: wn_Connect_Cert_ex -> wn_Send -> wn_Recv -> wn_Close.
+ * the cert lifecycle: wn_Connect_CertName_ex -> wn_Send -> wn_Recv -> wn_Close.
  *
  * Usage: client_cert <host> <port> <anchor.der>
  *        (default 127.0.0.1 4433 tests/pki/server/ec-cert.der)
@@ -101,8 +101,12 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    rc = wn_Connect_Cert_ex(&sess, &rng, sock_send, sock_recv, &fd, anchor,
-                            (word32)anchorLen, scratch, sizeof(scratch));
+    /* Bind the server identity to <host>: the leaf must chain to the anchor and
+     * present <host> in its SAN/CN. Pass an SPKI pin instead of host (or both)
+     * to authenticate one fixed server by key. host must match the cert. */
+    rc = wn_Connect_CertName_ex(&sess, &rng, sock_send, sock_recv, &fd, anchor,
+                                (word32)anchorLen, host, NULL, 0,
+                                scratch, sizeof(scratch));
     if (rc != 0) {
         printf("handshake failed: %d\n", rc);
         wc_FreeRng(&rng);
