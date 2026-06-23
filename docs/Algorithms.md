@@ -40,7 +40,8 @@ component first, then X25519 (draft-kwiatkowski-tls-ecdhe-mlkem).
 | CertVerify schemes: ECDSA P-256/384, RSA-PSS SHA-256/384, Ed25519 | | done, all live vs OpenSSL + wolfSSL |
 | multi-cert chain validation (leaf -> intermediate -> pinned root) | | done, live vs OpenSSL + wolfSSL |
 | server identity: hostname SAN/CN (RFC 6125) + exact key pin | `wn_Connect_CertName*`; hostname behind `WOLFNANO_X509_HOSTNAME` | done |
-| validity-time + extended constraint checks (basicConstraints, EKU) | | planned (#35) |
+| issuer BasicConstraints CA flag + leaf keyUsage/serverAuth EKU | enforced in `wn_VerifyChain` | done |
+| certificate validity-time (notBefore/notAfter) | needs a runtime clock | planned (#35) |
 
 **Memory note:** unlike the floor and the PSK/RPK handshake (which are true
 no-allocator), X.509 cert parsing uses a `DecodedCert` and needs working memory.
