@@ -37,6 +37,7 @@ typedef struct wn_ServerHello {
     word16 group;              /* selected key_share group */
     word16 version;            /* selected supported_versions value */
     int pskSelected;           /* selected PSK identity index, or -1 */
+    int isHelloRetry;          /* random matched the HRR sentinel */
 } wn_ServerHello;
 
 WOLFNANO_API int wn_ServerHello_Parse(const byte* msg, word32 msgLen,
