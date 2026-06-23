@@ -291,6 +291,7 @@ int wn_Connect_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     int gotEE = 0, done = 0;
 
     XMEMSET(zeros32, 0, sizeof(zeros32));
+    XMEMSET(&ks, 0, sizeof(ks));        /* group 0 => Free is a no-op if Init never runs */
 
     if ((sess == NULL) || (rng == NULL) || (ioSend == NULL) ||
         (ioRecv == NULL) || (psk == NULL) || (pskLen == 0) ||
@@ -977,6 +978,8 @@ static int wn_connect_cert_impl(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
 #ifdef WOLFNANO_SEND_ALERTS
     int keysReady = 0;
 #endif
+
+    XMEMSET(&ks, 0, sizeof(ks));        /* group 0 => Free is a no-op if Init never runs */
 
     if ((sess == NULL) || (rng == NULL) || (ioSend == NULL) ||
         (ioRecv == NULL) || (anchor == NULL) || (scratch == NULL) ||

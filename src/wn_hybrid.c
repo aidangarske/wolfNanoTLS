@@ -39,6 +39,9 @@ int wn_Hybrid_ClientKeyShare(wn_Hybrid* h, WC_RNG* rng, byte* out,
         if (wc_MlKemKey_Init(&h->kem, WC_ML_KEM_768, NULL, INVALID_DEVID) != 0) {
             ret = WOLFNANO_E_CRYPTO;
         }
+        else {
+            h->kemInit = 1;
+        }
     }
     if (ret == WOLFNANO_SUCCESS) {
         if ((wc_MlKemKey_MakeKey(&h->kem, rng) != 0) ||
@@ -50,6 +53,9 @@ int wn_Hybrid_ClientKeyShare(wn_Hybrid* h, WC_RNG* rng, byte* out,
     if (ret == WOLFNANO_SUCCESS) {
         if (wc_curve25519_init(&h->x) != 0) {
             ret = WOLFNANO_E_CRYPTO;
+        }
+        else {
+            h->xInit = 1;
         }
     }
     if (ret == WOLFNANO_SUCCESS) {
@@ -206,8 +212,14 @@ int wn_Hybrid_Free(wn_Hybrid* h)
         ret = WOLFNANO_E_INVALID_ARG;
     }
     else {
-        wc_MlKemKey_Free(&h->kem);
-        wc_curve25519_free(&h->x);
+        if (h->kemInit != 0) {
+            wc_MlKemKey_Free(&h->kem);
+            h->kemInit = 0;
+        }
+        if (h->xInit != 0) {
+            wc_curve25519_free(&h->x);
+            h->xInit = 0;
+        }
     }
 
     return ret;
