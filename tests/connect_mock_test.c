@@ -161,8 +161,16 @@ static int parse_client_pub(const byte* ch, word32 chLen, byte* pub)
     return (found && (r.err == 0)) ? 0 : -1;
 }
 
+static const byte g_hrr_random[32] = {
+    0xCF, 0x21, 0xAD, 0x74, 0xE5, 0x9A, 0x61, 0x11,
+    0xBE, 0x1D, 0x8C, 0x02, 0x1E, 0x65, 0xB8, 0x91,
+    0xC2, 0xA2, 0x11, 0x16, 0x7A, 0xBB, 0x8C, 0x5E,
+    0x07, 0x9E, 0x09, 0xE2, 0xC8, 0xA8, 0x33, 0x9C
+};
+
 /* mode: 0 = valid handshake; 1 = ServerHello not a handshake record;
- * 2 = bad key_share length; 3 = corrupt server Finished MAC. */
+ * 2 = bad key_share length; 3 = corrupt server Finished MAC;
+ * 8 = ServerHello carrying the HelloRetryRequest random sentinel. */
 static void run_server(int fd, int mode)
 {
     wn_KeyShare ks;
@@ -183,6 +191,9 @@ static void run_server(int fd, int mode)
     wn_Transcript_Init(&tc, WC_SHA256);
     wc_Sha256Hash((const byte*)"", 0, emptyHash);
     wc_RNG_GenerateBlock(&rng, random32, 32);
+    if (mode == 8) {
+        XMEMCPY(random32, g_hrr_random, 32);
+    }
 
     /* 1. ClientHello */
     srv_read_rec(fd, rec, &rtype, &recLen);
@@ -227,7 +238,7 @@ static void run_server(int fd, int mode)
     ee[0] = 0x01;
     srv_send_plain(fd, WN_REC_CHANGE_CIPHER, ee, 1);
 
-    if (mode == 2) {
+    if ((mode == 2) || (mode == 8)) {
         wn_KeyShare_Free(&ks); wc_FreeRng(&rng); return;
     }
 
@@ -356,6 +367,7 @@ int main(void)
     check(drive(5) == WOLFNANO_E_DECODE, "malformed flight message -> DECODE");
     check(drive(6) == WOLFNANO_SUCCESS, "unexpected flight message tolerated");
     check(drive(7) == WOLFNANO_E_UNEXPECTED_MSG, "non-appdata record in flight rejected");
+    check(drive(8) == WOLFNANO_E_UNSUPPORTED, "HelloRetryRequest detected and rejected");
 
     /* transport send failures: ClientHello header, ClientHello body, Finished */
     check(drive_ex(0, 1, 0) != WOLFNANO_SUCCESS, "ClientHello header send failure");

@@ -31,6 +31,14 @@
 #define WN_EXT_PRE_SHARED    41
 #define WN_EXT_KEY_SHARE     51
 
+/* HelloRetryRequest random sentinel (RFC 8446 4.1.3). */
+static const byte wn_hrr_random[32] = {
+    0xCF, 0x21, 0xAD, 0x74, 0xE5, 0x9A, 0x61, 0x11,
+    0xBE, 0x1D, 0x8C, 0x02, 0x1E, 0x65, 0xB8, 0x91,
+    0xC2, 0xA2, 0x11, 0x16, 0x7A, 0xBB, 0x8C, 0x5E,
+    0x07, 0x9E, 0x09, 0xE2, 0xC8, 0xA8, 0x33, 0x9C
+};
+
 int wn_ServerHello_Parse(const byte* msg, word32 msgLen, wn_ServerHello* out)
 {
     wn_Reader r;
@@ -56,6 +64,7 @@ int wn_ServerHello_Parse(const byte* msg, word32 msgLen, wn_ServerHello* out)
         out->group = 0;
         out->version = 0;
         out->pskSelected = -1;
+        out->isHelloRetry = 0;
 
         wn_Reader_Init(&r, msg, msgLen);
         type  = wn_Read_U8(&r);
@@ -92,6 +101,12 @@ int wn_ServerHello_Parse(const byte* msg, word32 msgLen, wn_ServerHello* out)
         if ((r.err != 0) || (type != WN_HS_SERVER_HELLO) ||
             (hsLen != (msgLen - 4)) || (out->random == NULL)) {
             ret = WOLFNANO_E_INVALID_ARG;
+        }
+    }
+
+    if (ret == WOLFNANO_SUCCESS) {
+        if (XMEMCMP(out->random, wn_hrr_random, sizeof(wn_hrr_random)) == 0) {
+            out->isHelloRetry = 1;
         }
     }
 

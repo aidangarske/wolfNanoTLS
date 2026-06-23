@@ -362,6 +362,9 @@ int wn_Connect_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     if (ret == WOLFNANO_SUCCESS) {
         ret = wn_ServerHello_Parse(scratch + 5, recLen - 5, &sh);
     }
+    if ((ret == WOLFNANO_SUCCESS) && (sh.isHelloRetry != 0)) {
+        ret = WOLFNANO_E_UNSUPPORTED;
+    }
     if (ret == WOLFNANO_SUCCESS) {
         ret = wn_Transcript_Update(&tc, scratch + 5, recLen - 5);
     }
@@ -898,6 +901,9 @@ int wn_Connect_Cert_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     }
     if (ret == WOLFNANO_SUCCESS) {
         ret = wn_ServerHello_Parse(scratch + 5, recLen - 5, &sh);
+    }
+    if ((ret == WOLFNANO_SUCCESS) && (sh.isHelloRetry != 0)) {
+        ret = WOLFNANO_E_UNSUPPORTED;
     }
     if (ret == WOLFNANO_SUCCESS) {
         ret = wn_Transcript_Update(&tc, scratch + 5, recLen - 5);
