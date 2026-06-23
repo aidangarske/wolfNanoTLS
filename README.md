@@ -6,6 +6,7 @@
 thin shell on top of [wolfSSL](https://github.com/wolfSSL/wolfssl).**
 
 [![CI](https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?logo=githubactions&logoColor=white)](https://github.com/aidangarske/wolfNanoTLS/actions)
+[![Coverity](https://img.shields.io/badge/Coverity-scan-2496ED?logo=coverity&logoColor=white)](https://scan.coverity.com/projects/wolfnano)
 [![License](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSING)
 [![TLS](https://img.shields.io/badge/TLS-1.3%20only-blueviolet)](https://www.rfc-editor.org/rfc/rfc8446)
 
