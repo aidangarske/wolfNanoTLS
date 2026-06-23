@@ -325,6 +325,16 @@ static void run_server(int fd, int mode)
         wn_KeyShare_Free(&ks); wc_FreeRng(&rng); return;
     }
 
+    if (mode == 12) {
+        /* encrypted record whose inner type is not handshake, mid-flight */
+        XMEMSET(plainFlight, 0, 4);
+        encLen = 0;
+        wn_Record_Protect(encRec, &encLen, sKey, 16, sIv, 0, WN_REC_APPDATA,
+                          plainFlight, 4);
+        (void)send(fd, encRec, encLen, 0);
+        wn_KeyShare_Free(&ks); wc_FreeRng(&rng); return;
+    }
+
     /* 5. EncryptedExtensions (empty) [+ extra msg, mode 6] + server Finished */
     wn_Writer_Init(&w, plainFlight, sizeof(plainFlight));
     wn_Write_U8(&w, 8);                          /* EncryptedExtensions */
@@ -430,6 +440,8 @@ int main(void)
           "duplicate EncryptedExtensions rejected");
     check(drive(11) == WOLFNANO_E_BAD_MAC,
           "Finished before EncryptedExtensions rejected");
+    check(drive(12) == WOLFNANO_E_UNEXPECTED_MSG,
+          "non-handshake inner record in flight rejected");
 
     /* transport send failures: ClientHello header, ClientHello body, Finished */
     check(drive_ex(0, 1, 0) != WOLFNANO_SUCCESS, "ClientHello header send failure");
