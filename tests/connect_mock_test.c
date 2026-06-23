@@ -93,7 +93,8 @@ static int read_exact(int fd, byte* buf, word32 n)
 }
 
 /* Read one TLS record (header + fragment) into rec; returns total length. */
-static int srv_read_rec(int fd, byte* rec, byte* type, word32* recLen)
+static int srv_read_rec(int fd, byte* rec, word32 cap, byte* type,
+                        word32* recLen)
 {
     word32 frag;
     if (read_exact(fd, rec, 5) != 0) {
@@ -101,6 +102,9 @@ static int srv_read_rec(int fd, byte* rec, byte* type, word32* recLen)
     }
     *type = rec[0];
     frag = ((word32)rec[3] << 8) | rec[4];
+    if (frag > cap - 5) {                       /* bound fragment to caller buffer */
+        return -1;
+    }
     if (read_exact(fd, rec + 5, frag) != 0) {
         return -1;
     }
@@ -140,6 +144,9 @@ static int parse_client_pub(const byte* ch, word32 chLen, byte* pub)
     (void)wn_Read_Bytes(&r, compLen);
     extLen = wn_Read_U16(&r);
     extEnd = r.pos + extLen;
+    if (extEnd > chLen) {                       /* bound the loop to the input */
+        extEnd = chLen;
+    }
     while ((r.pos < extEnd) && (r.err == 0) && (found == 0)) {
         et = wn_Read_U16(&r);
         el = wn_Read_U16(&r);
@@ -196,7 +203,7 @@ static void run_server(int fd, int mode)
     }
 
     /* 1. ClientHello */
-    srv_read_rec(fd, rec, &rtype, &recLen);
+    srv_read_rec(fd, rec, sizeof(rec), &rtype, &recLen);
     chLen = recLen - 5;
     parse_client_pub(rec + 5, chLen, cliPub);
     wn_Transcript_Update(&tc, rec + 5, chLen);
@@ -306,8 +313,8 @@ static void run_server(int fd, int mode)
 
     /* 6. drain the client's leftover CCS then its Finished, so the socket stays
      * open until the client has sent its Finished (avoids a close race). */
-    (void)srv_read_rec(fd, rec, &rtype, &recLen);
-    (void)srv_read_rec(fd, rec, &rtype, &recLen);
+    (void)srv_read_rec(fd, rec, sizeof(rec), &rtype, &recLen);
+    (void)srv_read_rec(fd, rec, sizeof(rec), &rtype, &recLen);
 
     wn_KeyShare_Free(&ks);
     wc_FreeRng(&rng);
