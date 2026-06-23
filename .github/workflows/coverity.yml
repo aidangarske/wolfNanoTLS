@@ -39,6 +39,7 @@ jobs:
           mkdir cov && tar xzf cov.tgz --strip-components=1 -C cov
           export PATH="$PWD/cov/bin:$PATH"
           cov-build --dir cov-int make test
+          cov-manage-emit --dir cov-int --tu-pattern "file('.*/wolfssl/.*')" delete
           tar czf wolfNano.tgz cov-int
           curl --form token="$COVERITY_TOKEN" --form email="$COVERITY_EMAIL" \
             --form file=@wolfNano.tgz --form version="ci" --form description="ci" \
