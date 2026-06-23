@@ -92,8 +92,13 @@ wolfNanoTLS's `intel` build runs wolfCrypt assembly through the `wc_*` seam
 | ECDSA P-256 sign | 26446 op/s |
 | ECDSA P-256 verify | 10013 op/s |
 | ECDH P-256 agree | 10546 op/s |
+| ML-KEM-768 keygen | 49572 op/s |
+| ML-KEM-768 encap | 52906 op/s |
+| ML-KEM-768 decap | 38360 op/s |
+| ML-DSA-65 sign | 4030 op/s |
+| ML-DSA-65 verify | 10952 op/s |
 
-Plus a full PQC + EdDSA suite. The portable-C baseline, the per-algorithm
+Plus EdDSA and the full portable-C baseline, the per-algorithm
 speedups, and a head-to-head vs mbedTLS are in
 [Benchmarks](https://github.com/aidangarske/wolfNanoTLS/wiki/Benchmarks).
 
