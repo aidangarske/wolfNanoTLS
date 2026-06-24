@@ -54,7 +54,7 @@ jobs:
           git add .github/wolfssl-master-known-good.txt
           git config user.name  "wolfnano-ci"
           git config user.email "aidan@wolfssl.com"
-          git commit -m "ci: bump wolfssl pin to master ${MASTER}"
+          git commit -m "[ci] bump wolfssl pin to master ${MASTER}"
           git push
           gh issue list --label wolfssl-master-break --state open --json number \
             --jq '.[].number' | xargs -r -I{} gh issue close {} \
