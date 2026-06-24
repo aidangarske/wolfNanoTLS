@@ -84,6 +84,12 @@ same host, 1 KB block:
 | ECDSA P-256 sign | 20799 op/s | 721 op/s | ~29x |
 | ECDH P-256 agree | 9472 op/s | 390 op/s | ~24x |
 | RSA-2048 private | 861 op/s | 95 op/s | ~9x |
+| ML-KEM-768 keygen | 49572 op/s | n/a | n/a |
+| ML-KEM-768 encap | 52906 op/s | n/a | n/a |
+| ML-KEM-768 decap | 38360 op/s | n/a | n/a |
+| ML-DSA-44 sign | 6226 op/s | n/a | n/a |
+| ML-DSA-44 verify | 17580 op/s | n/a | n/a |
 
-Plus a full PQC + EdDSA suite mbedTLS does not have at all. The block size
-matches mbedTLS's benchmark (1 KB) for a fair symmetric comparison.
+mbedTLS ships no ML-KEM / ML-DSA, so the post-quantum rows have no counterpart
+(plus EdDSA, also absent from mbedTLS). The block size matches mbedTLS's
+benchmark (1 KB) for a fair symmetric comparison.
