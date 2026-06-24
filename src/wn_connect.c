@@ -791,16 +791,12 @@ static int wn_CertVerify(word16 scheme, const byte* spki, word32 spkiLen,
 
     wn_BuildCvTbs(tbs, &tbsLen, th, thLen);
 
+    /* RFC 8446 4.4.3: accept only schemes wolfNanoTLS offered in the ClientHello
+     * signature_algorithms (see wn_clienthello.c); reject anything else. */
     if (scheme == 0x0403) {
         ret = wn_CvEcdsa(spki, spkiLen, WC_HASH_TYPE_SHA256, tbs, tbsLen, sig,
                          sigLen);
     }
-#ifdef WOLFSSL_SHA384
-    else if (scheme == 0x0503) {
-        ret = wn_CvEcdsa(spki, spkiLen, WC_HASH_TYPE_SHA384, tbs, tbsLen, sig,
-                         sigLen);
-    }
-#endif
 #ifdef HAVE_ED25519
     else if (scheme == 0x0807) {
         ret = wn_CvEd25519(spki, spkiLen, tbs, tbsLen, sig, sigLen);
@@ -811,12 +807,6 @@ static int wn_CertVerify(word16 scheme, const byte* spki, word32 spkiLen,
         ret = wn_CvRsaPss(spki, spkiLen, WC_HASH_TYPE_SHA256, WC_MGF1SHA256,
                           tbs, tbsLen, sig, sigLen);
     }
-#ifdef WOLFSSL_SHA384
-    else if (scheme == 0x0805) {
-        ret = wn_CvRsaPss(spki, spkiLen, WC_HASH_TYPE_SHA384, WC_MGF1SHA384,
-                          tbs, tbsLen, sig, sigLen);
-    }
-#endif
 #endif
 #ifdef WOLFSSL_HAVE_MLDSA
     else if (scheme == 0x0905) {
