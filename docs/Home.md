@@ -12,8 +12,8 @@ only through a thin `wc_*` provider seam.
 
 ## Pillars
 
-- **TLS 1.3 only**, client-first, Raw Public Keys (RFC 7250) plus PSK by
-  default. X.509 is a compile-time adder.
+- **TLS 1.3 only**, client-first, external PSK + ECDHE by
+  default. X.509 server-cert auth is a compile-time adder.
 - **True no-allocator**: the shell and the `src` crypto floor use no allocator
   at all, only caller-provided or static buffers (the wolfCOSE bar).
 - **Provider seam** selected at build time:

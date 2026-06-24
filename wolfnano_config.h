@@ -152,6 +152,12 @@ extern int wn_seed(unsigned char* output, unsigned int sz);
 /* ---- approved-mode (fips backend): X25519/ChaCha are outside the wolfCrypt
  * FIPS boundary, so an approved build negotiates ECDHE P-256 + AES-GCM only. */
 #ifdef WOLFNANO_FIPS
+    /* The X25519MLKEM768 hybrid group is outside the FIPS boundary and would
+     * silently win the key-share selection (see wn_keyshare.h), so reject the
+     * combination rather than ship a non-approved group in an approved build. */
+    #if defined(WOLFNANO_HAVE_MLKEM_HYBRID)
+        #error "WOLFNANO_FIPS cannot be combined with WOLFNANO_HAVE_MLKEM_HYBRID"
+    #endif
     #ifndef WOLFNANO_HAVE_ECDHE_P256
         #define WOLFNANO_HAVE_ECDHE_P256
     #endif

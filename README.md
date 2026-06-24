@@ -23,7 +23,7 @@ interop stays identical to wolfSSL.
 
 ## Main Features
 
-- **TLS 1.3 only**: client-first, Raw Public Keys (RFC 7250) + PSK by default;
+- **TLS 1.3 only**: client-first, external PSK + ECDHE by default, X.509 server-cert auth as a compile-time adder;
   X.509 is a compile-time adder. No TLS 1.2, no compatibility layer.
 - **Zero dynamic allocation**: the product shell and `src` crypto floor run
   entirely on caller-provided / static buffers (`WOLFSSL_NO_MALLOC`), verified

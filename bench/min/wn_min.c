@@ -24,7 +24,7 @@ int wn_fp_seed(unsigned char* output, unsigned int sz)
 int main(void)
 {
     int acc = 0;
-    byte buf[64];
+    byte buf[65];
     byte dg[32];
 
     XMEMSET(buf, 0x5a, sizeof(buf));
