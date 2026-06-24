@@ -1110,6 +1110,7 @@ static int wn_connect_cert_impl(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
          (sh.keyShareLen != WN_DEFAULT_SRV_SHARE_SZ) ||
          (sh.cipher != WN_CIPHER_AES_128_GCM_SHA256) ||
          (sh.version != 0x0304u) || (sh.group != WN_DEFAULT_GROUP) ||
+         (sh.pskSelected != -1) ||  /* cert path offered no PSK (RFC 8446 4.1.3) */
          (sh.sessionIdLen != 32) || (sh.sessionId == NULL) ||
          (ConstantCompare(sh.sessionId, sid, 32) != 0))) {
         ret = WOLFNANO_E_ILLEGAL_PARAM;
