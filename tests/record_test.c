@@ -156,6 +156,21 @@ int main(void)
     check(wn_RecvRecord(zero_recv, &b, rec, sizeof(rec), &rtype, &rl) != 0,
           "RecvRecord EOF rejected");
 
+    /* RFC 8446 5: ChangeCipherSpec must be a single 0x01 byte */
+    big2[0] = 20; big2[1] = 0x03; big2[2] = 0x03; big2[3] = 0; big2[4] = 1;
+    big2[5] = 0x01;
+    b.buf = big2; b.len = 6; b.pos = 0;
+    check((wn_RecvRecord(buf_recv, &b, rec, sizeof(rec), &rtype, &rl) == 0) &&
+          (rtype == 20), "RecvRecord accepts valid ChangeCipherSpec");
+    big2[5] = 0x00;                              /* wrong payload value */
+    b.buf = big2; b.len = 6; b.pos = 0;
+    check(wn_RecvRecord(buf_recv, &b, rec, sizeof(rec), &rtype, &rl)
+          == WOLFNANO_E_DECODE, "RecvRecord rejects non-0x01 ChangeCipherSpec");
+    big2[4] = 2; big2[5] = 0x01; big2[6] = 0x01; /* CCS length != 1 */
+    b.buf = big2; b.len = 7; b.pos = 0;
+    check(wn_RecvRecord(buf_recv, &b, rec, sizeof(rec), &rtype, &rl)
+          == WOLFNANO_E_DECODE, "RecvRecord rejects oversized ChangeCipherSpec");
+
     printf("\n%s (%d failure%s)\n", fails ? "\033[31mFAILED\033[0m" : "\033[32mALL PASS\033[0m",
            fails, fails == 1 ? "" : "s");
     return fails ? 1 : 0;
