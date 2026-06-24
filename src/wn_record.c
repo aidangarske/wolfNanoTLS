@@ -70,6 +70,11 @@ int wn_RecvRecord(wn_IoRecv recv, void* ctx, byte* rec, word32 cap,
         ret = io_recv_exact(recv, ctx, rec + 5, frag);
         *recLen = frag + 5;
     }
+    /* RFC 8446 5: a ChangeCipherSpec is exactly one byte with the value 0x01. */
+    if ((ret == WOLFNANOTLS_SUCCESS) && (*type == WN_REC_CHANGE_CIPHER) &&
+        ((frag != 1) || (rec[5] != 0x01))) {
+        ret = WOLFNANOTLS_E_DECODE;
+    }
 
     return ret;
 }

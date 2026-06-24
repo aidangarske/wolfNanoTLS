@@ -430,6 +430,8 @@ static void run_server(int fd, int mode)
     wc_FreeRng(&rng);
 }
 
+static int g_failSessClean = 1;
+
 /* Run one handshake against a forked mock server. failAt injects a transport
  * failure on the failAt-th client send (0 = never); wrapper uses the
  * handshake-only wn_Connect_Psk instead of the _ex form. */
@@ -462,9 +464,12 @@ static int drive_ex(int mode, int failAt, int wrapper)
                             sizeof(g_psk), g_id, scratch, sizeof(scratch));
     }
     else {
+        XMEMSET(&sess, 0xAA, sizeof(sess));
         rc = wn_Connect_Psk_ex(&sess, &rng, sock_send, sock_recv, &ioc, g_psk,
                                sizeof(g_psk), g_id, scratch, sizeof(scratch));
-        (void)sess;
+        if ((rc != WOLFNANOTLS_SUCCESS) && (sess.flags != 0)) {
+            g_failSessClean = 0;        /* failure left a non-clean session */
+        }
     }
     wc_FreeRng(&rng);
     close(sv[0]);
@@ -529,6 +534,7 @@ int main(void)
     check(drive_ex(0, 1, 0) != WOLFNANOTLS_SUCCESS, "ClientHello header send failure");
     check(drive_ex(0, 2, 0) != WOLFNANOTLS_SUCCESS, "ClientHello body send failure");
     check(drive_ex(0, 5, 0) != WOLFNANOTLS_SUCCESS, "client Finished send failure");
+    check(g_failSessClean, "failed handshake leaves a clean (zeroed) session");
 
     /* argument validation */
     wc_InitRng(&rng);
