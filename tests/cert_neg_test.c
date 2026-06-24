@@ -130,6 +130,12 @@ int main(void)
                         (word32)sizeof_ca_ecc_cert_der_256, tmp, &tl,
                         NULL, leafSpki, leafSpkiLen);
     check(rc == WOLFNANOTLS_E_BAD_CERT, "wrong key pin rejected");
+    leafSpki[0] ^= 0x01;                         /* restore the real pin bytes */
+    tl = (word32)sizeof(tmp);
+    rc = wn_VerifyChain(certs, certLens, 1, ca_ecc_cert_der_256,
+                        (word32)sizeof_ca_ecc_cert_der_256, tmp, &tl,
+                        NULL, leafSpki, 0);
+    check(rc == WOLFNANOTLS_E_BAD_CERT, "zero-length key pin rejected");
 
 #ifdef WOLFNANOTLS_X509_HOSTNAME
     check(wn_DnsNameMatch("example.com", 11, "example.com", 11)

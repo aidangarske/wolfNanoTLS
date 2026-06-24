@@ -83,6 +83,16 @@ int main(void)
     rc = wn_ServerHello_Parse(buf, (word32)sizeof(buf), &s);
     check(rc < 0, "unsolicited ServerHello extension rejected");
 
+    XMEMCPY(buf, sh, sizeof(sh));
+    buf[5] = 0x04;                              /* legacy_version 0x0303 -> 0x0304 */
+    rc = wn_ServerHello_Parse(buf, (word32)sizeof(buf), &s);
+    check(rc < 0, "bad legacy_version rejected");
+
+    XMEMCPY(buf, sh, sizeof(sh));
+    buf[41] = 0x01;                            /* legacy_compression_method != 0 */
+    rc = wn_ServerHello_Parse(buf, (word32)sizeof(buf), &s);
+    check(rc < 0, "non-null legacy_compression_method rejected");
+
     printf("\n%s (%d failure%s)\n", fails ? "\033[31mFAILED\033[0m" : "\033[32mALL PASS\033[0m",
            fails, fails == 1 ? "" : "s");
     return fails ? 1 : 0;

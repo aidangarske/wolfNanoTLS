@@ -335,6 +335,18 @@ static void run_server(int fd, int mode)
         wn_KeyShare_Free(&ks); wc_FreeRng(&rng); return;
     }
 
+    if (mode == 18) {
+        /* valid EE then a message whose length cannot fit the reassembly buffer */
+        wn_Writer_Init(&w, plainFlight, sizeof(plainFlight));
+        wn_Write_U8(&w, 8); wn_Write_U24(&w, 2); wn_Write_U16(&w, 0);
+        wn_Write_U8(&w, 20); wn_Write_U24(&w, 0xffffff);
+        encLen = 0;
+        wn_Record_Protect(encRec, &encLen, sKey, 16, sIv, 0, WN_REC_HANDSHAKE,
+                          plainFlight, w.len);
+        (void)send(fd, encRec, encLen, 0);
+        wn_KeyShare_Free(&ks); wc_FreeRng(&rng); return;
+    }
+
     if (mode == 11) {
         /* Finished before any EncryptedExtensions */
         XMEMSET(mac, 0, 32);
@@ -362,7 +374,14 @@ static void run_server(int fd, int mode)
     wn_Writer_Init(&w, plainFlight, sizeof(plainFlight));
     wn_Write_U8(&w, 8);                          /* EncryptedExtensions */
     ext = wn_Write_LenStart(&w, 3);
-    wn_Write_U16(&w, 0);                         /* extensions length 0 */
+    if (mode == 17) {
+        wn_Write_U16(&w, 8);                     /* one supported_groups ext */
+        wn_Write_U16(&w, 10); wn_Write_U16(&w, 4);
+        wn_Write_U16(&w, 2); wn_Write_U16(&w, 0x001d);
+    }
+    else {
+        wn_Write_U16(&w, 0);                     /* extensions length 0 */
+    }
     wn_Write_LenEnd(&w, ext, 3);
     if (mode == 6) {
         wn_Write_U8(&w, 99);                     /* unexpected (ignored) message */
@@ -501,6 +520,10 @@ int main(void)
           "EncryptedExtensions extension length overrun rejected");
     check(drive(16) == WOLFNANOTLS_SUCCESS,
           "fragmented server flight reassembled across records");
+    check(drive(17) == WOLFNANOTLS_SUCCESS,
+          "EncryptedExtensions with supported_groups accepted");
+    check(drive(18) == WOLFNANOTLS_E_DECODE,
+          "reassembly rejects a message larger than the buffer after a prior one");
 
     /* transport send failures: ClientHello header, ClientHello body, Finished */
     check(drive_ex(0, 1, 0) != WOLFNANOTLS_SUCCESS, "ClientHello header send failure");

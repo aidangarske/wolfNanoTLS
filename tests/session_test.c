@@ -207,6 +207,14 @@ int main(void)
           "wn_Recv answers update_requested with a KeyUpdate");
     check(s.cSeq == 0, "our write sequence reset after sending KeyUpdate");
 
+    /* 5b. KeyUpdate with an out-of-range request byte is rejected (RFC 8446 4.6.3). */
+    setup(&s, &m);
+    ku[4] = 2;                      /* not in {0,1} */
+    push_rec(&m, s.sKey, s.sIv, 0, WN_REC_HANDSHAKE, ku, sizeof(ku));
+    got = 0;
+    rc = wn_Recv(&s, out, sizeof(out), &got);
+    check(rc == WOLFNANOTLS_E_DECODE, "wn_Recv rejects invalid KeyUpdate request byte");
+
     /* 6. close_notify alert -> WOLFNANOTLS_E_CLOSED, no data. */
     setup(&s, &m);
     alert[0] = 1;                   /* warning */
