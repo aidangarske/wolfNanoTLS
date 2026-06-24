@@ -36,7 +36,7 @@
     #include <wolfssl/wolfcrypt/wc_mlkem.h>
 #endif
 #ifdef WOLFSSL_HAVE_MLDSA
-    #include <wolfssl/wolfcrypt/dilithium.h>
+    #include <wolfssl/wolfcrypt/wc_mldsa.h>
 #endif
 #include <stdio.h>
 #include <time.h>
