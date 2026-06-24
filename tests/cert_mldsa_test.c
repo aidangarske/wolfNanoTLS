@@ -18,7 +18,7 @@
  * along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
-/* ML-DSA-65 TLS 1.3 CertificateVerify (SignatureScheme 0x0905): keygen + sign
+/* ML-DSA TLS 1.3 CertificateVerify (level via WOLFNANOTLS_MLDSA_LEVEL): keygen + sign
  * a CertificateVerify TBS, export the public key to SPKI DER, then drive the
  * client's wn_CertVerify path and assert accept (good sig) + reject (tampered).
  */
@@ -46,14 +46,14 @@ int main(void)
     wc_MlDsaKey key;
     byte th[32];
     byte tbs[64 + 33 + 1 + 32];
-    byte spki[2048];
-    byte sig[5000];
+    byte spki[4096];
+    byte sig[6000];
     word32 tbsLen = 0;
     word32 sigLen;
     int spkiLen, rc, verifyRc;
     word32 i;
 
-    printf("wolfNanoTLS ML-DSA-65 CertificateVerify test (scheme 0x0905)\n");
+    printf("wolfNanoTLS ML-DSA CertificateVerify test\n");
 
     for (i = 0; i < sizeof(th); i++) {
         th[i] = (byte)i;
@@ -64,9 +64,9 @@ int main(void)
     check(rc == 0, "RNG init");
 
     rc  = wc_MlDsaKey_Init(&key, NULL, INVALID_DEVID);
-    rc |= wc_MlDsaKey_SetParams(&key, WC_ML_DSA_65);
+    rc |= wc_MlDsaKey_SetParams(&key, WN_MLDSA_PARAM);
     rc |= wc_MlDsaKey_MakeKey(&key, &rng);
-    check(rc == 0, "ML-DSA-65 keygen");
+    check(rc == 0, "ML-DSA keygen");
 
     spkiLen = wc_MlDsaKey_PublicKeyToDer(&key, spki, (word32)sizeof(spki), 1);
     check(spkiLen > 0, "export public key to SPKI DER");
@@ -75,12 +75,12 @@ int main(void)
     rc = wc_MlDsaKey_SignCtx(&key, NULL, 0, sig, &sigLen, tbs, tbsLen, &rng);
     check(rc == 0, "sign CertificateVerify TBS");
 
-    verifyRc = wn_CertVerify(0x0905, spki, (word32)spkiLen, th, sizeof(th),
+    verifyRc = wn_CertVerify(WN_MLDSA_SCHEME, spki, (word32)spkiLen, th, sizeof(th),
                              sig, sigLen);
-    check(verifyRc == WOLFNANOTLS_SUCCESS, "CertificateVerify accepted (0x0905)");
+    check(verifyRc == WOLFNANOTLS_SUCCESS, "CertificateVerify accepted");
 
     sig[0] ^= 0x01;
-    verifyRc = wn_CertVerify(0x0905, spki, (word32)spkiLen, th, sizeof(th),
+    verifyRc = wn_CertVerify(WN_MLDSA_SCHEME, spki, (word32)spkiLen, th, sizeof(th),
                              sig, sigLen);
     check(verifyRc != WOLFNANOTLS_SUCCESS, "tampered signature rejected");
 

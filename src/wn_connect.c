@@ -172,7 +172,7 @@ static void build_client_hello(wn_Writer* w, const byte* random32,
 #ifdef WOLFSSL_HAVE_MLDSA
     wn_Write_U16(w, 8);
     wn_Write_U16(w, 6);
-    wn_Write_U16(w, 0x0905);                    /* mldsa65 */
+    wn_Write_U16(w, WN_MLDSA_SCHEME);          /* ML-DSA (level via WOLFNANOTLS_MLDSA_LEVEL) */
 #else
     wn_Write_U16(w, 6);
     wn_Write_U16(w, 4);
@@ -590,16 +590,25 @@ int wn_Connect_Psk(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv, void* ioCtx,
  * the frame small for embedded. scratch is partitioned [record I/O | hsacc |
  * leafSpki]; records decrypt in place in the I/O region. WN_CERT_SCRATCH_MIN is
  * the minimum scratchLen. */
-#ifdef WOLFSSL_HAVE_MLDSA
-    /* ML-DSA-65 leaf SPKI is 1974 B (DER); its Certificate + ~3309 B
-     * CertificateVerify flight needs a larger accumulator. */
+#if defined(WOLFSSL_HAVE_MLDSA) && (WOLFNANOTLS_MLDSA_LEVEL == 5)
+    /* ML-DSA-87 leaf SPKI is ~2620 B (DER); its flight needs the most room. */
+    #define WN_HS_ACC_SZ       10240
+    #define WN_LEAF_SPKI_SZ    3072
+#elif defined(WOLFSSL_HAVE_MLDSA)
+    /* ML-DSA-44/65 leaf SPKI is up to 1974 B (DER); its Certificate + up to
+     * ~3309 B CertificateVerify flight needs a larger accumulator. */
     #define WN_HS_ACC_SZ       8192
     #define WN_LEAF_SPKI_SZ    2048
 #else
     #define WN_HS_ACC_SZ       6144
     #define WN_LEAF_SPKI_SZ    1024
 #endif
-#define WN_CERT_IO_MIN     4096
+#if defined(WOLFSSL_HAVE_MLDSA) && (WOLFNANOTLS_MLDSA_LEVEL == 5)
+    /* a single ML-DSA-87 CertificateVerify record (~4660 B) must fit in place */
+    #define WN_CERT_IO_MIN     8192
+#else
+    #define WN_CERT_IO_MIN     4096
+#endif
 #define WN_CERT_SCRATCH_MIN (WN_CERT_IO_MIN + WN_HS_ACC_SZ + WN_LEAF_SPKI_SZ)
 
 /* Build the TLS 1.3 CertificateVerify signed content (RFC 8446 4.4.3). */
@@ -742,6 +751,13 @@ static int wn_CvRsaPss(const byte* spki, word32 spkiLen, int hashType, int mgf,
 #endif /* !NO_RSA */
 
 #ifdef WOLFSSL_HAVE_MLDSA
+#if WOLFNANOTLS_MLDSA_LEVEL == 2
+    #define WN_MLDSA_PARAM WC_ML_DSA_44
+#elif WOLFNANOTLS_MLDSA_LEVEL == 3
+    #define WN_MLDSA_PARAM WC_ML_DSA_65
+#else
+    #define WN_MLDSA_PARAM WC_ML_DSA_87
+#endif
 static int wn_CvMlDsa(const byte* spki, word32 spkiLen, const byte* tbs,
                       word32 tbsLen, const byte* sig, word32 sigLen)
 {
@@ -757,7 +773,7 @@ static int wn_CvMlDsa(const byte* spki, word32 spkiLen, const byte* tbs,
         keyInit = 1;
     }
     if (ret == WOLFNANOTLS_SUCCESS) {
-        if (wc_MlDsaKey_SetParams(&key, WC_ML_DSA_65) != 0) {
+        if (wc_MlDsaKey_SetParams(&key, WN_MLDSA_PARAM) != 0) {
             ret = WOLFNANOTLS_E_CRYPTO;
         }
     }
@@ -809,7 +825,7 @@ static int wn_CertVerify(word16 scheme, const byte* spki, word32 spkiLen,
     }
 #endif
 #ifdef WOLFSSL_HAVE_MLDSA
-    else if (scheme == 0x0905) {
+    else if (scheme == WN_MLDSA_SCHEME) {
         ret = wn_CvMlDsa(spki, spkiLen, tbs, tbsLen, sig, sigLen);
     }
 #endif
