@@ -319,7 +319,7 @@ int wn_Connect_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     byte fin[36];
     byte plain[512];
     word32 truncOff, binderOff, chLen, recLen, thLen, pubLen, ssLen;
-    word32 plainLen; word64 sSeq = 0;
+    word32 plainLen, accOff = 0, accLen = 0; word64 sSeq = 0;
     byte rtype = 0, ctype = 0;
     int ret = WOLFNANO_SUCCESS;
     int gotEE = 0, done = 0;
@@ -441,32 +441,38 @@ int wn_Connect_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
         if ((ret == WOLFNANO_SUCCESS) &&
             ((recLen < (WN_RECORD_HEADER_SZ + WN_RECORD_TAG_SZ)) ||
              ((recLen - WN_RECORD_HEADER_SZ - WN_RECORD_TAG_SZ) >
-                 sizeof(plain)))) {
-            ret = WOLFNANO_E_DECODE;        /* inner record must fit plain[] */
+                 (sizeof(plain) - accLen)))) {
+            ret = WOLFNANO_E_DECODE;        /* reassembled flight must fit plain[] */
         }
         if (ret == WOLFNANO_SUCCESS) {
-            ret = wn_Record_Unprotect(plain, &plainLen, &ctype, sKey, 16, sIv,
-                                      sSeq, scratch, recLen);
+            ret = wn_Record_Unprotect(plain + accLen, &plainLen, &ctype, sKey, 16,
+                                      sIv, sSeq, scratch, recLen);
             sSeq++;
         }
         if ((ret == WOLFNANO_SUCCESS) && (ctype != WN_REC_HANDSHAKE)) {
             ret = WOLFNANO_E_UNEXPECTED_MSG;   /* flight is handshake records only */
         }
-        if ((ret == WOLFNANO_SUCCESS) && (ctype == WN_REC_HANDSHAKE)) {
-            wn_Reader hr;
-            wn_Reader_Init(&hr, plain, plainLen);
-            while ((hr.pos < plainLen) && (ret == WOLFNANO_SUCCESS) &&
-                   (done == 0)) {
+        if (ret == WOLFNANO_SUCCESS) {
+            /* RFC 8446 5.1: a handshake message may span records; accumulate and
+             * parse only complete messages, leaving any partial for the next. */
+            accLen += plainLen;
+            while ((ret == WOLFNANO_SUCCESS) && (done == 0) &&
+                   ((accLen - accOff) >= 4)) {
                 word32 mStart, mLen;
                 byte mType;
-                mStart = hr.pos;
-                mType = wn_Read_U8(&hr);
-                mLen = wn_Read_U24(&hr);
-                (void)wn_Read_Bytes(&hr, mLen);
-                if (hr.err != 0) {
-                    ret = WOLFNANO_E_DECODE;
+                mStart = accOff;
+                mType = plain[accOff];
+                mLen = ((word32)plain[accOff + 1] << 16) |
+                       ((word32)plain[accOff + 2] << 8) | plain[accOff + 3];
+                if ((accOff + 4 + mLen) > sizeof(plain)) {
+                    ret = WOLFNANO_E_DECODE; /* cannot fit the reassembly buffer */
+                    break;
                 }
-                else if (mType == WN_HS_ENCRYPTED_EXT) {
+                if ((accOff + 4 + mLen) > accLen) {
+                    break;                  /* message not complete yet */
+                }
+                accOff += 4 + mLen;
+                if (mType == WN_HS_ENCRYPTED_EXT) {
                     if (gotEE != 0) {           /* RFC 8446: one EE per flight */
                         ret = WOLFNANO_E_UNEXPECTED_MSG;
                     }

@@ -381,6 +381,22 @@ static void run_server(int fd, int mode)
     wn_Write_Bytes(&w, mac, 32);
     flightLen = w.len;
 
+    if (mode == 16) {
+        /* split the flight mid-Finished across two records (RFC 8446 5.1) */
+        word32 cut = flightLen - 16;
+        encLen = 0;
+        wn_Record_Protect(encRec, &encLen, sKey, 16, sIv, 0, WN_REC_HANDSHAKE,
+                          plainFlight, cut);
+        (void)send(fd, encRec, encLen, 0);
+        encLen = 0;
+        wn_Record_Protect(encRec, &encLen, sKey, 16, sIv, 1, WN_REC_HANDSHAKE,
+                          plainFlight + cut, flightLen - cut);
+        (void)send(fd, encRec, encLen, 0);
+        (void)srv_read_rec(fd, rec, sizeof(rec), &rtype, &recLen);
+        (void)srv_read_rec(fd, rec, sizeof(rec), &rtype, &recLen);
+        wn_KeyShare_Free(&ks); wc_FreeRng(&rng); return;
+    }
+
     encLen = 0;
     wn_Record_Protect(encRec, &encLen, sKey, 16, sIv, 0, WN_REC_HANDSHAKE,
                       plainFlight, flightLen);
@@ -483,6 +499,8 @@ int main(void)
           "EncryptedExtensions with no extensions vector rejected");
     check(drive(15) == WOLFNANO_E_DECODE,
           "EncryptedExtensions extension length overrun rejected");
+    check(drive(16) == WOLFNANO_SUCCESS,
+          "fragmented server flight reassembled across records");
 
     /* transport send failures: ClientHello header, ClientHello body, Finished */
     check(drive_ex(0, 1, 0) != WOLFNANO_SUCCESS, "ClientHello header send failure");
