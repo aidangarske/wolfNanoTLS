@@ -1247,6 +1247,9 @@ static int wn_connect_cert_impl(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     ForceZero(ecdhe, sizeof(ecdhe));
     ForceZero(mac, sizeof(mac));
     ForceZero(fin, sizeof(fin));
+    if ((hsacc != NULL) && (accLen > 0)) {
+        ForceZero(hsacc, accLen);          /* decrypted handshake flight */
+    }
 
     return ret;
 }

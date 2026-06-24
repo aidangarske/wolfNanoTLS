@@ -157,7 +157,7 @@ int wn_Recv(wn_Session* s, byte* out, word32 outCap, word32* outLen)
 {
     byte* plain = NULL;
     word32 recLen;
-    word32 plainLen;
+    word32 plainLen = 0;
     byte rtype;
     byte ctype;
     int ret = WOLFNANO_SUCCESS;
@@ -214,6 +214,10 @@ int wn_Recv(wn_Session* s, byte* out, word32 outCap, word32* outLen)
             else {
                 ret = WOLFNANO_E_UNEXPECTED_MSG;
             }
+        }
+        if (plainLen > 0) {
+            ForceZero(plain, plainLen);   /* don't retain plaintext in scratch */
+            plainLen = 0;
         }
     }
 

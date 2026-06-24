@@ -147,6 +147,9 @@ int wn_Record_Protect(byte* rec, word32* recLen, const byte* key, word32 keyLen,
     if (aesInit) {
         wc_AesFree(&aes);
     }
+    if ((ret != WOLFNANO_SUCCESS) && (rec != NULL) && (innerLen > 0)) {
+        ForceZero(rec + WN_RECORD_HEADER_SZ, innerLen);   /* drop staged plaintext */
+    }
     ForceZero(nonce, sizeof(nonce));
 
     return ret;
