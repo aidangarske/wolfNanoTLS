@@ -348,19 +348,26 @@ static void bench_pqc(WC_RNG* rng)
     NA("ML-KEM-768 keygen");
 #endif
 #ifdef WOLFSSL_HAVE_MLDSA
+  #if WOLFNANO_MLDSA_LEVEL == 2
+    #define WN_B_MLDSA_PARAM WC_ML_DSA_44
+  #elif WOLFNANO_MLDSA_LEVEL == 3
+    #define WN_B_MLDSA_PARAM WC_ML_DSA_65
+  #else
+    #define WN_B_MLDSA_PARAM WC_ML_DSA_87
+  #endif
     XMEMSET(dmsg, 0x5a, sizeof(dmsg));
     dok = (wc_MlDsaKey_Init(&dk, NULL, INVALID_DEVID) == 0) &&
-          (wc_MlDsaKey_SetParams(&dk, WC_ML_DSA_65) == 0);
+          (wc_MlDsaKey_SetParams(&dk, WN_B_MLDSA_PARAM) == 0);
   #ifndef WOLFSSL_MLDSA_VERIFY_ONLY
     if (dok && (wc_MlDsaKey_MakeKey(&dk, rng) == 0)) {
-        BENCH_OPS("ML-DSA-65 sign",
+        BENCH_OPS("ML-DSA sign",
             (dsigLen = sizeof(dsig),
              wc_MlDsaKey_SignCtx(&dk, NULL, 0, dsig, &dsigLen, dmsg,
                                  sizeof(dmsg), rng)));
         dsigLen = sizeof(dsig);
         if (wc_MlDsaKey_SignCtx(&dk, NULL, 0, dsig, &dsigLen, dmsg,
                                 sizeof(dmsg), rng) == 0) {
-            BENCH_OPS("ML-DSA-65 verify",
+            BENCH_OPS("ML-DSA verify",
                 wc_MlDsaKey_VerifyCtx(&dk, dsig, dsigLen, NULL, 0, dmsg,
                                       sizeof(dmsg), &dres));
         }
@@ -368,10 +375,10 @@ static void bench_pqc(WC_RNG* rng)
     }
   #else
     (void)dok; (void)dres; (void)dsigLen;
-    NA("ML-DSA-65 sign");
+    NA("ML-DSA sign");
   #endif
 #else
-    NA("ML-DSA-65 sign");
+    NA("ML-DSA sign");
 #endif
 }
 
