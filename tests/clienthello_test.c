@@ -48,6 +48,7 @@ int main(void)
     int i, ksFound = 0, ksMatch = 0;
     int rc;
     static const char host[] = "example.com";
+    char longhost[301];
     word16 listLen, nameLen;
     byte nameType;
     int sniFound = 0, sniMatch = 0, sniAbsent = 1;
@@ -149,6 +150,13 @@ int main(void)
     }
     check(sniFound && sniMatch && (r.err == 0),
           "server_name (SNI) carries the host name");
+
+    /* SNI host longer than the 255-byte limit is rejected */
+    for (i = 0; i < 300; i++) { longhost[i] = 'a'; }
+    longhost[300] = 0;
+    rc = wn_ClientHello_Build_ex(ch, &chLen, sizeof(ch), rnd, sid, 32, pub, 32,
+                                 longhost);
+    check(rc == WOLFNANO_E_INVALID_ARG, "over-long SNI host rejected");
 
     /* invalid args + buffer too small */
     rc = wn_ClientHello_Build(NULL, &chLen, sizeof(ch), rnd, sid, 32, pub, 32);

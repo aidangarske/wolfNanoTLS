@@ -115,6 +115,13 @@ int main(int argc, char** argv)
     reqLen = snprintf((char*)req, sizeof(req),
                       "GET / HTTP/1.1\r\nHost: %s\r\nUser-Agent: wolfNano\r\n"
                       "Connection: close\r\n\r\n", host);
+    if ((reqLen < 0) || (reqLen >= (int)sizeof(req))) {
+        printf("request too long for %s\n", host);
+        wn_Close(&sess);
+        wc_FreeRng(&rng);
+        close(fd);
+        return 1;
+    }
     rc = wn_Send(&sess, req, (word32)reqLen);
     if (rc >= 0) {
         rc = wn_Recv(&sess, in, sizeof(in) - 1, &got);

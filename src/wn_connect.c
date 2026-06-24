@@ -90,7 +90,8 @@ static int wn_CheckEncExt(const byte* body, word32 bodyLen, int sniOffered)
             ret = WOLFNANO_E_DECODE;
         }
         else if ((et != WN_EXT_SUPPORTED_GRP) &&
-                 !((et == WN_EXT_SERVER_NAME) && (sniOffered != 0))) {
+                 !((et == WN_EXT_SERVER_NAME) && (sniOffered != 0) &&
+                   (el == 0))) {       /* RFC 6066: the SNI ack is empty */
             ret = WOLFNANO_E_UNEXPECTED_MSG;
         }
     }
@@ -1189,7 +1190,9 @@ static int wn_connect_cert_impl(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
             /* enforce the legal flight order (RFC 8446 4.4); see wn_flight.h */
             ret = wn_FlightOrder(mType, &gotEE, &gotCert, &gotCv);
             if ((ret == WOLFNANO_SUCCESS) && (mType == WN_HS_ENCRYPTED_EXT)) {
-                ret = wn_CheckEncExt(hsacc + off + 4, mLen, serverName != NULL);
+                ret = wn_CheckEncExt(hsacc + off + 4, mLen,
+                                     (serverName != NULL) &&
+                                     (serverName[0] != 0));
             }
             if ((ret == WOLFNANO_SUCCESS) && (mType == WN_HS_CERT_VERIFY)) {
                 ret = wn_Transcript_GetHash(&tc, thCert, &thLen);

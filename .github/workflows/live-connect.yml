@@ -1,9 +1,12 @@
 name: live-connect
 
+# Not run on pull_request: a live external endpoint must not gate PRs on a
+# transient network blip. Runs on main, on a daily schedule, and on demand.
 on:
   push:
     branches: [main]
-  pull_request:
+  schedule:
+    - cron: '0 7 * * *'
   workflow_dispatch:
 
 permissions:
