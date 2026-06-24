@@ -304,8 +304,30 @@ static void run_server(int fd, int mode)
     if (mode == 10) {
         /* two EncryptedExtensions in the flight (RFC 8446 allows one) */
         wn_Writer_Init(&w, plainFlight, sizeof(plainFlight));
-        wn_Write_U8(&w, 8); wn_Write_U24(&w, 0);
-        wn_Write_U8(&w, 8); wn_Write_U24(&w, 0);
+        wn_Write_U8(&w, 8); wn_Write_U24(&w, 2); wn_Write_U16(&w, 0);
+        wn_Write_U8(&w, 8); wn_Write_U24(&w, 2); wn_Write_U16(&w, 0);
+        encLen = 0;
+        wn_Record_Protect(encRec, &encLen, sKey, 16, sIv, 0, WN_REC_HANDSHAKE,
+                          plainFlight, w.len);
+        (void)send(fd, encRec, encLen, 0);
+        wn_KeyShare_Free(&ks); wc_FreeRng(&rng); return;
+    }
+
+    if ((mode == 13) || (mode == 14) || (mode == 15)) {
+        /* EncryptedExtensions body checks: forbidden ext, missing vector,
+         * and an extension length that overruns the vector. */
+        wn_Writer_Init(&w, plainFlight, sizeof(plainFlight));
+        wn_Write_U8(&w, 8);
+        if (mode == 14) {
+            wn_Write_U24(&w, 0);            /* no extensions vector field */
+        }
+        else {
+            ext = wn_Write_LenStart(&w, 3);
+            wn_Write_U16(&w, 4);            /* extensions vector length */
+            wn_Write_U16(&w, (mode == 13) ? 51 : 10);  /* 51 forbidden in EE */
+            wn_Write_U16(&w, (mode == 15) ? 0xFFFF : 0);
+            wn_Write_LenEnd(&w, ext, 3);
+        }
         encLen = 0;
         wn_Record_Protect(encRec, &encLen, sKey, 16, sIv, 0, WN_REC_HANDSHAKE,
                           plainFlight, w.len);
@@ -455,6 +477,12 @@ int main(void)
           "Finished before EncryptedExtensions rejected");
     check(drive(12) == WOLFNANO_E_UNEXPECTED_MSG,
           "non-handshake inner record in flight rejected");
+    check(drive(13) == WOLFNANO_E_UNEXPECTED_MSG,
+          "forbidden EncryptedExtensions extension rejected");
+    check(drive(14) == WOLFNANO_E_DECODE,
+          "EncryptedExtensions with no extensions vector rejected");
+    check(drive(15) == WOLFNANO_E_DECODE,
+          "EncryptedExtensions extension length overrun rejected");
 
     /* transport send failures: ClientHello header, ClientHello body, Finished */
     check(drive_ex(0, 1, 0) != WOLFNANO_SUCCESS, "ClientHello header send failure");

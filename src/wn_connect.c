@@ -59,8 +59,42 @@
 
 #define WN_HS_FINISHED       20
 #define WN_HS_ENCRYPTED_EXT  8
+#define WN_EXT_SUPPORTED_GRP 10
 
 /* wn_RecvRecord (record read) now lives in wn_record.c; declared in wn_record.h. */
+
+/* RFC 8446 4.3.1 / 4.2: EncryptedExtensions carries only extensions the client
+ * offered that belong here. wolfNano offers nothing EE-legal but supported_groups,
+ * so reject any other (forbidden or unsolicited) extension type. */
+static int wn_CheckEncExt(const byte* body, word32 bodyLen)
+{
+    wn_Reader r;
+    word32 extEnd;
+    word16 extLen;
+    word16 et;
+    word16 el;
+    int ret = WOLFNANO_SUCCESS;
+
+    wn_Reader_Init(&r, body, bodyLen);
+    extLen = wn_Read_U16(&r);
+    extEnd = r.pos + extLen;
+    if ((r.err != 0) || (extEnd != bodyLen)) {
+        ret = WOLFNANO_E_DECODE;
+    }
+    while ((ret == WOLFNANO_SUCCESS) && (r.pos < extEnd) && (r.err == 0)) {
+        et = wn_Read_U16(&r);
+        el = wn_Read_U16(&r);
+        (void)wn_Read_Bytes(&r, el);
+        if (r.err != 0) {
+            ret = WOLFNANO_E_DECODE;
+        }
+        else if (et != WN_EXT_SUPPORTED_GRP) {
+            ret = WOLFNANO_E_UNEXPECTED_MSG;
+        }
+    }
+
+    return ret;
+}
 
 /* Send the TLS 1.3 middlebox-compatibility ChangeCipherSpec (RFC 8446 D.4). */
 static int send_ccs(wn_IoSend send, void* ctx);
@@ -437,7 +471,11 @@ int wn_Connect_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
                         ret = WOLFNANO_E_UNEXPECTED_MSG;
                     }
                     else {
-                        ret = wn_Transcript_Update(&tc, plain + mStart, mLen + 4);
+                        ret = wn_CheckEncExt(plain + mStart + 4, mLen);
+                        if (ret == WOLFNANO_SUCCESS) {
+                            ret = wn_Transcript_Update(&tc, plain + mStart,
+                                                       mLen + 4);
+                        }
                         gotEE = 1;
                     }
                 }
@@ -1130,6 +1168,9 @@ static int wn_connect_cert_impl(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
             }
             /* enforce the legal flight order (RFC 8446 4.4); see wn_flight.h */
             ret = wn_FlightOrder(mType, &gotEE, &gotCert, &gotCv);
+            if ((ret == WOLFNANO_SUCCESS) && (mType == WN_HS_ENCRYPTED_EXT)) {
+                ret = wn_CheckEncExt(hsacc + off + 4, mLen);
+            }
             if ((ret == WOLFNANO_SUCCESS) && (mType == WN_HS_CERT_VERIFY)) {
                 ret = wn_Transcript_GetHash(&tc, thCert, &thLen);
             }
