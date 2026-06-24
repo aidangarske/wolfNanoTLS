@@ -76,6 +76,14 @@
         #define WOLFSSL_KEY_GEN
     #endif
     #define WC_RSA_PSS
+    /* Real-world roots are RSA-4096 (e.g. ISRG Root X1); the SP default caps at
+     * 3072, so raise the verify ceiling so public CA chains validate. */
+    #ifndef RSA_MAX_SIZE
+        #define RSA_MAX_SIZE 4096
+    #endif
+    #ifndef SP_INT_BITS
+        #define SP_INT_BITS 4096
+    #endif
 #endif
 
 /* ---- side-channel hardening (constant-time) ---- */
