@@ -38,7 +38,7 @@ int main(void)
         XMEMSET(iv, 0, sizeof(iv));
         acc += wc_AesInit(&aes, NULL, INVALID_DEVID);
         acc += wc_AesGcmSetKey(&aes, key, sizeof(key));
-        acc += wc_AesGcmEncrypt(&aes, ct, buf, (word32)sizeof(buf), iv, 12,
+        acc += wc_AesGcmEncrypt(&aes, ct, buf, (word32)sizeof(ct), iv, 12,
                                 tag, 16, NULL, 0);
         wc_AesFree(&aes);
     }
