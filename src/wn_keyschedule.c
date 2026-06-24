@@ -57,9 +57,18 @@ int wn_Tls13_Extract(byte* prk, const byte* salt, word32 saltLen,
     }
 
     if (ret == WOLFNANOTLS_SUCCESS) {
-        /* wc_ takes a non-const ikm but does not modify it for Extract. */
-        ret = wc_Tls13_HKDF_Extract(prk, salt, saltLen,
-                                    (byte*)ikm, ikmLen, digest);
+        if (ikmLen == 0) {
+            /* wolfCrypt writes a digest-sized zero block through ikm for the
+             * zero-length case, so give it writable scratch, not the caller's
+             * (possibly read-only) const buffer. */
+            byte zikm[WC_MAX_DIGEST_SIZE];
+            XMEMSET(zikm, 0, sizeof(zikm));
+            ret = wc_Tls13_HKDF_Extract(prk, salt, saltLen, zikm, 0, digest);
+        }
+        else {
+            ret = wc_Tls13_HKDF_Extract(prk, salt, saltLen, (byte*)ikm, ikmLen,
+                                        digest);
+        }
         /* LCOV_EXCL_START - HKDF-Extract does not fail on a validated digest */
         if (ret != 0) {
             ret = WOLFNANOTLS_E_CRYPTO;
@@ -80,7 +89,7 @@ int wn_Tls13_ExpandLabel(byte* okm, word32 okmLen, const byte* secret,
 
     hashLen = wn_DigestSize(digest);
     if ((okm == NULL) || (secret == NULL) || (label == NULL) ||
-        (hashLen == 0)) {
+        (hashLen == 0) || ((info == NULL) && (infoLen > 0))) {
         ret = WOLFNANOTLS_E_INVALID_ARG;
     }
 

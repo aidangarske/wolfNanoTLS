@@ -213,6 +213,8 @@ int main(void)
           == WOLFNANOTLS_E_INVALID_ARG, "Extract NULL rejected");
     check(wn_Tls13_Extract(big, NULL, 0, psk, 32, 0x7f)
           == WOLFNANOTLS_E_INVALID_ARG, "Extract unknown digest rejected");
+    check(wn_Tls13_Extract(big, NULL, 0, psk, 0, WC_SHA256)
+          == WOLFNANOTLS_SUCCESS, "Extract with zero-length IKM succeeds");
     check(wn_Tls13_ExpandLabel(NULL, 32, sHs, "key", NULL, 0, WC_SHA256)
           == WOLFNANOTLS_E_INVALID_ARG, "ExpandLabel NULL rejected");
     check(wn_Tls13_FinishedMac(NULL, sHs, emptyHash, 32, WC_SHA256)
