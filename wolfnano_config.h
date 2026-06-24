@@ -187,8 +187,27 @@ extern int wn_seed(unsigned char* output, unsigned int sz);
 
 #ifdef WOLFNANO_MLDSA
     #define WOLFSSL_HAVE_MLDSA
-    #define WOLFSSL_NO_ML_DSA_44       /* ML-DSA-65 only */
-    #define WOLFSSL_NO_ML_DSA_87
+    /* Default ML-DSA-44 (NIST level 2): security-balanced with the 128-bit
+     * suite (X25519/P-256/AES-128) and the smallest keys/signatures. Opt into
+     * level 3 (65) or 5 (87) with WOLFNANO_MLDSA_LEVEL when required. */
+    #ifndef WOLFNANO_MLDSA_LEVEL
+        #define WOLFNANO_MLDSA_LEVEL 2
+    #endif
+    #if WOLFNANO_MLDSA_LEVEL == 2
+        #define WOLFSSL_NO_ML_DSA_65
+        #define WOLFSSL_NO_ML_DSA_87
+        #define WN_MLDSA_SCHEME 0x0904
+    #elif WOLFNANO_MLDSA_LEVEL == 3
+        #define WOLFSSL_NO_ML_DSA_44
+        #define WOLFSSL_NO_ML_DSA_87
+        #define WN_MLDSA_SCHEME 0x0905
+    #elif WOLFNANO_MLDSA_LEVEL == 5
+        #define WOLFSSL_NO_ML_DSA_44
+        #define WOLFSSL_NO_ML_DSA_65
+        #define WN_MLDSA_SCHEME 0x0906
+    #else
+        #error "WOLFNANO_MLDSA_LEVEL must be 2 (ML-DSA-44), 3 (65), or 5 (87)"
+    #endif
     /* Default: verify-only, no-allocation (the wolfNano client cert-verify
      * path). WOLFNANO_MLDSA_SIGN adds keygen/sign (needs working memory). */
     #ifndef WOLFNANO_MLDSA_SIGN

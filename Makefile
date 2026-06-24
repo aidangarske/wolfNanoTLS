@@ -411,14 +411,17 @@ mldsatest: ## build + run ML-DSA-65 round-trip + verify-only no-malloc proof
 	 then echo "  FAIL: verify-only references heap"; exit 1; \
 	 else echo "  PASS: verify-only ML-DSA is allocation-free"; fi
 
-certmldsatest: ## build + run the ML-DSA-65 CertificateVerify test (scheme 0x0905)
+certmldsatest: ## build + run the ML-DSA CertificateVerify test at each level (44/65/87)
 	@mkdir -p $(BUILD)
-	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_X509 \
-	   -DWOLFNANO_HAVE_RSA_VERIFY -DWOLFNANO_MLDSA -DWOLFNANO_MLDSA_SIGN \
-	   -DWOLFNANO_ALLOW_MALLOC -DWOLFNANO_TARGET_PORTABLE_C \
-	   $(CERTMLDSA_SRC) tests/cert_mldsa_test.c -o $(BUILD)/cert_mldsa_test
-	@echo "---- run ----"
-	@./$(BUILD)/cert_mldsa_test
+	@for lvl in 2 3 5; do \
+	   echo "---- ML-DSA level $$lvl ----"; \
+	   $(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_X509 \
+	      -DWOLFNANO_HAVE_RSA_VERIFY -DWOLFNANO_MLDSA -DWOLFNANO_MLDSA_SIGN \
+	      -DWOLFNANO_MLDSA_LEVEL=$$lvl \
+	      -DWOLFNANO_ALLOW_MALLOC -DWOLFNANO_TARGET_PORTABLE_C \
+	      $(CERTMLDSA_SRC) tests/cert_mldsa_test.c -o $(BUILD)/cert_mldsa_test || exit 1; \
+	   ./$(BUILD)/cert_mldsa_test || exit 1; \
+	 done
 
 certnegtest: ## build + run X.509 negative auth tests (chain + hostname + ECDSA CertVerify)
 	@mkdir -p $(BUILD)

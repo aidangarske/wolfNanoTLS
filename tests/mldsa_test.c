@@ -18,7 +18,7 @@
  * along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
-/* ML-DSA-65 sign/verify round-trip and tamper rejection. */
+/* ML-DSA sign/verify round-trip and tamper rejection (level via WOLFNANO_MLDSA_LEVEL). */
 
 #include <wolfssl/wolfcrypt/settings.h>
 #include <wolfssl/wolfcrypt/wc_mldsa.h>
@@ -35,6 +35,17 @@ static void check(int ok, const char* name)
     }
 }
 
+#if WOLFNANO_MLDSA_LEVEL == 2
+    #define WN_T_MLDSA_PARAM WC_ML_DSA_44
+    #define WN_T_MLDSA_NAME  "ML-DSA-44"
+#elif WOLFNANO_MLDSA_LEVEL == 3
+    #define WN_T_MLDSA_PARAM WC_ML_DSA_65
+    #define WN_T_MLDSA_NAME  "ML-DSA-65"
+#else
+    #define WN_T_MLDSA_PARAM WC_ML_DSA_87
+    #define WN_T_MLDSA_NAME  "ML-DSA-87"
+#endif
+
 int main(void)
 {
     WC_RNG rng;
@@ -44,13 +55,13 @@ int main(void)
     word32 sigLen;
     int sigSz = 0, res = 0, rc;
 
-    printf("wolfNano ML-DSA-65 sign/verify test\n");
+    printf("wolfNano " WN_T_MLDSA_NAME " sign/verify test\n");
 
     rc = wc_InitRng(&rng);
     check(rc == 0, "RNG init");
 
     rc  = wc_MlDsaKey_Init(&key, NULL, INVALID_DEVID);
-    rc |= wc_MlDsaKey_SetParams(&key, WC_ML_DSA_65);
+    rc |= wc_MlDsaKey_SetParams(&key, WN_T_MLDSA_PARAM);
     rc |= wc_MlDsaKey_MakeKey(&key, &rng);
     rc |= wc_MlDsaKey_GetSigLen(&key, &sigSz);
     check((rc == 0) && (sigSz > 0) && (sigSz <= (int)sizeof(sig)),
