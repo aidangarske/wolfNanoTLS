@@ -407,9 +407,9 @@ mldsatest: ## build + run ML-DSA-65 round-trip + verify-only no-malloc proof
 	@echo "---- verify-only no-malloc proof ----"
 	@cc $(CFLAGS_COMMON) -DWOLFNANOTLS_MLDSA -DWOLFNANOTLS_TARGET_PORTABLE_C \
 	   -c $(WC)/wc_mldsa.c -o $(BUILD)/wc_mldsa_vo.o 2>/dev/null
-	@nm $(BUILD)/wc_mldsa_vo.o | grep -E ' U _(malloc|calloc|realloc|free)$$' \
-	   && echo "  FAIL: verify-only references heap" \
-	   || echo "  PASS: verify-only ML-DSA is allocation-free"
+	@if nm $(BUILD)/wc_mldsa_vo.o | grep -E ' U _(malloc|calloc|realloc|free)$$'; \
+	 then echo "  FAIL: verify-only references heap"; exit 1; \
+	 else echo "  PASS: verify-only ML-DSA is allocation-free"; fi
 
 certmldsatest: ## build + run the ML-DSA-65 CertificateVerify test (scheme 0x0905)
 	@mkdir -p $(BUILD)
