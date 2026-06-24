@@ -46,8 +46,8 @@ int main(void)
     wc_MlDsaKey key;
     byte th[32];
     byte tbs[64 + 33 + 1 + 32];
-    byte spki[2048];
-    byte sig[5000];
+    byte spki[4096];
+    byte sig[6000];
     word32 tbsLen = 0;
     word32 sigLen;
     int spkiLen, rc, verifyRc;

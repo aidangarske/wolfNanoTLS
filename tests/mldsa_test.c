@@ -18,7 +18,7 @@
  * along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
-/* ML-DSA-65 sign/verify round-trip and tamper rejection. */
+/* ML-DSA sign/verify round-trip and tamper rejection (level via WOLFNANOTLS_MLDSA_LEVEL). */
 
 #include <wolfssl/wolfcrypt/settings.h>
 #include <wolfssl/wolfcrypt/wc_mldsa.h>

@@ -603,7 +603,12 @@ int wn_Connect_Psk(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv, void* ioCtx,
     #define WN_HS_ACC_SZ       6144
     #define WN_LEAF_SPKI_SZ    1024
 #endif
-#define WN_CERT_IO_MIN     4096
+#if defined(WOLFSSL_HAVE_MLDSA) && (WOLFNANOTLS_MLDSA_LEVEL == 5)
+    /* a single ML-DSA-87 CertificateVerify record (~4660 B) must fit in place */
+    #define WN_CERT_IO_MIN     8192
+#else
+    #define WN_CERT_IO_MIN     4096
+#endif
 #define WN_CERT_SCRATCH_MIN (WN_CERT_IO_MIN + WN_HS_ACC_SZ + WN_LEAF_SPKI_SZ)
 
 /* Build the TLS 1.3 CertificateVerify signed content (RFC 8446 4.4.3). */
