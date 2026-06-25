@@ -37,5 +37,7 @@ jobs:
         run: make certnegpintest
       - name: X.509 generated-PKI chain-constraint test (CA flag, keyUsage, EKU)
         run: make certgentest
+      - name: X.509 clockless tier compiles (WOLFNANO_NO_X509_TIME)
+        run: make cert-notime-build
       - name: configs-build (compile every starter template)
         run: make configs-build

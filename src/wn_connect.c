@@ -965,14 +965,55 @@ static int wn_CheckServerName(DecodedCert* leaf, const char* host)
 }
 #endif /* WOLFNANO_X509_HOSTNAME */
 
+#ifndef NO_ASN_TIME
+/* Reject a cert whose validity window does not contain `now` (RFC 5280 4.1.2.5).
+ * `now` is caller-supplied (clock injection); 0 falls back to the wc_* clock. */
+static int wn_CertTimeValid(const DecodedCert* cert, time_t now)
+{
+    const byte* d;
+    byte fmt;
+    int dlen;
+    int ret = WOLFNANO_SUCCESS;
+
+    if ((cert->beforeDate == NULL) || (cert->afterDate == NULL)) {
+        ret = WOLFNANO_E_BAD_CERT;          /* a server cert must carry dates */
+    }
+    if (ret == WOLFNANO_SUCCESS) {
+        if (wc_GetDateInfo(cert->beforeDate, cert->beforeDateLen, &d, &fmt,
+                &dlen) != 0) {
+            ret = WOLFNANO_E_BAD_CERT;
+        }
+        else if (wc_ValidateDateWithTime(d, fmt, ASN_BEFORE, now, dlen) != 1) {
+            ret = WOLFNANO_E_BAD_CERT;       /* not yet valid */
+        }
+    }
+    if (ret == WOLFNANO_SUCCESS) {
+        if (wc_GetDateInfo(cert->afterDate, cert->afterDateLen, &d, &fmt,
+                &dlen) != 0) {
+            ret = WOLFNANO_E_BAD_CERT;
+        }
+        else if (wc_ValidateDateWithTime(d, fmt, ASN_AFTER, now, dlen) != 1) {
+            ret = WOLFNANO_E_BAD_CERT;       /* expired */
+        }
+    }
+
+    return ret;
+}
+#endif /* !NO_ASN_TIME */
+
 /* Verify a presented cert chain (leaf first) up to the pinned anchor: each cert
  * must be signed by the next, and the topmost by the anchor. Copies the leaf
  * SPKI out for CertificateVerify and, when requested, enforces an SPKI pin
- * and/or a server-name (hostname) identity match on the leaf. */
+ * and/or a server-name (hostname) identity match on the leaf. `now` bounds the
+ * leaf and intermediate validity windows (the pinned anchor is trusted as-is). */
 static int wn_VerifyChain(const byte** certs, const word32* certLens, int n,
                           const byte* anchor, word32 anchorLen, byte* spki,
                           word32* spkiLen, const char* serverName,
-                          const byte* pinnedKey, word32 pinnedKeyLen)
+                          const byte* pinnedKey, word32 pinnedKeyLen
+#ifndef NO_ASN_TIME
+                          , time_t now
+#endif
+                          )
 {
     DecodedCert issuer;
     DecodedCert leaf;
@@ -1008,6 +1049,15 @@ static int wn_VerifyChain(const byte** certs, const word32* certLens, int n,
                 (issuer.isCA == 0)) {
                 ret = WOLFNANO_E_BAD_CERT;   /* presented intermediate must be a CA */
             }
+#ifndef NO_ASN_TIME
+            /* time-check presented intermediates, but never the pinned anchor,
+             * even if the server redundantly included it in the chain. */
+            if ((ret == WOLFNANO_SUCCESS) && ((i + 1) < n) &&
+                ((issuerLen != anchorLen) ||
+                 (ConstantCompare(issuerDer, anchor, (int)anchorLen) != 0))) {
+                ret = wn_CertTimeValid(&issuer, now);
+            }
+#endif
             wc_FreeDecodedCert(&issuer);
         }
     }
@@ -1044,6 +1094,11 @@ static int wn_VerifyChain(const byte** certs, const word32* certLens, int n,
                 ret = WOLFNANO_E_UNSUPPORTED;
 #endif
             }
+#ifndef NO_ASN_TIME
+            if (ret == WOLFNANO_SUCCESS) {
+                ret = wn_CertTimeValid(&leaf, now);
+            }
+#endif
         }
     }
     if (leafInit) {
@@ -1260,9 +1315,16 @@ static int wn_connect_cert_impl(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
                     ret = WOLFNANO_E_DECODE;
                 }
                 if (ret == WOLFNANO_SUCCESS) {
+#ifndef NO_ASN_TIME
+                    time_t now = XTIME(0);   /* integrator-provided clock seam */
+#endif
                     ret = wn_VerifyChain(certs, certLens, nc, anchor, anchorLen,
                                          leafSpki, &spkiLen, serverName,
-                                         pinnedKey, pinnedKeyLen);
+                                         pinnedKey, pinnedKeyLen
+#ifndef NO_ASN_TIME
+                                         , now
+#endif
+                                         );
                 }
             }
             if ((ret == WOLFNANO_SUCCESS) && (mType == WN_HS_CERT_VERIFY)) {

@@ -100,10 +100,30 @@ static const byte ee_sni[]    = { 0x00,0x04, 0x00,0x00, 0x00,0x00 };
 static const byte ee_sni_ne[] = { 0x00,0x05, 0x00,0x00, 0x00,0x01, 0x00 };
 static const byte ee_bad[]    = { 0x00,0x04, 0x00,0x33, 0x00,0x00 };
 
+/* UTC broken-down time -> Unix seconds (no local tz / DST; dates are UTC). */
+static long wn_tm_to_unix(const struct tm* t)
+{
+    static const long md[12] = {0,31,59,90,120,151,181,212,243,273,304,334};
+    long y = (long)t->tm_year + 1900;
+    long leaps = (y - 1) / 4 - (y - 1) / 100 + (y - 1) / 400 - 477;
+    long days = (y - 1970) * 365 + leaps + md[t->tm_mon] + (t->tm_mday - 1);
+    if ((t->tm_mon >= 2) &&
+        (((y % 4 == 0) && (y % 100 != 0)) || (y % 400 == 0))) {
+        days += 1;
+    }
+    return ((days * 24 + t->tm_hour) * 60 + t->tm_min) * 60 + t->tm_sec;
+}
+
 int main(void)
 {
     WC_RNG rng;
     ecc_key ek;
+    DecodedCert dcT;
+    struct tm tmB, tmA;
+    const byte* dB;
+    byte fB;
+    int lB;
+    time_t nowValid = 0, nowPast = 0, nowFuture = 0;
     byte th[32];
     byte tbs[64 + 33 + 1 + 32];
     byte spki[256];
@@ -279,31 +299,65 @@ int main(void)
           "ClientHello offers ecdsa_secp256r1_sha256 (0x0403)");
 #endif
 
+    /* derive a clock inside the leaf's own validity so the functional chain
+     * checks stay version-agnostic regardless of when the test certs were made. */
+    wc_InitDecodedCert(&dcT, serv_ecc_der_256, (word32)sizeof_serv_ecc_der_256,
+                       NULL);
+    rc = wc_ParseCert(&dcT, CERT_TYPE, NO_VERIFY, NULL);
+    if (rc == 0) {
+        rc = wc_GetDateInfo(dcT.beforeDate, dcT.beforeDateLen, &dB, &fB, &lB);
+    }
+    if (rc == 0) {
+        rc = wc_GetDateAsCalendarTime(dB, lB, fB, &tmB);
+    }
+    check(rc == 0, "extract leaf notBefore");
+    rc = wc_GetDateInfo(dcT.afterDate, dcT.afterDateLen, &dB, &fB, &lB);
+    if (rc == 0) {
+        rc = wc_GetDateAsCalendarTime(dB, lB, fB, &tmA);
+    }
+    check(rc == 0, "extract leaf notAfter");
+    wc_FreeDecodedCert(&dcT);
+    nowValid  = (time_t)(wn_tm_to_unix(&tmB) + 86400);
+    nowPast   = (time_t)(wn_tm_to_unix(&tmB) - 86400);
+    nowFuture = (time_t)(wn_tm_to_unix(&tmA) + 86400);
+
     certs[0] = serv_ecc_der_256;
     certLens[0] = (word32)sizeof_serv_ecc_der_256;
     leafSpkiLen = (word32)sizeof(leafSpki);
     rc = wn_VerifyChain(certs, certLens, 1, ca_ecc_cert_der_256,
                         (word32)sizeof_ca_ecc_cert_der_256, leafSpki,
-                        &leafSpkiLen, NULL, NULL, 0);
+                        &leafSpkiLen, NULL, NULL, 0, nowValid);
     check(rc == WOLFNANO_SUCCESS, "valid ECC chain verified");
+
+    /* validity-window enforcement (#35): leaf outside [notBefore,notAfter] */
+    leafSpkiLen = (word32)sizeof(leafSpki);
+    rc = wn_VerifyChain(certs, certLens, 1, ca_ecc_cert_der_256,
+                        (word32)sizeof_ca_ecc_cert_der_256, leafSpki,
+                        &leafSpkiLen, NULL, NULL, 0, nowPast);
+    check(rc == WOLFNANO_E_BAD_CERT, "not-yet-valid cert rejected");
+    leafSpkiLen = (word32)sizeof(leafSpki);
+    rc = wn_VerifyChain(certs, certLens, 1, ca_ecc_cert_der_256,
+                        (word32)sizeof_ca_ecc_cert_der_256, leafSpki,
+                        &leafSpkiLen, NULL, NULL, 0, nowFuture);
+    check(rc == WOLFNANO_E_BAD_CERT, "expired cert rejected");
 
     /* key pin: leafSpki now holds the real leaf key; pin against it. */
     tl = (word32)sizeof(tmp);
     rc = wn_VerifyChain(certs, certLens, 1, ca_ecc_cert_der_256,
                         (word32)sizeof_ca_ecc_cert_der_256, tmp, &tl,
-                        NULL, leafSpki, leafSpkiLen);
+                        NULL, leafSpki, leafSpkiLen, nowValid);
     check(rc == WOLFNANO_SUCCESS, "matching public-key pin accepted");
     leafSpki[0] ^= 0x01;
     tl = (word32)sizeof(tmp);
     rc = wn_VerifyChain(certs, certLens, 1, ca_ecc_cert_der_256,
                         (word32)sizeof_ca_ecc_cert_der_256, tmp, &tl,
-                        NULL, leafSpki, leafSpkiLen);
+                        NULL, leafSpki, leafSpkiLen, nowValid);
     check(rc == WOLFNANO_E_BAD_CERT, "wrong key pin rejected");
     leafSpki[0] ^= 0x01;                         /* restore the real pin bytes */
     tl = (word32)sizeof(tmp);
     rc = wn_VerifyChain(certs, certLens, 1, ca_ecc_cert_der_256,
                         (word32)sizeof_ca_ecc_cert_der_256, tmp, &tl,
-                        NULL, leafSpki, 0);
+                        NULL, leafSpki, 0, nowValid);
     check(rc == WOLFNANO_E_BAD_CERT, "zero-length key pin rejected");
 
 #ifdef WOLFNANO_X509_HOSTNAME
@@ -339,12 +393,12 @@ int main(void)
     tl = (word32)sizeof(tmp);
     rc = wn_VerifyChain(certs, certLens, 1, ca_ecc_cert_der_256,
                         (word32)sizeof_ca_ecc_cert_der_256, tmp, &tl,
-                        nameBuf, NULL, 0);
+                        nameBuf, NULL, 0, nowValid);
     check(rc == WOLFNANO_SUCCESS, "leaf hostname accepted");
     tl = (word32)sizeof(tmp);
     rc = wn_VerifyChain(certs, certLens, 1, ca_ecc_cert_der_256,
                         (word32)sizeof_ca_ecc_cert_der_256, tmp, &tl,
-                        "no.match.invalid", NULL, 0);
+                        "no.match.invalid", NULL, 0, nowValid);
     check(rc == WOLFNANO_E_BAD_CERT, "wrong hostname rejected");
 #endif /* WOLFNANO_X509_HOSTNAME */
 
@@ -355,7 +409,7 @@ int main(void)
     leafSpkiLen = (word32)sizeof(leafSpki);
     rc = wn_VerifyChain(certs, certLens, 1, ca_ecc_cert_der_256,
                         (word32)sizeof_ca_ecc_cert_der_256, leafSpki,
-                        &leafSpkiLen, NULL, NULL, 0);
+                        &leafSpkiLen, NULL, NULL, 0, nowValid);
     check(rc == WOLFNANO_E_BAD_CERT, "tampered ECC chain rejected");
 
     /* EncryptedExtensions acceptance (wn_CheckEncExt): empty, supported_groups,

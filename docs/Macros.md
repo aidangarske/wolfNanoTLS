@@ -22,6 +22,7 @@ applies the standing size cuts).
 | `WOLFNANO_RSA_FULL` | adds RSA keygen/sign (tooling, not the no-alloc product) | `WOLFSSL_KEY_GEN` |
 | `WOLFNANO_X509` | X.509 cert path (needs heap) | cert path + `WOLFSSL_SMALL_CERT_VERIFY` |
 | `WOLFNANO_X509_HOSTNAME` | leaf hostname (SAN/CN, RFC 6125) matching; default on with `WOLFNANO_X509`. Set `0` for a key-pin-only cert build (~0.5 KB smaller) | gates `wn_CheckServerName` |
+| `WOLFNANO_NO_X509_TIME` | opt out of leaf/intermediate validity (notBefore/notAfter) checking; for clockless devices only. Default: cert builds enforce dates via the `XTIME` clock seam | drops `wn_CertTimeValid` |
 | `WOLFNANO_MLKEM` | ML-KEM-768 + X25519MLKEM768 hybrid | `WOLFSSL_HAVE_MLKEM` |
 | `WOLFNANO_MLDSA` | ML-DSA-65 verify (no-malloc) | `WOLFSSL_HAVE_MLDSA`, verify-only |
 | `WOLFNANO_MLDSA_SIGN` | adds ML-DSA keygen/sign (needs memory) | drops verify-only |
@@ -85,5 +86,6 @@ toolchain). See [Benchmarks](Benchmarks.md).
 
 Always applied in `wolfnano_config.h`: no old TLS, no MD5/SHA-1/DES3/RC4/DSA,
 no RSA/DH, no PWDBASED/PKCS12, single-threaded, no filesystem, no error
-strings. Cert-time validation (`NO_ASN_TIME`) stays off until the X.509 adder,
-which brings a time hook.
+strings. Cert-time validation (`NO_ASN_TIME`) is off in PSK-only builds; the
+X.509 adder turns ASN time on and enforces leaf/intermediate validity via the
+`XTIME` clock seam (opt out with `WOLFNANO_NO_X509_TIME`).

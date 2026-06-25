@@ -42,7 +42,7 @@ component first, then X25519 (draft-kwiatkowski-tls-ecdhe-mlkem).
 | multi-cert chain validation (leaf -> intermediate -> pinned root) | | done, live vs OpenSSL + wolfSSL |
 | server identity: hostname SAN/CN (RFC 6125) + exact key pin | `wn_Connect_CertName*`; hostname behind `WOLFNANO_X509_HOSTNAME` | done |
 | issuer BasicConstraints CA flag + leaf keyUsage/serverAuth EKU | enforced in `wn_VerifyChain` | done |
-| certificate validity-time (notBefore/notAfter) | needs a runtime clock | planned (#35) |
+| certificate validity-time (notBefore/notAfter) on leaf + intermediates | clock injected via the `XTIME` seam; opt out with `WOLFNANO_NO_X509_TIME` | done |
 
 **Memory note:** unlike the floor and the PSK/RPK handshake (which are true
 no-allocator), X.509 cert parsing uses a `DecodedCert` and needs working memory.
