@@ -9,11 +9,19 @@ on:
 permissions:
   contents: read
 
-# Build every example against the current API (so they cannot bitrot) and run
-# the PSK example end-to-end against openssl s_server. The HTTPS example runs in
-# live-connect.yml; the cert / PQC connect paths are exercised by interop.yml.
+# Build every example against pinned / latest-stable / master wolfSSL so a
+# version bump cannot silently regress them, and run the PSK example end-to-end
+# against openssl s_server. The HTTPS example runs in live-connect.yml; the
+# cert / PQC connect paths are also exercised by interop.yml.
 jobs:
+  discover:
+    uses: ./.github/workflows/_discover-wolfssl.yml
+
   examples:
+    needs: discover
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.discover.outputs.matrix) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -21,8 +29,16 @@ jobs:
         with:
           submodules: recursive
       - uses: ./.github/actions/wolfssl-checkout
-      - name: build all examples
-        run: make example example-cert example-https example-pqc
+        with:
+          ref: ${{ matrix.ref }}
+      - name: build examples (wolfssl ${{ matrix.ref }})
+        run: |
+          make example example-cert example-https
+          if [ -f wolfssl/wolfcrypt/src/wc_mlkem.c ]; then
+            make example-pqc
+          else
+            echo "::notice::wolfSSL ${{ matrix.ref }} predates wc_mlkem; skipping example-pqc"
+          fi
       - name: run PSK example against openssl s_server
         run: |
           set -e

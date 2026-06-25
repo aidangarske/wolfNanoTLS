@@ -89,11 +89,13 @@ static int wn_CheckEncExt(const byte* body, word32 bodyLen, int sniOffered)
         if (r.err != 0) {
             ret = WOLFNANO_E_DECODE;
         }
-        /* RFC 6066: a server_name ack is allowed only if SNI was offered, and
-         * it must be empty (el == 0). */
-        else if ((et != WN_EXT_SUPPORTED_GRP) &&
-                 !((et == WN_EXT_SERVER_NAME) && sniOffered && (el == 0))) {
-            ret = WOLFNANO_E_UNEXPECTED_MSG;
+        else if (et != WN_EXT_SUPPORTED_GRP) {
+            /* RFC 6066: server_name is allowed only when SNI was offered and the
+             * ack is empty (el == 0); anything else is unsolicited. */
+            int sniAck = (et == WN_EXT_SERVER_NAME) && sniOffered && (el == 0);
+            if (sniAck == 0) {
+                ret = WOLFNANO_E_UNEXPECTED_MSG;
+            }
         }
     }
 
