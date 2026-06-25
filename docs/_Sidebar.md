@@ -10,5 +10,5 @@
 - [CI](CI.md)
 - [Benchmarks](Benchmarks.md)
 - [Footprint](Footprint.md)
+- [Comparison](Comparison.md)
 - [FIPS](FIPS.md)
-- [Positioning](Positioning.md)

@@ -194,10 +194,10 @@ Full documentation lives in the
 - [Macros](https://github.com/aidangarske/wolfNano/wiki/Macros)
 - [Footprint](https://github.com/aidangarske/wolfNano/wiki/Footprint)
 - [Benchmarks](https://github.com/aidangarske/wolfNano/wiki/Benchmarks)
+- [Comparison](https://github.com/aidangarske/wolfNano/wiki/Comparison)
 - [FIPS](https://github.com/aidangarske/wolfNano/wiki/FIPS)
 - [Testing](https://github.com/aidangarske/wolfNano/wiki/Testing)
 - [CI](https://github.com/aidangarske/wolfNano/wiki/CI)
-- [Positioning](https://github.com/aidangarske/wolfNano/wiki/Positioning)
 
 ## License
 
