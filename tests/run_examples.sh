@@ -1,16 +1,18 @@
 #!/bin/sh
-# Run every wolfNano example that talks to a local TLS 1.3 peer against stock
-# wolfSSL's example server: the PSK example (-s -i), the X.509 cert example
-# (-c -k -d -i), and the PQC hybrid example (--pqc X25519MLKEM768). Each example
-# is the same binary a user builds from examples/, exercised end to end. Skips
-# cleanly when the relevant server binary or build artifact is absent so it is
-# safe to run anywhere. The live HTTPS example needs the public internet and is
-# run separately by live-connect.yml.
+# Run every wolfNano example end to end. Three talk to a stock wolfSSL example
+# server: the PSK example (-s -i), the X.509 cert example (-c -k -d -i), and the
+# PQC hybrid example (--pqc X25519MLKEM768). The fourth is the live HTTPS example,
+# run against a real public endpoint. Each is the same binary a user builds from
+# examples/. Skips cleanly when the relevant server, build artifact, or network
+# is absent so it is safe to run anywhere; live-connect.yml is the hard gate for
+# the HTTPS path on main.
 set -u
 
 SERVER=${WOLFSSL_SERVER:-$HOME/wolfssl/examples/server/server}
 PQC_SERVER=${WOLFSSL_PQC_SERVER:-}
 CERT_HOST=${CERT_HOST:-wolfNano-test}
+HTTPS_HOST=${HTTPS_HOST:-valid-isrgrootx1.letsencrypt.org}
+HTTPS_ROOT_URL=${HTTPS_ROOT_URL:-https://letsencrypt.org/certs/isrgrootx1.der}
 BUILD=${BUILD:-./build}
 FAILED=0
 
@@ -112,8 +114,32 @@ run_pqc() {
     fi
 }
 
+run_https() {
+    ANCHOR=/tmp/wn_isrgrootx1.der
+    if [ ! -x "$BUILD/example_client_https" ]; then
+        yellow "SKIP HTTPS example (example_client_https not built)"
+        return 0
+    fi
+    if ! curl -fsSL --retry 3 "$HTTPS_ROOT_URL" -o "$ANCHOR" 2>/dev/null; then
+        yellow "SKIP HTTPS example (could not fetch trust anchor; no network)"
+        return 0
+    fi
+    i=1
+    while [ "$i" -le 3 ]; do
+        if "$BUILD/example_client_https" "$HTTPS_HOST" "$ANCHOR" 443; then
+            green "PASS HTTPS example"
+            return 0
+        fi
+        i=$((i + 1))
+        sleep 5
+    done
+    yellow "SKIP HTTPS example ($HTTPS_HOST unreachable after 3 tries;"
+    echo "     live-connect.yml gates this path on main)"
+}
+
 run_psk
 run_cert
 run_pqc
+run_https
 
 exit $FAILED
