@@ -22,6 +22,11 @@ runs:
       shell: bash
       run: |
         set -eux
+        # preinstalled third-party repos (microsoft/azure) intermittently 403 and
+        # fail apt-get update; we do not need them for the toolchain
+        sudo rm -f /etc/apt/sources.list.d/microsoft-prod.list \
+                   /etc/apt/sources.list.d/azure-cli.list \
+                   /etc/apt/sources.list.d/azure-cli.sources
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends build-essential clang make
     - name: Arm cross toolchain (newlib)
