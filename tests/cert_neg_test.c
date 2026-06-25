@@ -47,6 +47,13 @@ static void check(int ok, const char* name)
     }
 }
 
+/* EncryptedExtensions bodies (2-byte ext vector len + extensions) */
+static const byte ee_empty[]  = { 0x00, 0x00 };
+static const byte ee_sgroup[] = { 0x00,0x04, 0x00,0x0a, 0x00,0x00 };
+static const byte ee_sni[]    = { 0x00,0x04, 0x00,0x00, 0x00,0x00 };
+static const byte ee_sni_ne[] = { 0x00,0x05, 0x00,0x00, 0x00,0x01, 0x00 };
+static const byte ee_bad[]    = { 0x00,0x04, 0x00,0x33, 0x00,0x00 };
+
 int main(void)
 {
     WC_RNG rng;
@@ -188,6 +195,22 @@ int main(void)
                         (word32)sizeof_ca_ecc_cert_der_256, leafSpki,
                         &leafSpkiLen, NULL, NULL, 0);
     check(rc == WOLFNANO_E_BAD_CERT, "tampered ECC chain rejected");
+
+    /* EncryptedExtensions acceptance (wn_CheckEncExt): empty, supported_groups,
+     * and server_name (allowed only when SNI was offered). */
+    check(wn_CheckEncExt(ee_empty, sizeof(ee_empty), 0) == WOLFNANO_SUCCESS,
+          "EE empty accepted");
+    check(wn_CheckEncExt(ee_sgroup, sizeof(ee_sgroup), 0) == WOLFNANO_SUCCESS,
+          "EE supported_groups accepted");
+    check(wn_CheckEncExt(ee_sni, sizeof(ee_sni), 1) == WOLFNANO_SUCCESS,
+          "EE server_name accepted when SNI offered");
+    check(wn_CheckEncExt(ee_sni, sizeof(ee_sni), 0) == WOLFNANO_E_UNEXPECTED_MSG,
+          "EE server_name rejected when SNI not offered");
+    check(wn_CheckEncExt(ee_sni_ne, sizeof(ee_sni_ne), 1)
+              == WOLFNANO_E_UNEXPECTED_MSG,
+          "EE non-empty server_name ack rejected");
+    check(wn_CheckEncExt(ee_bad, sizeof(ee_bad), 1) == WOLFNANO_E_UNEXPECTED_MSG,
+          "EE forbidden extension rejected");
 
     if (ekInit) {
         wc_ecc_free(&ek);

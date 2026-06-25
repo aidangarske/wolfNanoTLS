@@ -47,6 +47,11 @@ int main(void)
     byte type, sidLen, compLen;
     int i, ksFound = 0, ksMatch = 0;
     int rc;
+    static const char host[] = "example.com";
+    char longhost[301];
+    word16 listLen, nameLen;
+    byte nameType;
+    int sniFound = 0, sniMatch = 0, sniAbsent = 1;
 
     for (i = 0; i < 32; i++) { rnd[i] = (byte)i; }
     for (i = 0; i < 32; i++) { sid[i] = (byte)(0x40 + i); }
@@ -101,11 +106,71 @@ int main(void)
             }
         }
         else {
+            if (et == 0) {                     /* server_name */
+                sniAbsent = 0;
+            }
             (void)wn_Read_Bytes(&r, el);
         }
     }
     check(ksFound && ksMatch && (r.err == 0),
           "key_share carries our X25519 public key");
+    check(sniAbsent, "no server_name extension when serverName is NULL");
+
+    /* build again with SNI and confirm the server_name extension is present */
+    rc = wn_ClientHello_Build_ex(ch, &chLen, sizeof(ch), rnd, sid, 32, pub, 32,
+                                 host);
+    check(rc == WOLFNANO_SUCCESS, "build ClientHello with SNI");
+    wn_Reader_Init(&r, ch, chLen);
+    (void)wn_Read_U8(&r); (void)wn_Read_U24(&r); (void)wn_Read_U16(&r);
+    (void)wn_Read_Bytes(&r, 32);
+    sidLen = wn_Read_U8(&r); (void)wn_Read_Bytes(&r, sidLen);
+    (void)wn_Read_U16(&r); (void)wn_Read_U16(&r);          /* cipher_suites */
+    compLen = wn_Read_U8(&r); (void)wn_Read_Bytes(&r, compLen);
+    extLen = wn_Read_U16(&r);
+    extEnd = r.pos + extLen;
+    if (extEnd > chLen) { extEnd = chLen; }
+    while ((r.pos < extEnd) && (r.err == 0)) {
+        et = wn_Read_U16(&r);
+        el = wn_Read_U16(&r);
+        if (et == 0) {                         /* server_name */
+            sniFound = 1;
+            listLen  = wn_Read_U16(&r);
+            nameType = wn_Read_U8(&r);
+            nameLen  = wn_Read_U16(&r);
+            p        = wn_Read_Bytes(&r, nameLen);
+            if ((listLen == (word16)(1 + 2 + (sizeof(host) - 1))) &&
+                (nameType == 0) && (nameLen == (sizeof(host) - 1)) &&
+                (p != NULL) && (XMEMCMP(p, host, sizeof(host) - 1) == 0)) {
+                sniMatch = 1;
+            }
+        }
+        else {
+            (void)wn_Read_Bytes(&r, el);
+        }
+    }
+    check(sniFound && sniMatch && (r.err == 0),
+          "server_name (SNI) carries the host name");
+
+    /* exactly 255 bytes is the maximum accepted host length */
+    for (i = 0; i < 255; i++) { longhost[i] = 'a'; }
+    longhost[255] = 0;
+    rc = wn_ClientHello_Build_ex(ch, &chLen, sizeof(ch), rnd, sid, 32, pub, 32,
+                                 longhost);
+    check(rc == WOLFNANO_SUCCESS, "255-byte SNI host accepted");
+
+    /* 256 bytes is the first length over the limit */
+    for (i = 0; i < 256; i++) { longhost[i] = 'a'; }
+    longhost[256] = 0;
+    rc = wn_ClientHello_Build_ex(ch, &chLen, sizeof(ch), rnd, sid, 32, pub, 32,
+                                 longhost);
+    check(rc == WOLFNANO_E_INVALID_ARG, "256-byte SNI host rejected");
+
+    /* SNI host longer than the 255-byte limit is rejected */
+    for (i = 0; i < 300; i++) { longhost[i] = 'a'; }
+    longhost[300] = 0;
+    rc = wn_ClientHello_Build_ex(ch, &chLen, sizeof(ch), rnd, sid, 32, pub, 32,
+                                 longhost);
+    check(rc == WOLFNANO_E_INVALID_ARG, "over-long SNI host rejected");
 
     /* invalid args + buffer too small */
     rc = wn_ClientHello_Build(NULL, &chLen, sizeof(ch), rnd, sid, 32, pub, 32);

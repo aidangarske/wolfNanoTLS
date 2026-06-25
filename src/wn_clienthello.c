@@ -28,6 +28,8 @@
 #include "wn_msg.h"
 
 #define WN_HS_CLIENT_HELLO   1
+#define WN_EXT_SERVER_NAME   0
+#define WN_SNI_MAX_HOST      255
 #define WN_EXT_SUPPORTED_GRP 10
 #define WN_EXT_SIG_ALGS      13
 #define WN_EXT_SUPPORTED_VER 43
@@ -38,13 +40,27 @@ int wn_ClientHello_Build(byte* out, word32* outLen, word32 outCap,
                          word32 sessionIdLen, const byte* pub,
                          word32 pubLen)
 {
+    return wn_ClientHello_Build_ex(out, outLen, outCap, random32, sessionId,
+                                   sessionIdLen, pub, pubLen, NULL);
+}
+
+int wn_ClientHello_Build_ex(byte* out, word32* outLen, word32 outCap,
+                            const byte* random32, const byte* sessionId,
+                            word32 sessionIdLen, const byte* pub,
+                            word32 pubLen, const char* serverName)
+{
     wn_Writer w;
     word32 hsLen;
     word32 extLen;
+    word32 nameLen = 0;
     int ret = WOLFNANO_SUCCESS;
 
+    if (serverName != NULL) {
+        nameLen = (word32)XSTRLEN(serverName);
+    }
     if ((out == NULL) || (outLen == NULL) || (random32 == NULL) ||
-        (pub == NULL) || (pubLen != WN_DEFAULT_PUB_SZ) || (sessionIdLen > 32)) {
+        (pub == NULL) || (pubLen != WN_DEFAULT_PUB_SZ) || (sessionIdLen > 32) ||
+        (nameLen > WN_SNI_MAX_HOST)) {
         ret = WOLFNANO_E_INVALID_ARG;
     }
 
@@ -69,6 +85,16 @@ int wn_ClientHello_Build(byte* out, word32* outLen, word32 outCap,
         wn_Write_U8(&w, 0);
 
         extLen = wn_Write_LenStart(&w, 2);     /* extensions */
+
+        /* server_name (SNI, RFC 6066): a single host_name entry */
+        if (nameLen > 0) {
+            wn_Write_U16(&w, WN_EXT_SERVER_NAME);
+            wn_Write_U16(&w, (word16)(2 + 1 + 2 + nameLen));
+            wn_Write_U16(&w, (word16)(1 + 2 + nameLen)); /* server_name_list */
+            wn_Write_U8(&w, 0);                          /* host_name */
+            wn_Write_U16(&w, (word16)nameLen);
+            wn_Write_Bytes(&w, (const byte*)serverName, nameLen);
+        }
 
         /* supported_versions: [TLS 1.3] */
         wn_Write_U16(&w, WN_EXT_SUPPORTED_VER);

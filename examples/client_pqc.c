@@ -26,10 +26,8 @@
  * Lifecycle: wn_Connect_Psk_ex -> wn_Send -> wn_Recv -> wn_Close.
  *
  * Usage: client_pqc <host> <port>   (default 127.0.0.1 4433)
- * Try it against:  openssl s_server -tls1_3 -nocert -rev -accept 4433 \
- *                    -groups X25519MLKEM768 \
- *                    -psk 000102030405060708090a0b0c0d0e0f \
- *                    -psk_identity Client_identity
+ * Try it against wolfSSL's example server (built with --enable-mlkem):
+ *   examples/server/server -v 4 -s -i --pqc X25519MLKEM768 -p 4433
  */
 
 #include "wn_connect.h"
@@ -53,8 +51,13 @@ static int sock_recv(void* ctx, byte* buf, word32 len)
 
 int main(int argc, char** argv)
 {
-    static const byte psk[16] = {
-        0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+    /* wolfSSL's example server (-s) uses this fixed TLS 1.3 PSK for identity
+     * "Client_identity": 01 23 45 67 89 ab cd ef, repeated. */
+    static const byte psk[32] = {
+        0x01,0x23,0x45,0x67,0x89,0xab,0xcd,0xef,
+        0x01,0x23,0x45,0x67,0x89,0xab,0xcd,0xef,
+        0x01,0x23,0x45,0x67,0x89,0xab,0xcd,0xef,
+        0x01,0x23,0x45,0x67,0x89,0xab,0xcd,0xef
     };
     static const byte msg[] = "hello from wolfNano\n";
     const char* host = (argc > 1) ? argv[1] : "127.0.0.1";

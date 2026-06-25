@@ -1,0 +1,58 @@
+name: examples
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Build every example against the pinned wolfSSL, then RUN them all end to end
+# against the stock wolfSSL example server (tests/run_examples.sh): PSK, X.509
+# cert, and PQC hybrid. The live HTTPS example runs in live-connect.yml.
+jobs:
+  build-and-run-examples:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: ./.github/actions/setup
+      - name: build wolfSSL example server
+        run: |
+          set -eux
+          git clone --depth 1 https://github.com/wolfSSL/wolfssl "$RUNNER_TEMP/wolfssl-full"
+          cd "$RUNNER_TEMP/wolfssl-full"
+          ./autogen.sh
+          ./configure --enable-tls13 --enable-psk --enable-curve25519 --enable-ed25519
+          make -j"$(nproc)" examples/server/server
+      - name: build wolfSSL PQC server (separate, --enable-mlkem)
+        run: |
+          set -eux
+          git clone --depth 1 https://github.com/wolfSSL/wolfssl "$RUNNER_TEMP/wolfssl-pqc"
+          cd "$RUNNER_TEMP/wolfssl-pqc"
+          ./autogen.sh
+          ./configure --enable-tls13 --enable-psk --enable-curve25519 \
+            --enable-mlkem --enable-experimental
+          make -j"$(nproc)" examples/server/server
+      - name: build examples
+        run: |
+          set -eu
+          make example example-cert example-https
+          if [ -f wolfssl/wolfcrypt/src/wc_mlkem.c ]; then
+            make example-pqc
+          else
+            echo "::notice::pinned wolfSSL predates wc_mlkem; skipping example-pqc"
+          fi
+      - name: run examples against wolfSSL server
+        run: |
+          set -eu
+          # cert example checks the leaf hostname; the test cert is CN wolfNano-test
+          grep -q wolfNano-test /etc/hosts || \
+            echo "127.0.0.1 wolfNano-test" | sudo tee -a /etc/hosts >/dev/null
+          export WOLFSSL_SERVER="$RUNNER_TEMP/wolfssl-full/examples/server/server"
+          export WOLFSSL_PQC_SERVER="$RUNNER_TEMP/wolfssl-pqc/examples/server/server"
+          sh tests/run_examples.sh
