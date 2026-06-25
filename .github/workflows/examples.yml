@@ -9,38 +9,11 @@ on:
 permissions:
   contents: read
 
-# Build every example against pinned / latest-stable / master wolfSSL so a
-# version bump cannot silently regress them (examples job), then RUN them all
-# end to end against the stock wolfSSL example server (run job,
-# tests/run_examples.sh). The live HTTPS example runs in live-connect.yml.
+# Build every example against the pinned wolfSSL, then RUN them all end to end
+# against the stock wolfSSL example server (tests/run_examples.sh): PSK, X.509
+# cert, and PQC hybrid. The live HTTPS example runs in live-connect.yml.
 jobs:
-  discover:
-    uses: ./.github/workflows/_discover-wolfssl.yml
-
-  examples:
-    needs: discover
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.discover.outputs.matrix) }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - uses: ./.github/actions/wolfssl-checkout
-        with:
-          ref: ${{ matrix.ref }}
-      - name: build examples (wolfssl ${{ matrix.ref }})
-        run: |
-          make example example-cert example-https
-          if [ -f wolfssl/wolfcrypt/src/wc_mlkem.c ]; then
-            make example-pqc
-          else
-            echo "::notice::wolfSSL ${{ matrix.ref }} predates wc_mlkem; skipping example-pqc"
-          fi
-
-  run:
+  build-and-run-examples:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -68,7 +41,7 @@ jobs:
       - name: build examples
         run: |
           set -eu
-          make example example-cert
+          make example example-cert example-https
           if [ -f wolfssl/wolfcrypt/src/wc_mlkem.c ]; then
             make example-pqc
           else
