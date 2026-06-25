@@ -59,14 +59,15 @@
 
 #define WN_HS_FINISHED       20
 #define WN_HS_ENCRYPTED_EXT  8
+#define WN_EXT_SERVER_NAME   0
 #define WN_EXT_SUPPORTED_GRP 10
 
 /* wn_RecvRecord (record read) now lives in wn_record.c; declared in wn_record.h. */
 
 /* RFC 8446 4.3.1 / 4.2: EncryptedExtensions carries only extensions the client
- * offered that belong here. wolfNanoTLS offers nothing EE-legal but supported_groups,
- * so reject any other (forbidden or unsolicited) extension type. */
-static int wn_CheckEncExt(const byte* body, word32 bodyLen)
+ * offered that belong here. wolfNanoTLS offers supported_groups, plus server_name
+ * when SNI was sent; reject any other (forbidden or unsolicited) type. */
+static int wn_CheckEncExt(const byte* body, word32 bodyLen, int sniOffered)
 {
     wn_Reader r;
     word32 extEnd;
@@ -89,7 +90,12 @@ static int wn_CheckEncExt(const byte* body, word32 bodyLen)
             ret = WOLFNANOTLS_E_DECODE;
         }
         else if (et != WN_EXT_SUPPORTED_GRP) {
-            ret = WOLFNANOTLS_E_UNEXPECTED_MSG;
+            /* RFC 6066: server_name is allowed only when SNI was offered and the
+             * ack is empty (el == 0); anything else is unsolicited. */
+            int sniAck = (et == WN_EXT_SERVER_NAME) && sniOffered && (el == 0);
+            if (sniAck == 0) {
+                ret = WOLFNANOTLS_E_UNEXPECTED_MSG;
+            }
         }
     }
 
@@ -480,7 +486,7 @@ int wn_Connect_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
                         ret = WOLFNANOTLS_E_UNEXPECTED_MSG;
                     }
                     else {
-                        ret = wn_CheckEncExt(plain + mStart + 4, mLen);
+                        ret = wn_CheckEncExt(plain + mStart + 4, mLen, 0);
                         if (ret == WOLFNANOTLS_SUCCESS) {
                             ret = wn_Transcript_Update(&tc, plain + mStart,
                                                        mLen + 4);
@@ -1088,8 +1094,8 @@ static int wn_connect_cert_impl(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
 
     /* ClientHello (ECDHE, no PSK) */
     if (ret == WOLFNANOTLS_SUCCESS) {
-        ret = wn_ClientHello_Build(scratch, &chLen, scratchLen, random32, sid,
-                                   32, cliPub, pubLen);
+        ret = wn_ClientHello_Build_ex(scratch, &chLen, scratchLen, random32, sid,
+                                      32, cliPub, pubLen, serverName);
     }
     if (ret == WOLFNANOTLS_SUCCESS) {
         ret = wn_Transcript_Update(&tc, scratch, chLen);
@@ -1187,7 +1193,9 @@ static int wn_connect_cert_impl(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
             /* enforce the legal flight order (RFC 8446 4.4); see wn_flight.h */
             ret = wn_FlightOrder(mType, &gotEE, &gotCert, &gotCv);
             if ((ret == WOLFNANOTLS_SUCCESS) && (mType == WN_HS_ENCRYPTED_EXT)) {
-                ret = wn_CheckEncExt(hsacc + off + 4, mLen);
+                ret = wn_CheckEncExt(hsacc + off + 4, mLen,
+                                     (serverName != NULL) &&
+                                     (serverName[0] != 0));
             }
             if ((ret == WOLFNANOTLS_SUCCESS) && (mType == WN_HS_CERT_VERIFY)) {
                 ret = wn_Transcript_GetHash(&tc, thCert, &thLen);

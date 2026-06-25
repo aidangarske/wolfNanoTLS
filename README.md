@@ -25,6 +25,10 @@ interop stays identical to wolfSSL.
 
 - **TLS 1.3 only**: client-first, external PSK + ECDHE by default, X.509 server-cert auth as a compile-time adder;
   X.509 is a compile-time adder. No TLS 1.2, no compatibility layer.
+- **Connects to the real internet**: sends SNI (`server_name`) and verifies the
+  full CA chain + hostname, so a named connect reaches CDNs / virtual hosts. A
+  live TLS 1.3 GET against a public HTTPS endpoint runs in CI
+  ([examples/client_https.c](examples/client_https.c)).
 - **Zero dynamic allocation**: the product shell and `src` crypto floor run
   entirely on caller-provided / static buffers (`WOLFSSL_NO_MALLOC`), verified
   with a malloc trap. Nothing on the heap.
@@ -125,15 +129,17 @@ rc = wn_Connect_Psk_ex(&sess, &rng, mySend, myRecv, &fd, psk, pskLen,
 if (rc != WOLFNANOTLS_SUCCESS) {
     return rc;                 /* handshake failed: do not use the session */
 }
-if (wn_Send(&sess, (const byte*)"hello", 5) >= 0) {
+if (wn_Send(&sess, (const byte*)"hello", 5) == 0) {
     rc = wn_Recv(&sess, buf, sizeof(buf), &got);
 }
 wn_Close(&sess);
 ```
 
 `mySend` / `myRecv` are your transport callbacks (`wn_IoSend` / `wn_IoRecv`).
-See [examples/client.c](examples/client.c) for a complete runnable client and
-`make example`.
+See [examples/client.c](examples/client.c) (PSK, `make example`),
+[examples/client_cert.c](examples/client_cert.c) (X.509, `make example-cert`),
+and [examples/client_https.c](examples/client_https.c) (live HTTPS GET with SNI
++ chain verification, `make example-https`) for complete runnable clients.
 
 ## Build
 

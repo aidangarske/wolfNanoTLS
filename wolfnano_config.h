@@ -76,6 +76,19 @@
         #define WOLFSSL_KEY_GEN
     #endif
     #define WC_RSA_PSS
+    /* Real-world roots are RSA-4096 (e.g. ISRG Root X1); the SP default caps at
+     * 3072, so raise the verify ceiling so public CA chains validate. */
+    #ifndef RSA_MAX_SIZE
+        #define RSA_MAX_SIZE 4096
+    #endif
+    #ifndef SP_INT_BITS
+        #define SP_INT_BITS 4096
+    #endif
+    /* SP_INT_BITS only covers the generic sp_int engine; specialized SP backends
+     * gate RSA modulus sizes at compile time, so enable the 4096 path there too. */
+    #if defined(WOLFSSL_SP_MATH) && !defined(WOLFSSL_SP_4096)
+        #define WOLFSSL_SP_4096
+    #endif
 #endif
 
 /* ---- side-channel hardening (constant-time) ---- */

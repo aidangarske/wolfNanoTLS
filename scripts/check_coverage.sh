@@ -21,12 +21,13 @@ awk -v enforce="$ENFORCE" '
     bad = 0
     printf "%-26s %7s %7s %8s\n", "file", "lines", "hit", "cover"
   }
-  /^SF:/ { f = substr($0, 4); show = (f ~ /\/src\/[^\/]+\.(c|h)$/); total = 0; cov = 0 }
+  /^SF:/ { f = substr($0, 4); show = (f ~ /\/src\/[^\/]+\.(c|h)$/); total = 0; cov = 0; unc = "" }
   /^DA:/ {
     if (show) {
       split(substr($0, 4), a, ",")
       total++
       if (a[2] + 0 > 0) { cov++ }
+      else { unc = unc " " a[1] }
     }
   }
   /^end_of_record/ {
@@ -36,7 +37,8 @@ awk -v enforce="$ENFORCE" '
       printf "%-26s %7d %7d %7.2f%%\n", base, total, cov, pct
       key = "src/" base
       if ((key in en) && cov < total) {
-        printf "  >>> ENFORCE FAIL: %s at %d/%d lines\n", key, cov, total
+        printf "  >>> ENFORCE FAIL: %s at %d/%d lines (uncovered:%s)\n",
+          key, cov, total, unc
         bad = 1
       }
     }

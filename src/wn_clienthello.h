@@ -40,4 +40,13 @@ WOLFNANOTLS_API int wn_ClientHello_Build(byte* out, word32* outLen, word32 outCa
                                       const byte* sessionId, word32 sessionIdLen,
                                       const byte* pub, word32 pubLen);
 
+/* As wn_ClientHello_Build, plus a server_name (SNI, RFC 6066) extension when
+ * serverName is non-NULL (host_name type). serverName is a NUL-terminated DNS
+ * name; pass NULL to omit SNI. */
+WOLFNANOTLS_API int wn_ClientHello_Build_ex(byte* out, word32* outLen,
+                                         word32 outCap, const byte* random32,
+                                         const byte* sessionId,
+                                         word32 sessionIdLen, const byte* pub,
+                                         word32 pubLen, const char* serverName);
+
 #endif /* WN_CLIENTHELLO_H */
