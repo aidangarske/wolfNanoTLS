@@ -185,8 +185,12 @@ static void run_server(int fd)
 
     srvLen = 0;
     ssLen = 0;
-    wn_Hybrid_ServerRespond(cliShare, WN_HYBRID_CLIENT_SHARE, &rng,
-                            srvShare, &srvLen, ecdhe, &ssLen);
+    if (wn_Hybrid_ServerRespond(cliShare, WN_HYBRID_CLIENT_SHARE, &rng,
+                                srvShare, &srvLen, ecdhe, &ssLen) != 0) {
+        wc_FreeRng(&rng);     /* drop the canned response so the client side
+                               * fails the handshake loudly, not silently */
+        return;
+    }
 
     wn_Writer_Init(&w, sh, sizeof(sh));
     wn_Write_U8(&w, 2);
