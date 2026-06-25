@@ -52,6 +52,7 @@ int wn_ClientHello_Build_ex(byte* out, word32* outLen, word32 outCap,
     wn_Writer w;
     word32 hsLen;
     word32 extLen;
+    word32 saExt, saList;
     word32 nameLen = 0;
     int ret = WOLFNANO_SUCCESS;
 
@@ -108,27 +109,33 @@ int wn_ClientHello_Build_ex(byte* out, word32* outLen, word32 outCap,
         wn_Write_U16(&w, 2);
         wn_Write_U16(&w, WN_DEFAULT_GROUP);
 
-        /* signature_algorithms */
+        /* signature_algorithms (RFC 8446 4.2.3): the offered set is a function
+         * of the compiled-in primitives; lengths self-size via LenStart/LenEnd
+         * so a scheme is offered only when wn_CertVerify can check it. */
         wn_Write_U16(&w, WN_EXT_SIG_ALGS);
-#ifdef WOLFNANO_FIPS
-        wn_Write_U16(&w, 6);
-        wn_Write_U16(&w, 4);
-        wn_Write_U16(&w, 0x0403);              /* ecdsa_secp256r1_sha256 */
-        wn_Write_U16(&w, 0x0804);              /* rsa_pss_rsae_sha256 */
-#elif defined(WOLFSSL_HAVE_MLDSA)
-        wn_Write_U16(&w, 10);
-        wn_Write_U16(&w, 8);
-        wn_Write_U16(&w, WN_MLDSA_SCHEME);              /* ML-DSA (level via WOLFNANO_MLDSA_LEVEL) */
+        saExt  = wn_Write_LenStart(&w, 2);
+        saList = wn_Write_LenStart(&w, 2);
+#ifndef WOLFNANO_FIPS
+    #ifdef WOLFSSL_HAVE_MLDSA
+        wn_Write_U16(&w, WN_MLDSA_SCHEME);     /* ML-DSA (WOLFNANO_MLDSA_LEVEL) */
+    #endif
         wn_Write_U16(&w, 0x0807);              /* ed25519 */
+#endif
+#if defined(HAVE_ECC384) && defined(WOLFSSL_SHA384)
+        wn_Write_U16(&w, 0x0503);              /* ecdsa_secp384r1_sha384 */
+#endif
         wn_Write_U16(&w, 0x0403);              /* ecdsa_secp256r1_sha256 */
-        wn_Write_U16(&w, 0x0804);              /* rsa_pss_rsae_sha256 */
-#else
-        wn_Write_U16(&w, 8);
-        wn_Write_U16(&w, 6);
-        wn_Write_U16(&w, 0x0807);              /* ed25519 */
-        wn_Write_U16(&w, 0x0403);              /* ecdsa_secp256r1_sha256 */
+#ifndef NO_RSA
+    #ifdef WOLFSSL_SHA512
+        wn_Write_U16(&w, 0x0806);              /* rsa_pss_rsae_sha512 */
+    #endif
+    #ifdef WOLFSSL_SHA384
+        wn_Write_U16(&w, 0x0805);              /* rsa_pss_rsae_sha384 */
+    #endif
         wn_Write_U16(&w, 0x0804);              /* rsa_pss_rsae_sha256 */
 #endif
+        wn_Write_LenEnd(&w, saList, 2);
+        wn_Write_LenEnd(&w, saExt, 2);
 
         /* key_share: one entry for the configured group */
         wn_Write_U16(&w, WN_EXT_KEY_SHARE);

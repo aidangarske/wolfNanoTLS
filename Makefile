@@ -426,7 +426,7 @@ certmldsatest: ## build + run the ML-DSA CertificateVerify test at each level (4
 certnegtest: ## build + run X.509 negative auth tests (chain + hostname + ECDSA CertVerify)
 	@mkdir -p $(BUILD)
 	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_X509 \
-	   -DWOLFNANO_HAVE_RSA_VERIFY \
+	   -DWOLFNANO_HAVE_RSA_VERIFY -DWOLFNANO_RSA_FULL \
 	   -DWOLFNANO_ALLOW_MALLOC -DWOLFNANO_TARGET_PORTABLE_C \
 	   $(CERTMLDSA_SRC) tests/cert_neg_test.c -o $(BUILD)/cert_neg_test
 	@echo "---- run ----"
@@ -445,7 +445,7 @@ certgentest: ## build + run generated-PKI chain-constraint tests (CA flag, keyUs
 certnegpintest: ## build + run the key-pin-only cert tier (WOLFNANO_X509_HOSTNAME=0)
 	@mkdir -p $(BUILD)
 	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_X509 \
-	   -DWOLFNANO_X509_HOSTNAME=0 -DWOLFNANO_HAVE_RSA_VERIFY \
+	   -DWOLFNANO_X509_HOSTNAME=0 -DWOLFNANO_HAVE_RSA_VERIFY -DWOLFNANO_RSA_FULL \
 	   -DWOLFNANO_ALLOW_MALLOC -DWOLFNANO_TARGET_PORTABLE_C \
 	   $(CERTMLDSA_SRC) tests/cert_neg_test.c -o $(BUILD)/cert_neg_pin_test
 	@echo "---- run ----"

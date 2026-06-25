@@ -631,8 +631,8 @@ static void wn_BuildCvTbs(byte* tbs, word32* tbsLen, const byte* th,
 }
 
 static int wn_CvEcdsa(const byte* spki, word32 spkiLen, int hashType,
-                      const byte* tbs, word32 tbsLen, const byte* sig,
-                      word32 sigLen)
+                      int curveSize, const byte* tbs, word32 tbsLen,
+                      const byte* sig, word32 sigLen)
 {
     ecc_key key;
     byte hash[WC_MAX_DIGEST_SIZE];
@@ -655,6 +655,13 @@ static int wn_CvEcdsa(const byte* spki, word32 spkiLen, int hashType,
     }
     if (ret == WOLFNANO_SUCCESS) {
         if (wc_EccPublicKeyDecode(spki, &idx, &key, spkiLen) != 0) {
+            ret = WOLFNANO_E_BAD_CERT;
+        }
+    }
+    if (ret == WOLFNANO_SUCCESS) {
+        /* RFC 8446 4.2.3: an ECDSA SignatureScheme binds the curve, so the
+         * leaf key must be on the curve the scheme names. */
+        if ((key.dp == NULL) || (key.dp->size != curveSize)) {
             ret = WOLFNANO_E_BAD_CERT;
         }
     }
@@ -816,9 +823,15 @@ static int wn_CertVerify(word16 scheme, const byte* spki, word32 spkiLen,
     /* RFC 8446 4.4.3: accept only schemes wolfNano offered in the ClientHello
      * signature_algorithms (see wn_clienthello.c); reject anything else. */
     if (scheme == 0x0403) {
-        ret = wn_CvEcdsa(spki, spkiLen, WC_HASH_TYPE_SHA256, tbs, tbsLen, sig,
-                         sigLen);
+        ret = wn_CvEcdsa(spki, spkiLen, WC_HASH_TYPE_SHA256, 32, tbs, tbsLen,
+                         sig, sigLen);
     }
+#if defined(HAVE_ECC384) && defined(WOLFSSL_SHA384)
+    else if (scheme == 0x0503) {
+        ret = wn_CvEcdsa(spki, spkiLen, WC_HASH_TYPE_SHA384, 48, tbs, tbsLen,
+                         sig, sigLen);
+    }
+#endif
 #ifdef HAVE_ED25519
     else if (scheme == 0x0807) {
         ret = wn_CvEd25519(spki, spkiLen, tbs, tbsLen, sig, sigLen);
@@ -829,6 +842,18 @@ static int wn_CertVerify(word16 scheme, const byte* spki, word32 spkiLen,
         ret = wn_CvRsaPss(spki, spkiLen, WC_HASH_TYPE_SHA256, WC_MGF1SHA256,
                           tbs, tbsLen, sig, sigLen);
     }
+    #ifdef WOLFSSL_SHA384
+    else if (scheme == 0x0805) {
+        ret = wn_CvRsaPss(spki, spkiLen, WC_HASH_TYPE_SHA384, WC_MGF1SHA384,
+                          tbs, tbsLen, sig, sigLen);
+    }
+    #endif
+    #ifdef WOLFSSL_SHA512
+    else if (scheme == 0x0806) {
+        ret = wn_CvRsaPss(spki, spkiLen, WC_HASH_TYPE_SHA512, WC_MGF1SHA512,
+                          tbs, tbsLen, sig, sigLen);
+    }
+    #endif
 #endif
 #ifdef WOLFSSL_HAVE_MLDSA
     else if (scheme == WN_MLDSA_SCHEME) {
