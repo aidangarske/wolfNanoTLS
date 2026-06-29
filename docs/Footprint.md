@@ -25,6 +25,28 @@ the one row built without `-flto`: `wc_mldsa.c` trips an LTO + `--gc-sections`
 live-code-removal bug in ArmGNU 14.2, so it slightly over-states versus the
 `-flto` rows.
 
+## STM32H5 (NUCLEO-H563ZI) — validated on silicon
+
+All five profiles above were run on a real **NUCLEO-H563ZI** as a wolfNanoTLS
+client over the [wolfIP](https://github.com/wolfssl/wolfip) TCP/IP stack,
+completing a TLS 1.3 handshake (and encrypted echo) against a wolfSSL example
+server — so these `.text` figures are what a deployment actually ships and runs,
+not just a cross-compile.
+
+| Profile | wolfNanoTLS `.text` | wolfSSL client (same scope) |
+|---|--:|--:|
+| PSK + ECDHE X25519 | ~17.6 KB | — |
+| PSK + ECDHE P-256 | ~25.2 KB | — |
+| PSK + X25519MLKEM768 | ~32.9 KB | — |
+| cert / X.509 P-256 | ~60.8 KB | **~150 KB** |
+| cert / X.509 + ML-DSA-44 | ~79.3 KB | — |
+
+At the X.509 P-256 scope a full **wolfSSL** TLS 1.3 client is **~2.4× larger**
+`.text` than wolfNanoTLS — wolfNanoTLS is the smaller client on the H5. Reproduce
+the per-profile sizes and the wolfSSL comparison with `sh bench/footprint-h5.sh`
+(same toolchain for both columns). On-silicon handshake timings per profile are
+in [Benchmarks](Benchmarks.md).
+
 ## Crypto floor on Cortex-M33 (cross-compiled, static)
 
 Code size is static, so the on-target crypto floor can be measured on the host

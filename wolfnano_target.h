@@ -58,6 +58,21 @@
     #define SP_WORD_SIZE 32
     #define TFM_NO_ASM
 
+#elif defined(WOLFNANO_TARGET_CORTEXM33_SMALL)
+    /* Smallest Cortex-M build: 16-bit Thumb SP math (sp_armthumb.c) + no symmetric
+     * asm. AES/SHA/X25519 come from the size-optimized portable C selected by the
+     * config size knobs (GCM_SMALL / WOLFSSL_AES_SMALL_TABLES / SHA256_SMALL), and
+     * SP uses the compact 16-bit Thumb encodings instead of the larger (faster)
+     * Cortex-M UMAAL path. Trades speed for the smallest .text — the footprint
+     * "smallest" headline. Assembles on cortex-m33 (Thumb-1 is a Thumb-2 subset). */
+    #define WOLFSSL_SP_MATH
+    #define WOLFSSL_HAVE_SP_ECC
+    #define WOLFSSL_HAVE_SP_RSA
+    #define WOLFSSL_SP_ARM_THUMB_ASM    /* sp_armthumb.c; 16-bit Thumb encodings */
+    #define WOLFSSL_SP_SMALL            /* compact (non-unrolled) SP routines */
+    #define SP_WORD_SIZE 32
+    #define TFM_NO_ASM
+
 #elif defined(WOLFNANO_TARGET_AARCH64)
     /* ARMv8 aarch64: NEON + (optional) crypto-extension AES/SHA + SP arm64 asm. */
     #define WOLFSSL_ARMASM

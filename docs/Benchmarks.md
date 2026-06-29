@@ -60,6 +60,27 @@ from source here; aarch64/riscv64 need a complete toolchain. **Speed numbers for
 those require the target silicon** (the Cortex-M33 / STM32H563 is the priority
 and uses the DWT cycle counter).
 
+## STM32H5 (NUCLEO-H563ZI) on-silicon handshake
+
+First on-device numbers: full TLS 1.3 handshake measured client-side with the
+DWT cycle counter on a NUCLEO-H563ZI (Cortex-M33 @ ~64 MHz HSI), running as a
+wolfNanoTLS client over the [wolfIP](https://github.com/wolfssl/wolfip) stack
+against a wolfSSL example server (PSK and X.509). PSK/PQC use the fast Cortex-M
+asm SP; the cert rows use portable-C SP (the `sp_cortexm` asm has a wolfSSL
+RSA-verify-only build quirk), which is why they are far slower.
+
+| Profile | DWT cycles | ≈ time | SP backend |
+|---|--:|--:|---|
+| PSK + ECDHE X25519 | 3,228,564 | ~50 ms | Cortex-M asm |
+| PSK + ECDHE P-256 | 5,517,711 | ~86 ms | Cortex-M asm |
+| PSK + X25519MLKEM768 (PQC) | 6,227,080 | ~97 ms | Cortex-M asm |
+| cert / X.509 P-256 | 258,948,145 | ~4.0 s | portable C |
+| cert / X.509 + ML-DSA-44 | 121,944,342 | ~1.9 s | portable C |
+
+`ms = cycles / 64000`. Reproduce via the wolfIP STM32H563 port
+(`src/port/stm32h563`, `ENABLE_WOLFNANO=1`). Size for the same builds is in
+[Footprint](Footprint.md).
+
 A head-to-head against mbedTLS and stock wolfSSL (speed and size) is in
 [Comparison](Comparison.md).
 

@@ -144,6 +144,14 @@ SPSRC_thumb2  := $(WC)/sp_int.c $(WC)/sp_cortexm.c
 ASMSRC_thumb2 := $(ARM)/thumb2-aes-asm_c.c $(ARM)/thumb2-sha256-asm_c.c \
                  $(ARM)/thumb2-sha512-asm_c.c $(ARM)/thumb2-curve25519_c.c
 
+# thumb2-small: smallest Cortex-M build. 16-bit Thumb SP (sp_armthumb.c) and NO
+# symmetric asm — AES/SHA/X25519 stay size-optimized C. Smaller .text than the
+# fast 'thumb2' row above; used for the footprint "smallest" headline.
+CC_thumb2-small     := $(CC_thumb2)
+FLAGS_thumb2-small  := -mcpu=cortex-m33 -mthumb -DWOLFNANO_TARGET_CORTEXM33_SMALL
+SPSRC_thumb2-small  := $(WC)/sp_int.c $(WC)/sp_armthumb.c
+ASMSRC_thumb2-small :=
+
 CC_aarch64     := $(shell command -v aarch64-elf-gcc 2>/dev/null || echo aarch64-none-elf-gcc)
 FLAGS_aarch64  := -march=armv8-a+crypto -DWOLFNANO_TARGET_AARCH64
 SPSRC_aarch64  := $(WC)/sp_int.c $(WC)/sp_arm64.c
