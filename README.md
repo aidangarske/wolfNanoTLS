@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/images/wolfnano-logo.png" width="290" alt="wolfNanoTLS logo" />
+<h1>wolfNanoTLS</h1>
 
 **A condensed, TLS 1.3-only, zero-allocation embedded TLS library, built as a
 thin shell on top of [wolfSSL](https://github.com/wolfSSL/wolfssl).**
