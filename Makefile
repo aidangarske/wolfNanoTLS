@@ -131,7 +131,8 @@ ASMSRC_none  :=
 CC_intel     := cc
 FLAGS_intel  := -march=native -DWOLFNANOTLS_TARGET_X86_64
 SPSRC_intel  := $(WC)/sp_int.c $(WC)/sp_x86_64.c $(WC)/sp_x86_64_asm.S
-ASMSRC_intel := $(WC)/aes_asm.S $(WC)/aes_gcm_asm.S $(WC)/sha256_asm.S \
+# 64-bit AES-NI is in aes_x86_64_asm.S; aes_asm.S is now WOLFSSL_X86_BUILD (32-bit) only
+ASMSRC_intel := $(WC)/aes_x86_64_asm.S $(WC)/aes_gcm_asm.S $(WC)/sha256_asm.S \
                 $(WC)/sha512_asm.S $(WC)/fe_x25519_asm.S $(WC)/cpuid.c
 
 # Prefer a complete arm-none-eabi toolchain (with newlib) if one is installed;
