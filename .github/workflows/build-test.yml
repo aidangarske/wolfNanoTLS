@@ -27,16 +27,12 @@ jobs:
       - if: runner.os == 'Linux'
         uses: ./.github/actions/setup
       - uses: ./.github/actions/wolfssl-checkout
-      - name: make test (all self-test suites)
+      - name: make test (all self-test suites, includes wn_x509 vs wolfSSL diff)
         run: make test
-      - name: ML-DSA-65 CertificateVerify test (X509 + ML-DSA)
-        run: make certmldsatest
-      - name: X.509 negative auth test (chain + hostname + ECDSA CertificateVerify)
-        run: make certnegtest
-      - name: X.509 SPKI-pin-only tier (hostname compiled out)
-        run: make certnegpintest
-      - name: X.509 generated-PKI chain-constraint test (CA flag, keyUsage, EKU)
-        run: make certgentest
+      - name: X.509 cert tests -- wolfSSL asn.c backend (default)
+        run: make certmldsatest certnegtest certnegpintest certgentest
+      - name: X.509 cert tests -- native wn_x509 backend (X509_LITE=1)
+        run: make certmldsatest certnegtest certnegpintest certgentest X509_LITE=1
       - name: X.509 clockless tier compiles (WOLFNANO_NO_X509_TIME)
         run: make cert-notime-build
       - name: configs-build (compile every starter template)

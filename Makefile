@@ -11,6 +11,17 @@ ifeq ($(MALLOC),1)
   MALLOC_FLAG := -DWOLFNANO_ALLOW_MALLOC
 endif
 
+# X.509 backend for the cert handshake path. Default: wolfSSL asn.c/DecodedCert
+# (full feature set). X509_LITE=1: the smaller native wn_x509 parser (drops
+# asn.c's reachable cert parser for ~10 KB less .text).
+ifeq ($(X509_LITE),1)
+  X509_BACKEND_FLAG := -DWOLFNANO_X509_LITE
+  X509_BACKEND_SRC  := src/wn_x509.c
+else
+  X509_BACKEND_FLAG :=
+  X509_BACKEND_SRC  :=
+endif
+
 CFLAGS_COMMON := -Os -Wall -Wextra -Wdeclaration-after-statement \
                  -DWOLFSSL_USER_SETTINGS -I. -I$(WOLFSSL) $(MALLOC_FLAG) \
                  $(EXTRA_CFLAGS)
@@ -176,12 +187,13 @@ ASM_CC    := $(CC_$(WOLFNANO_ASM))
 ASM_FLAGS := $(FLAGS_$(WOLFNANO_ASM))
 ASM_SRC   := $(SPSRC_$(WOLFNANO_ASM)) $(ASMSRC_$(WOLFNANO_ASM))
 
-.PHONY: host kstest keyupdatetest sessiontest mocktest mockhybridtest errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest certmldsatest certnegtest certnegpintest certgentest hybridtest certtest fipsproof bench benchrun targets test-qemu test test-core check example example-cert cert-notime-build example-https example-pqc configs-build m33mu coverage stackcheck clean
+.PHONY: host kstest keyupdatetest sessiontest mocktest mockhybridtest errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest certmldsatest certnegtest certnegpintest certgentest hybridtest certtest x509diff x509verifytest x509negtest x509negvectest fipsproof bench benchrun targets test-qemu test test-core check example example-cert cert-notime-build example-https example-pqc configs-build m33mu coverage stackcheck clean
 test: test-core mlkemtest mldsatest hybridtest mockhybridtest wctestpqc ## build + run all local self-tests (certmldsatest runs separately; compiling X509 here would drag the interop-only cert path into the coverage build)
-test-core: host kstest keyupdatetest sessiontest mocktest errtest rfctest tstest rectest ksharetest hstest wctest msgtest chtest shtest negtest flighttest alerttest matrixtest certtest ## non-PQC suites (wolfSSL without the wc_mlkem/wc_mldsa API)
+test-core: host kstest keyupdatetest sessiontest mocktest errtest rfctest tstest rectest ksharetest hstest wctest msgtest chtest shtest negtest flighttest alerttest matrixtest certtest x509diff x509verifytest x509negtest x509negvectest ## non-PQC suites (wolfSSL without the wc_mlkem/wc_mldsa API)
 
 SUITES := host kstest keyupdatetest sessiontest mocktest mockhybridtest errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc \
-  msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest certmldsatest certnegtest certnegpintest certgentest hybridtest certtest
+  msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest certmldsatest certnegtest certnegpintest certgentest hybridtest certtest \
+  x509diff x509verifytest x509negtest x509negvectest
 
 check: ## run every suite, continue past failures, print one colored PASS/FAIL tally
 	@mkdir -p $(BUILD)
@@ -373,7 +385,10 @@ matrixtest: ## build + run the data-driven negotiation matrix (PORTABLE_C)
 FUZZ_TIME ?= 60
 FUZZ_CC ?= clang
 fuzz: ## coverage-guided fuzz of the wire parsers (clang libFuzzer + ASan)
-	@mkdir -p $(BUILD)/corp_sh $(BUILD)/corp_msg $(BUILD)/corp_rec
+	@mkdir -p $(BUILD)/corp_sh $(BUILD)/corp_msg $(BUILD)/corp_rec $(BUILD)/corp_x509
+	$(FUZZ_CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C \
+	   -fsanitize=fuzzer,address,undefined -g \
+	   src/wn_x509.c tests/fuzz_x509.c -o $(BUILD)/fuzz_x509
 	$(FUZZ_CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C \
 	   -fsanitize=fuzzer,address -g \
 	   src/wn_msg.c src/wn_serverhello.c tests/fuzz_serverhello.c \
@@ -387,6 +402,7 @@ fuzz: ## coverage-guided fuzz of the wire parsers (clang libFuzzer + ASan)
 	   $(WC)/random.c $(WC)/sha256.c $(WC)/sha512.c $(WC)/aes.c src/wn_record.c \
 	   tests/wn_host_seed.c tests/fuzz_record.c -o $(BUILD)/fuzz_record
 	@echo "---- run ($(FUZZ_TIME)s each) ----"
+	@./$(BUILD)/fuzz_x509       -max_total_time=$(FUZZ_TIME) -timeout=10 $(BUILD)/corp_x509
 	@./$(BUILD)/fuzz_serverhello -max_total_time=$(FUZZ_TIME) -timeout=10 $(BUILD)/corp_sh
 	@./$(BUILD)/fuzz_msg        -max_total_time=$(FUZZ_TIME) -timeout=10 $(BUILD)/corp_msg
 	@./$(BUILD)/fuzz_record     -max_total_time=$(FUZZ_TIME) -timeout=10 $(BUILD)/corp_rec
@@ -418,37 +434,41 @@ certmldsatest: ## build + run the ML-DSA CertificateVerify test at each level (4
 	   echo "---- ML-DSA level $$lvl ----"; \
 	   $(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_X509 \
 	      -DWOLFNANO_HAVE_RSA_VERIFY -DWOLFNANO_MLDSA -DWOLFNANO_MLDSA_SIGN \
-	      -DWOLFNANO_MLDSA_LEVEL=$$lvl \
+	      -DWOLFNANO_MLDSA_LEVEL=$$lvl $(X509_BACKEND_FLAG) \
 	      -DWOLFNANO_ALLOW_MALLOC -DWOLFNANO_TARGET_PORTABLE_C \
-	      $(CERTMLDSA_SRC) tests/cert_mldsa_test.c -o $(BUILD)/cert_mldsa_test || exit 1; \
+	      $(CERTMLDSA_SRC) $(X509_BACKEND_SRC) tests/cert_mldsa_test.c \
+	      -o $(BUILD)/cert_mldsa_test || exit 1; \
 	   ./$(BUILD)/cert_mldsa_test || exit 1; \
 	 done
 
 certnegtest: ## build + run X.509 negative auth tests (chain + hostname + ECDSA CertVerify)
 	@mkdir -p $(BUILD)
-	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_X509 \
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_X509 $(X509_BACKEND_FLAG) \
 	   -DWOLFNANO_HAVE_RSA_VERIFY -DWOLFNANO_RSA_FULL \
 	   -DWOLFNANO_ALLOW_MALLOC -DWOLFNANO_TARGET_PORTABLE_C \
-	   $(CERTMLDSA_SRC) tests/cert_neg_test.c -o $(BUILD)/cert_neg_test
+	   $(CERTMLDSA_SRC) $(X509_BACKEND_SRC) tests/cert_neg_test.c \
+	   -o $(BUILD)/cert_neg_test
 	@echo "---- run ----"
 	@./$(BUILD)/cert_neg_test
 
 certgentest: ## build + run generated-PKI chain-constraint tests (CA flag, keyUsage, EKU)
 	@mkdir -p $(BUILD)
-	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_X509 \
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_X509 $(X509_BACKEND_FLAG) \
 	   -DWOLFNANO_HAVE_RSA_VERIFY -DWOLFNANO_RSA_FULL \
 	   -DWOLFSSL_CERT_GEN -DWOLFSSL_CERT_EXT -DWOLFSSL_KEY_GEN \
 	   -DWOLFNANO_ALLOW_MALLOC -DWOLFNANO_TARGET_PORTABLE_C \
-	   $(CERTMLDSA_SRC) tests/cert_gen_test.c -o $(BUILD)/cert_gen_test
+	   $(CERTMLDSA_SRC) $(X509_BACKEND_SRC) tests/cert_gen_test.c \
+	   -o $(BUILD)/cert_gen_test
 	@echo "---- run ----"
 	@./$(BUILD)/cert_gen_test
 
 certnegpintest: ## build + run the key-pin-only cert tier (WOLFNANO_X509_HOSTNAME=0)
 	@mkdir -p $(BUILD)
-	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_X509 \
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_X509 $(X509_BACKEND_FLAG) \
 	   -DWOLFNANO_X509_HOSTNAME=0 -DWOLFNANO_HAVE_RSA_VERIFY -DWOLFNANO_RSA_FULL \
 	   -DWOLFNANO_ALLOW_MALLOC -DWOLFNANO_TARGET_PORTABLE_C \
-	   $(CERTMLDSA_SRC) tests/cert_neg_test.c -o $(BUILD)/cert_neg_pin_test
+	   $(CERTMLDSA_SRC) $(X509_BACKEND_SRC) tests/cert_neg_test.c \
+	   -o $(BUILD)/cert_neg_pin_test
 	@echo "---- run ----"
 	@./$(BUILD)/cert_neg_pin_test
 
@@ -466,6 +486,46 @@ certtest: ## build + run the X.509 cert-verify test (ECC + RSA; needs heap)
 	   $(CERT_SRC) $(WC)/rsa.c tests/cert_test.c -o $(BUILD)/cert_test
 	@echo "---- run ----"
 	@./$(BUILD)/cert_test
+
+x509diff: ## differential-test wn_x509 vs wolfSSL wc_ParseCert over embedded certs
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_X509 -DWOLFNANO_X509_HOSTNAME \
+	   -DWOLFNANO_HAVE_RSA_VERIFY \
+	   -DWOLFNANO_ALLOW_MALLOC -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(CERT_SRC) src/wn_x509.c $(WC)/rsa.c tests/x509_wolfssl_diff.c \
+	   -o $(BUILD)/x509_wolfssl_diff
+	@echo "---- run ----"
+	@./$(BUILD)/x509_wolfssl_diff
+
+x509negtest: ## negative/adversarial wn_x509 tests (crit-unknown, inner!=outer, truncation)
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_X509 -DWOLFNANO_X509_HOSTNAME \
+	   -DWOLFNANO_HAVE_RSA_VERIFY \
+	   -DWOLFNANO_ALLOW_MALLOC -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(CERT_SRC) src/wn_x509.c $(WC)/rsa.c tests/x509_neg_test.c \
+	   -o $(BUILD)/x509_neg_test
+	@echo "---- run ----"
+	@./$(BUILD)/x509_neg_test
+
+x509verifytest: ## wn_X509_VerifySignedBy + TimeValid (chain verify vs wolfSSL, tamper reject)
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_X509 -DWOLFNANO_X509_HOSTNAME \
+	   -DWOLFNANO_HAVE_RSA_VERIFY \
+	   -DWOLFNANO_ALLOW_MALLOC -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(CERT_SRC) src/wn_x509.c $(WC)/rsa.c \
+	   tests/x509_verify_test.c -o $(BUILD)/x509_verify_test
+	@echo "---- run ----"
+	@./$(BUILD)/x509_verify_test
+
+x509negvectest: ## wn_x509 vs wolfSSL on malformed cert vectors (lifted from wolfSSL certs/test)
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_X509 -DWOLFNANO_X509_HOSTNAME \
+	   -DWOLFNANO_HAVE_RSA_VERIFY \
+	   -DWOLFNANO_ALLOW_MALLOC -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(CERT_SRC) src/wn_x509.c $(WC)/rsa.c tests/x509_negvec_test.c \
+	   -o $(BUILD)/x509_negvec_test
+	@echo "---- run ----"
+	@./$(BUILD)/x509_negvec_test
 
 interop: ## live TLS 1.3 PSK handshake vs OpenSSL and wolfSSL
 	@mkdir -p $(BUILD)
@@ -485,9 +545,10 @@ interop: ## live TLS 1.3 PSK handshake vs OpenSSL and wolfSSL
 	   -DWOLFNANO_TARGET_PORTABLE_C \
 	   $(MOCKHYB_SRC) tests/interop_psk_test.c -o $(BUILD)/interop_psk_hybrid_client
 	@echo "== PSK (X25519MLKEM768) vs wolfSSL =="; CLIENT=$(BUILD)/interop_psk_hybrid_client sh tests/interop_wolfssl_hybrid.sh
-	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_X509 -DWOLFNANO_HAVE_RSA_VERIFY \
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_X509 $(X509_BACKEND_FLAG) \
+	   -DWOLFNANO_HAVE_RSA_VERIFY \
 	   -DWOLFNANO_ALLOW_MALLOC -DWOLFNANO_TARGET_PORTABLE_C \
-	   $(CONN_CERT_SRC) $(WC)/rsa.c tests/interop_cert_test.c \
+	   $(CONN_CERT_SRC) $(WC)/rsa.c $(X509_BACKEND_SRC) tests/interop_cert_test.c \
 	   -o $(BUILD)/interop_cert_client
 	@echo "== cert(ECDSA) vs OpenSSL =="; sh tests/interop_cert.sh ecdsa
 	@echo "== cert(RSA-PSS) vs OpenSSL =="; sh tests/interop_cert.sh rsa
@@ -497,9 +558,10 @@ interop: ## live TLS 1.3 PSK handshake vs OpenSSL and wolfSSL
 	@echo "== cert(RSA-PSS) vs wolfSSL =="; sh tests/interop_cert_wolfssl.sh rsa
 	@echo "== cert(Ed25519) vs wolfSSL =="; sh tests/interop_cert_wolfssl.sh ed
 	@echo "== cert(chain leaf<-inter<-root) vs wolfSSL =="; sh tests/interop_cert_wolfssl.sh chain
-	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_X509 -DWOLFNANO_HAVE_RSA_VERIFY \
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_X509 $(X509_BACKEND_FLAG) \
+	   -DWOLFNANO_HAVE_RSA_VERIFY \
 	   -DWOLFNANO_ALLOW_MALLOC -DWOLFNANO_FIPS -DWOLFNANO_TARGET_PORTABLE_C \
-	   $(CONN_CERT_SRC) $(WC)/rsa.c tests/interop_cert_test.c \
+	   $(CONN_CERT_SRC) $(WC)/rsa.c $(X509_BACKEND_SRC) tests/interop_cert_test.c \
 	   -o $(BUILD)/interop_cert_fips_client
 	@echo "== cert(ECDSA, approved ECDHE P-256 suites) vs OpenSSL =="; \
 	   WN_CERT_CLIENT=interop_cert_fips_client sh tests/interop_cert.sh ecdsa
@@ -594,26 +656,28 @@ example: ## build the minimal PSK client example (examples/client.c)
 
 example-cert: ## build the X.509 server-cert client example (examples/client_cert.c)
 	@mkdir -p $(BUILD)
-	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_X509 -DWOLFNANO_HAVE_RSA_VERIFY \
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_X509 $(X509_BACKEND_FLAG) \
+	   -DWOLFNANO_HAVE_RSA_VERIFY \
 	   -DWOLFNANO_ALLOW_MALLOC -DWOLFNANO_TARGET_PORTABLE_C \
-	   $(CONN_CERT_SRC) $(WC)/rsa.c examples/client_cert.c \
+	   $(CONN_CERT_SRC) $(WC)/rsa.c $(X509_BACKEND_SRC) examples/client_cert.c \
 	   -o $(BUILD)/example_client_cert
 	@echo "built $(BUILD)/example_client_cert"
 
 cert-notime-build: ## compile-check the clockless cert tier (WOLFNANO_NO_X509_TIME)
 	@mkdir -p $(BUILD)
-	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_X509 -DWOLFNANO_HAVE_RSA_VERIFY \
-	   -DWOLFNANO_NO_X509_TIME \
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_X509 $(X509_BACKEND_FLAG) \
+	   -DWOLFNANO_HAVE_RSA_VERIFY -DWOLFNANO_NO_X509_TIME \
 	   -DWOLFNANO_ALLOW_MALLOC -DWOLFNANO_TARGET_PORTABLE_C \
-	   $(CONN_CERT_SRC) $(WC)/rsa.c examples/client_cert.c \
+	   $(CONN_CERT_SRC) $(WC)/rsa.c $(X509_BACKEND_SRC) examples/client_cert.c \
 	   -o $(BUILD)/example_client_cert_notime
 	@echo "built $(BUILD)/example_client_cert_notime"
 
 example-https: ## build the live HTTPS client example (examples/client_https.c)
 	@mkdir -p $(BUILD)
-	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_X509 -DWOLFNANO_HAVE_RSA_VERIFY \
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_X509 $(X509_BACKEND_FLAG) \
+	   -DWOLFNANO_HAVE_RSA_VERIFY \
 	   -DWOLFNANO_ALLOW_MALLOC -DWOLFNANO_TARGET_PORTABLE_C \
-	   $(CONN_CERT_SRC) $(WC)/rsa.c examples/client_https.c \
+	   $(CONN_CERT_SRC) $(WC)/rsa.c $(X509_BACKEND_SRC) examples/client_https.c \
 	   -o $(BUILD)/example_client_https
 	@echo "built $(BUILD)/example_client_https"
 
