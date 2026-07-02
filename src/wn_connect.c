@@ -39,8 +39,6 @@
 #ifdef WOLFNANO_SEND_ALERTS
 #include "wn_alert.h"
 #endif
-#include <wolfssl/wolfcrypt/asn_public.h>
-#include <wolfssl/wolfcrypt/asn.h>
 #include <wolfssl/wolfcrypt/ecc.h>
 #ifdef HAVE_ED25519
     #include <wolfssl/wolfcrypt/ed25519.h>
@@ -50,6 +48,15 @@
 #endif
 #ifdef WOLFSSL_HAVE_MLDSA
     #include <wolfssl/wolfcrypt/wc_mldsa.h>
+#endif
+#ifdef WOLFNANO_X509
+    /* X.509 backend: wolfSSL asn.c by default (full DecodedCert feature set);
+     * the smaller native wn_x509 parser under WOLFNANO_X509_LITE. */
+    #include "wn_x509.h"
+    #ifndef WOLFNANO_X509_LITE
+        #include <wolfssl/wolfcrypt/asn_public.h>
+        #include <wolfssl/wolfcrypt/asn.h>
+    #endif
 #endif
 
 #ifndef WOLFSSL_MISC_INCLUDED
@@ -630,13 +637,19 @@ static void wn_BuildCvTbs(byte* tbs, word32* tbsLen, const byte* th,
     *tbsLen = 98 + thLen;
 }
 
+#ifdef HAVE_ECC
 static int wn_CvEcdsa(const byte* spki, word32 spkiLen, int hashType,
                       int curveSize, const byte* tbs, word32 tbsLen,
                       const byte* sig, word32 sigLen)
 {
     ecc_key key;
     byte hash[WC_MAX_DIGEST_SIZE];
+#ifndef WOLFNANO_X509_LITE
     word32 idx = 0;
+#else
+    const byte* rawKey = NULL;
+    word32 rawKeyLen = 0;
+#endif
     int ret = WOLFNANO_SUCCESS;
     int res = 0, keyInit = 0, hashLen;
 
@@ -654,16 +667,20 @@ static int wn_CvEcdsa(const byte* spki, word32 spkiLen, int hashType,
         }
     }
     if (ret == WOLFNANO_SUCCESS) {
-        if (wc_EccPublicKeyDecode(spki, &idx, &key, spkiLen) != 0) {
+        /* RFC 8446 4.2.3: the ECDSA scheme binds the curve. Native imports the
+         * raw point (curve from the scheme); WOLFSSL_ASN decodes the SPKI. */
+#ifndef WOLFNANO_X509_LITE
+        if ((wc_EccPublicKeyDecode(spki, &idx, &key, spkiLen) != 0) ||
+            (key.dp == NULL) || (key.dp->size != curveSize)) {
             ret = WOLFNANO_E_BAD_CERT;
         }
-    }
-    if (ret == WOLFNANO_SUCCESS) {
-        /* RFC 8446 4.2.3: an ECDSA SignatureScheme binds the curve, so the
-         * leaf key must be on the curve the scheme names. */
-        if ((key.dp == NULL) || (key.dp->size != curveSize)) {
+#else
+        if ((wn_X509_SpkiRawKey(spki, spkiLen, &rawKey, &rawKeyLen) != 0) ||
+            (wc_ecc_import_x963_ex(rawKey, rawKeyLen, &key,
+                (curveSize == 48) ? ECC_SECP384R1 : ECC_SECP256R1) != 0)) {
             ret = WOLFNANO_E_BAD_CERT;
         }
+#endif
     }
     if (ret == WOLFNANO_SUCCESS) {
         if ((wc_ecc_verify_hash(sig, sigLen, hash, (word32)hashLen, &res,
@@ -677,13 +694,19 @@ static int wn_CvEcdsa(const byte* spki, word32 spkiLen, int hashType,
 
     return ret;
 }
+#endif /* HAVE_ECC */
 
 #ifdef HAVE_ED25519
 static int wn_CvEd25519(const byte* spki, word32 spkiLen, const byte* tbs,
                         word32 tbsLen, const byte* sig, word32 sigLen)
 {
     ed25519_key key;
+#ifndef WOLFNANO_X509_LITE
     word32 idx = 0;
+#else
+    const byte* rawKey = NULL;
+    word32 rawKeyLen = 0;
+#endif
     int ret = WOLFNANO_SUCCESS;
     int res = 0, keyInit = 0;
 
@@ -694,7 +717,9 @@ static int wn_CvEd25519(const byte* spki, word32 spkiLen, const byte* tbs,
         keyInit = 1;
     }
     if (ret == WOLFNANO_SUCCESS) {
-        /* DecodedCert yields the raw 32-byte Ed25519 key, not an SPKI. */
+        /* Native always gets the raw 32-byte key (import validates the length);
+         * WOLFSSL_ASN may pass the raw key or an SPKI. */
+#ifndef WOLFNANO_X509_LITE
         if (spkiLen == ED25519_PUB_KEY_SIZE) {
             if (wc_ed25519_import_public(spki, spkiLen, &key) != 0) {
                 ret = WOLFNANO_E_BAD_CERT;
@@ -703,6 +728,12 @@ static int wn_CvEd25519(const byte* spki, word32 spkiLen, const byte* tbs,
         else if (wc_Ed25519PublicKeyDecode(spki, &idx, &key, spkiLen) != 0) {
             ret = WOLFNANO_E_BAD_CERT;
         }
+#else
+        if ((wn_X509_SpkiRawKey(spki, spkiLen, &rawKey, &rawKeyLen) != 0) ||
+            (wc_ed25519_import_public(rawKey, rawKeyLen, &key) != 0)) {
+            ret = WOLFNANO_E_BAD_CERT;
+        }
+#endif
     }
     if (ret == WOLFNANO_SUCCESS) {
         if ((wc_ed25519_verify_msg(sig, sigLen, tbs, tbsLen, &res, &key) != 0)
@@ -726,7 +757,15 @@ static int wn_CvRsaPss(const byte* spki, word32 spkiLen, int hashType, int mgf,
     RsaKey key;
     byte hash[WC_MAX_DIGEST_SIZE];
     byte out[512];
+#ifndef WOLFNANO_X509_LITE
     word32 idx = 0;
+#else
+    const byte* rawKey = NULL;
+    word32 rawKeyLen = 0;
+    const byte* n = NULL;
+    const byte* e = NULL;
+    word32 nLen = 0, eLen = 0;
+#endif
     int ret = WOLFNANO_SUCCESS;
     int keyInit = 0, hashLen;
 
@@ -744,9 +783,18 @@ static int wn_CvRsaPss(const byte* spki, word32 spkiLen, int hashType, int mgf,
         }
     }
     if (ret == WOLFNANO_SUCCESS) {
+        /* Native loads the raw n/e; WOLFSSL_ASN decodes the SPKI. */
+#ifndef WOLFNANO_X509_LITE
         if (wc_RsaPublicKeyDecode(spki, &idx, &key, spkiLen) != 0) {
             ret = WOLFNANO_E_BAD_CERT;
         }
+#else
+        if ((wn_X509_SpkiRawKey(spki, spkiLen, &rawKey, &rawKeyLen) != 0) ||
+            (wn_X509_RsaRawNE(rawKey, rawKeyLen, &n, &nLen, &e, &eLen) != 0) ||
+            (wc_RsaPublicKeyDecodeRaw(n, nLen, e, eLen, &key) != 0)) {
+            ret = WOLFNANO_E_BAD_CERT;
+        }
+#endif
     }
     if (ret == WOLFNANO_SUCCESS) {
         if (wc_RsaPSS_VerifyCheck((byte*)sig, sigLen, out, (word32)sizeof(out),
@@ -810,6 +858,34 @@ static int wn_CvMlDsa(const byte* spki, word32 spkiLen, const byte* tbs,
 #endif /* WOLFSSL_HAVE_MLDSA */
 
 /* Verify a TLS 1.3 server CertificateVerify over the transcript hash. */
+#ifdef WOLFNANO_X509_LITE
+/* Bind the peer-selected SignatureScheme to the leaf's parsed SPKI key type and
+ * curve. The native raw-key import (ECDSA/RSA/Ed25519) skips the SPKI
+ * AlgorithmIdentifier, so a raw-import scheme must match the declared key and
+ * fails closed on an unknown/unclassified algorithm. ML-DSA (and WOLFSSL_ASN)
+ * are not bound here: their decoders validate the full SPKI. */
+static int wn_SchemeKeyOk(word16 scheme, int leafKeyAlg, int leafCurve)
+{
+    int ok = 1;
+
+    if (scheme == 0x0403) {
+        ok = (leafKeyAlg == WN_X509_KEY_ECDSA) &&
+             (leafCurve == WN_X509_CURVE_P256);
+    }
+    else if (scheme == 0x0503) {
+        ok = (leafKeyAlg == WN_X509_KEY_ECDSA) &&
+             (leafCurve == WN_X509_CURVE_P384);
+    }
+    else if (scheme == 0x0807) {
+        ok = (leafKeyAlg == WN_X509_KEY_ED25519);
+    }
+    else if ((scheme == 0x0804) || (scheme == 0x0805) || (scheme == 0x0806)) {
+        ok = (leafKeyAlg == WN_X509_KEY_RSA);
+    }
+    return ok;
+}
+#endif /* WOLFNANO_X509_LITE */
+
 static int wn_CertVerify(word16 scheme, const byte* spki, word32 spkiLen,
                          const byte* th, word32 thLen, const byte* sig,
                          word32 sigLen)
@@ -817,15 +893,32 @@ static int wn_CertVerify(word16 scheme, const byte* spki, word32 spkiLen,
     byte tbs[64 + 33 + 1 + WC_MAX_DIGEST_SIZE];
     word32 tbsLen = 0;
     int ret = WOLFNANO_SUCCESS;
+#ifdef WOLFNANO_X509_LITE
+    int leafKeyAlg = WN_X509_KEY_UNKNOWN;
+    int leafCurve = WN_X509_CURVE_NONE;
+#endif
 
     wn_BuildCvTbs(tbs, &tbsLen, th, thLen);
+#ifdef WOLFNANO_X509_LITE
+    /* native path imports the raw key by TLS scheme; classify the leaf SPKI and
+     * reject if a raw-import scheme does not match its declared key type. */
+    (void)wn_X509_SpkiKeyInfo(spki, spkiLen, &leafKeyAlg, &leafCurve);
+    if (!wn_SchemeKeyOk(scheme, leafKeyAlg, leafCurve)) {
+        ret = WOLFNANO_E_BAD_CERT;
+    }
+#endif
 
     /* RFC 8446 4.4.3: accept only schemes wolfNanoTLS offered in the ClientHello
      * signature_algorithms (see wn_clienthello.c); reject anything else. */
-    if (scheme == 0x0403) {
+    if (ret != WOLFNANO_SUCCESS) {
+        ret = WOLFNANO_E_BAD_CERT;
+    }
+#ifdef HAVE_ECC
+    else if (scheme == 0x0403) {
         ret = wn_CvEcdsa(spki, spkiLen, WC_HASH_TYPE_SHA256, 32, tbs, tbsLen,
                          sig, sigLen);
     }
+#endif
 #if defined(HAVE_ECC384) && defined(WOLFSSL_SHA384)
     else if (scheme == 0x0503) {
         ret = wn_CvEcdsa(spki, spkiLen, WC_HASH_TYPE_SHA384, 48, tbs, tbsLen,
@@ -870,6 +963,7 @@ static int wn_CertVerify(word16 scheme, const byte* spki, word32 spkiLen,
 /* Exact public-key pin: the leaf key must equal the caller-provided bytes, in
  * the same encoding wolfNanoTLS parses (SubjectPublicKeyInfo DER for ECC/RSA, raw
  * key for Ed25519/ML-DSA). Obtain the pin from the target server's leaf. */
+#ifndef WOLFNANO_X509_LITE
 static int wn_CheckKeyPin(DecodedCert* leaf, const byte* pin, word32 pinLen)
 {
     int ret = WOLFNANO_E_BAD_CERT;
@@ -882,6 +976,33 @@ static int wn_CheckKeyPin(DecodedCert* leaf, const byte* pin, word32 pinLen)
 
     return ret;
 }
+#else
+static int wn_CheckKeyPin(const wn_X509Cert* leaf, const byte* pin,
+                          word32 pinLen)
+{
+    const byte* key = NULL;
+    word32 keyLen = 0;
+    int ret = WOLFNANO_E_BAD_CERT;
+
+    if (leaf != NULL) {
+        /* Match the stock pin encoding: SPKI for ECDSA, raw key otherwise. */
+        if (leaf->keyAlg == WN_X509_KEY_ECDSA) {
+            key = leaf->spki;
+            keyLen = leaf->spkiLen;
+        }
+        else {
+            key = leaf->pubKey;
+            keyLen = leaf->pubKeyLen;
+        }
+        if ((pin != NULL) && (pinLen > 0) && (pinLen == keyLen) &&
+            (ConstantCompare(key, pin, (int)pinLen) == 0)) {
+            ret = WOLFNANO_SUCCESS;
+        }
+    }
+
+    return ret;
+}
+#endif
 
 #ifdef WOLFNANO_X509_HOSTNAME
 static char wn_AsciiLower(char c)
@@ -933,6 +1054,7 @@ static int wn_DnsNameMatch(const char* pat, int patLen, const char* host,
 
 /* Validate serverName against the leaf SAN dNSName entries (RFC 6125), falling
  * back to subject CN only when the cert presents no SAN dNSName. */
+#ifndef WOLFNANO_X509_LITE
 static int wn_CheckServerName(DecodedCert* leaf, const char* host)
 {
     DNS_entry* e;
@@ -954,6 +1076,8 @@ static int wn_CheckServerName(DecodedCert* leaf, const char* host)
                 }
             }
         }
+        /* RFC 6125 6.4.4: fall back to CN only when the cert presents no
+         * dNSName SAN (an IP-only or empty SAN still permits CN matching). */
         if ((sawDns == 0) && (leaf->subjectCN != NULL) &&
             (wn_DnsNameMatch(leaf->subjectCN, leaf->subjectCNLen, host,
                              hostLen) == WOLFNANO_SUCCESS)) {
@@ -963,11 +1087,42 @@ static int wn_CheckServerName(DecodedCert* leaf, const char* host)
 
     return ret;
 }
+#else
+static int wn_CheckServerName(const wn_X509Cert* leaf, const char* host)
+{
+    int i;
+    int hostLen;
+    int ret = WOLFNANO_E_BAD_CERT;
+
+    if ((leaf == NULL) || (host == NULL)) {
+        ret = WOLFNANO_E_BAD_CERT;
+    }
+    else {
+        hostLen = (int)XSTRLEN(host);
+        for (i = 0; i < leaf->sanCount; i++) {
+            if (wn_DnsNameMatch(leaf->san[i].name, leaf->san[i].len, host,
+                                hostLen) == WOLFNANO_SUCCESS) {
+                ret = WOLFNANO_SUCCESS;
+            }
+        }
+        /* RFC 6125 6.4.4: fall back to CN only when the cert presents no
+         * dNSName SAN (an IP-only or empty SAN still permits CN matching). */
+        if ((leaf->sanCount == 0) && (leaf->subjectCN != NULL) &&
+            (wn_DnsNameMatch(leaf->subjectCN, leaf->subjectCNLen, host,
+                             hostLen) == WOLFNANO_SUCCESS)) {
+            ret = WOLFNANO_SUCCESS;
+        }
+    }
+
+    return ret;
+}
+#endif
 #endif /* WOLFNANO_X509_HOSTNAME */
 
-#ifndef NO_ASN_TIME
+#if !defined(NO_ASN_TIME) && !defined(WOLFNANO_X509_LITE)
 /* Reject a cert whose validity window does not contain `now` (RFC 5280 4.1.2.5).
- * `now` is caller-supplied (clock injection); 0 falls back to the wc_* clock. */
+ * `now` is caller-supplied (clock injection); 0 falls back to the wc_* clock.
+ * (Native path uses wn_X509_TimeValid instead.) */
 static int wn_CertTimeValid(const DecodedCert* cert, time_t now)
 {
     const byte* d;
@@ -1015,11 +1170,13 @@ static int wn_VerifyChain(const byte** certs, const word32* certLens, int n,
 #endif
                           )
 {
+#ifndef WOLFNANO_X509_LITE
     DecodedCert issuer;
     DecodedCert leaf;
     const byte* issuerDer;
     word32 issuerLen;
     int i;
+    int notAnchor;
     int ret = WOLFNANO_SUCCESS;
     int leafInit = 0;
 
@@ -1036,6 +1193,11 @@ static int wn_VerifyChain(const byte** certs, const word32* certLens, int n,
             issuerDer = anchor;
             issuerLen = anchorLen;
         }
+        /* CA/keyCertSign/time apply to presented intermediates only; the pinned
+         * anchor is trusted a priori even if the server re-sent it in the chain */
+        notAnchor = ((i + 1) < n) &&
+                    ((issuerLen != anchorLen) ||
+                     (ConstantCompare(issuerDer, anchor, (int)anchorLen) != 0));
         wc_InitDecodedCert(&issuer, issuerDer, issuerLen, NULL);
         if (wc_ParseCert(&issuer, CERT_TYPE, NO_VERIFY, NULL) != 0) {
             ret = WOLFNANO_E_BAD_CERT;
@@ -1045,30 +1207,32 @@ static int wn_VerifyChain(const byte** certs, const word32* certLens, int n,
                     issuer.publicKey, issuer.pubKeySize, issuer.keyOID) != 0) {
                 ret = WOLFNANO_E_BAD_CERT;
             }
-            if ((ret == WOLFNANO_SUCCESS) && ((i + 1) < n) &&
-                (issuer.isCA == 0)) {
+            if ((ret == WOLFNANO_SUCCESS) && notAnchor && (issuer.isCA == 0)) {
                 ret = WOLFNANO_E_BAD_CERT;   /* presented intermediate must be a CA */
             }
+            if ((ret == WOLFNANO_SUCCESS) && notAnchor &&
+                (issuer.extKeyUsageSet != 0) &&
+                ((issuer.extKeyUsage & KEYUSE_KEY_CERT_SIGN) == 0)) {
+                ret = WOLFNANO_E_BAD_CERT;   /* intermediate must allow keyCertSign */
+            }
 #ifndef NO_ASN_TIME
-            /* time-check presented intermediates, but never the pinned anchor,
-             * even if the server redundantly included it in the chain. */
-            if ((ret == WOLFNANO_SUCCESS) && ((i + 1) < n) &&
-                ((issuerLen != anchorLen) ||
-                 (ConstantCompare(issuerDer, anchor, (int)anchorLen) != 0))) {
+            if ((ret == WOLFNANO_SUCCESS) && notAnchor) {
                 ret = wn_CertTimeValid(&issuer, now);
             }
 #endif
-            wc_FreeDecodedCert(&issuer);
         }
+        /* wc_ParseCert may retain heap state (altNames/subjectCN/publicKey)
+         * before it fails, so release it always, not only on the success path. */
+        wc_FreeDecodedCert(&issuer);
     }
 
     if (ret == WOLFNANO_SUCCESS) {
         wc_InitDecodedCert(&leaf, certs[0], certLens[0], NULL);
+        leafInit = 1;                 /* always release; parse may retain heap state then fail */
         if (wc_ParseCert(&leaf, CERT_TYPE, NO_VERIFY, NULL) != 0) {
             ret = WOLFNANO_E_BAD_CERT;
         }
         else {
-            leafInit = 1;
             if (leaf.pubKeySize > *spkiLen) {
                 ret = WOLFNANO_E_CRYPTO;
             }
@@ -1106,6 +1270,106 @@ static int wn_VerifyChain(const byte** certs, const word32* certLens, int n,
     }
 
     return ret;
+#else /* native wn_x509 */
+    wn_X509Cert child;
+    wn_X509Cert issuer;
+    const byte* issuerDer;
+    word32 issuerLen;
+    int i;
+    int notAnchor;
+    int ret = WOLFNANO_SUCCESS;
+
+    if (n < 1) {
+        ret = WOLFNANO_E_INVALID_ARG;
+    }
+
+    for (i = 0; (i < n) && (ret == WOLFNANO_SUCCESS); i++) {
+        if ((i + 1) < n) {
+            issuerDer = certs[i + 1];
+            issuerLen = certLens[i + 1];
+        }
+        else {
+            issuerDer = anchor;
+            issuerLen = anchorLen;
+        }
+        /* CA/keyCertSign/time apply to presented intermediates only; the pinned
+         * anchor is trusted a priori even if the server re-sent it in the chain */
+        notAnchor = ((i + 1) < n) &&
+                    ((issuerLen != anchorLen) ||
+                     (ConstantCompare(issuerDer, anchor, (int)anchorLen) != 0));
+        if ((wn_X509_Parse(&child, certs[i], certLens[i]) != WOLFNANO_SUCCESS) ||
+            (wn_X509_Parse(&issuer, issuerDer, issuerLen) != WOLFNANO_SUCCESS)) {
+            ret = WOLFNANO_E_BAD_CERT;
+        }
+        if ((ret == WOLFNANO_SUCCESS) &&
+            (wn_X509_VerifySignedBy(&child, &issuer) != WOLFNANO_SUCCESS)) {
+            ret = WOLFNANO_E_BAD_CERT;
+        }
+        if ((ret == WOLFNANO_SUCCESS) && notAnchor &&
+            ((issuer.flags & WN_X509_F_CA) == 0)) {
+            ret = WOLFNANO_E_BAD_CERT;   /* presented intermediate must be a CA */
+        }
+        if ((ret == WOLFNANO_SUCCESS) && notAnchor &&
+            ((issuer.flags & WN_X509_F_KU_SET) != 0) &&
+            ((issuer.keyUsage & WN_X509_KU_KEY_CERT_SIGN) == 0)) {
+            ret = WOLFNANO_E_BAD_CERT;   /* intermediate must allow keyCertSign */
+        }
+#ifndef NO_ASN_TIME
+        if ((ret == WOLFNANO_SUCCESS) && notAnchor) {
+            ret = wn_X509_TimeValid(&issuer, now);
+            if (ret == WOLFNANO_E_X509_DECODE) {
+                ret = WOLFNANO_E_BAD_CERT;  /* a bad date is a cert failure */
+            }
+        }
+#endif
+    }
+
+    if (ret == WOLFNANO_SUCCESS) {
+        if (wn_X509_Parse(&child, certs[0], certLens[0]) != WOLFNANO_SUCCESS) {
+            ret = WOLFNANO_E_BAD_CERT;
+        }
+        else {
+            /* leaf SPKI for CertificateVerify (wn_Cv* extract the raw key) */
+            if (child.spkiLen > *spkiLen) {
+                ret = WOLFNANO_E_CRYPTO;
+            }
+            else {
+                XMEMCPY(spki, child.spki, child.spkiLen);
+                *spkiLen = child.spkiLen;
+            }
+            if ((ret == WOLFNANO_SUCCESS) &&
+                ((child.flags & WN_X509_F_KU_SET) != 0) &&
+                ((child.keyUsage & WN_X509_KU_DIGITAL_SIG) == 0)) {
+                ret = WOLFNANO_E_BAD_CERT;   /* leaf must allow digitalSignature */
+            }
+            if ((ret == WOLFNANO_SUCCESS) &&
+                ((child.flags & WN_X509_F_EKU_SET) != 0) &&
+                ((child.extKeyUsage & WN_X509_EKU_SERVER_AUTH) == 0)) {
+                ret = WOLFNANO_E_BAD_CERT;   /* leaf EKU must allow serverAuth */
+            }
+            if ((ret == WOLFNANO_SUCCESS) && (pinnedKey != NULL)) {
+                ret = wn_CheckKeyPin(&child, pinnedKey, pinnedKeyLen);
+            }
+            if ((ret == WOLFNANO_SUCCESS) && (serverName != NULL)) {
+#ifdef WOLFNANO_X509_HOSTNAME
+                ret = wn_CheckServerName(&child, serverName);
+#else
+                ret = WOLFNANO_E_UNSUPPORTED;
+#endif
+            }
+#ifndef NO_ASN_TIME
+            if (ret == WOLFNANO_SUCCESS) {
+                ret = wn_X509_TimeValid(&child, now);
+                if (ret == WOLFNANO_E_X509_DECODE) {
+                    ret = WOLFNANO_E_BAD_CERT;  /* a bad date is a cert failure */
+                }
+            }
+#endif
+        }
+    }
+
+    return ret;
+#endif /* !WOLFNANO_X509_LITE */
 }
 
 static int wn_connect_cert_impl(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
@@ -1311,8 +1575,9 @@ static int wn_connect_cert_impl(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
                     (void)wn_Read_Bytes(&hr, extl);
                 }
                 spkiLen = WN_LEAF_SPKI_SZ;
-                if ((ret == WOLFNANO_SUCCESS) && (hr.err != 0)) {
-                    ret = WOLFNANO_E_DECODE;
+                if ((ret == WOLFNANO_SUCCESS) &&
+                    ((hr.err != 0) || (hr.pos != listEnd))) {
+                    ret = WOLFNANO_E_DECODE; /* malformed, or chain > WN_MAX_CHAIN */
                 }
                 if (ret == WOLFNANO_SUCCESS) {
 #ifndef NO_ASN_TIME

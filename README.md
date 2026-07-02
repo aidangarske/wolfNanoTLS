@@ -33,8 +33,9 @@ interop stays identical to wolfSSL.
   entirely on caller-provided / static buffers (`WOLFSSL_NO_MALLOC`), verified
   with a malloc trap. Nothing on the heap.
 - **Tiny footprint**: a complete Cortex-M33 TLS 1.3 PSK + ECDHE client is
-  **17.6 KB** of `.text` (X25519) or **25.2 KB** (P-256); the cert / X.509
-  client is **60.8 KB**, and the slim shell itself is **~8.7 KB**; see
+  **18.2 KB** of `.text` (X25519) or **26.0 KB** (P-256); the cert / X.509
+  client is as small as **53.1 KB** with the native `wn_x509` parser
+  (`WOLFNANO_X509_LITE`), and the slim shell itself is **~8.7 KB**; see
   [Footprint](https://github.com/aidangarske/wolfNanoTLS/wiki/Footprint).
 - **Full wolfSSL asm speed**: target assembly is linked unchanged from the
   submodule. On x86_64, AES-128-GCM hits **2.7 GB/s** and ECDSA P-256 sign
@@ -70,11 +71,17 @@ Whole TLS 1.3 client linked from source for Cortex-M33 (AES-128-GCM, SHA-256),
 
 | Client | wolfNanoTLS `.text` |
 |---|--:|
-| PSK + ECDHE, X25519 | **17.6 KB** |
-| PSK + ECDHE, P-256 | **25.2 KB** |
-| PSK + X25519MLKEM768 (post-quantum) | **32.9 KB** |
-| cert / X.509, P-256 | **60.8 KB** |
-| cert / X.509 + ML-DSA-44 (post-quantum) | **79.3 KB** |
+| PSK + ECDHE, X25519 | **18.2 KB** |
+| PSK + ECDHE, P-256 | **26.0 KB** |
+| PSK + X25519MLKEM768 (post-quantum) | **33.6 KB** |
+| cert / X.509, P-256 | **53.1 KB** |
+| cert / X.509 + ML-DSA-44 (post-quantum) | **67.8 KB** |
+
+The cert rows show the native `wn_x509` parser (`WOLFNANO_X509_LITE`, `make
+X509_LITE=1`). The **default** cert backend is wolfSSL's full `asn.c` (complete,
+proven; 62.4 KB / 79.8 KB); `WOLFNANO_X509_LITE` opts into the smaller native
+parser for ~15% less `.text`. See
+[Footprint](https://github.com/aidangarske/wolfNanoTLS/wiki/Footprint).
 
 At ~17 KB the PSK client fits Cortex-M0+/M3/M4 parts from ~32 KB flash. The
 default curve is **X25519** (smallest); set `WOLFNANO_HAVE_ECDHE_P256` (or

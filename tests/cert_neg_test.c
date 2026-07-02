@@ -30,6 +30,7 @@
 #include <wolfssl/wolfcrypt/settings.h>
 #include <wolfssl/wolfcrypt/ecc.h>
 #include <wolfssl/wolfcrypt/asn_public.h>
+#include <wolfssl/wolfcrypt/asn.h>   /* test uses DecodedCert for its own setup */
 #include <wolfssl/wolfcrypt/hash.h>
 #include <wolfssl/wolfcrypt/random.h>
 #ifndef NO_RSA
@@ -202,6 +203,17 @@ int main(void)
     vr = wn_CertVerify(0x0403, spki, (word32)spkiLen, th, sizeof(th), sig,
                      sigLen);
     check(vr != WOLFNANO_SUCCESS, "tampered ECDSA signature rejected");
+
+    /* SPKI algorithm must match the scheme: corrupt id-ecPublicKey so the leaf
+     * no longer declares an EC key, restore the valid signature, and confirm
+     * 0x0403 is rejected (native binds the SPKI algorithm; asn.c decode fails). */
+    sig[10] ^= 0x01;                    /* restore the valid signature */
+    check(spki[6] == 0x2A, "SPKI id-ecPublicKey OID at expected offset");
+    spki[6] = 0x2B;                     /* 1.2.840... -> unknown OID */
+    vr = wn_CertVerify(0x0403, spki, (word32)spkiLen, th, sizeof(th), sig,
+                     sigLen);
+    check(vr != WOLFNANO_SUCCESS, "CertVerify rejects SPKI algorithm != scheme");
+    spki[6] = 0x2A;                     /* restore */
 
 #if defined(HAVE_ECC384) && defined(WOLFSSL_SHA384)
     rc = wc_ecc_init(&ek384);
