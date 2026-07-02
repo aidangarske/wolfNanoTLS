@@ -41,6 +41,8 @@ const char* wn_ErrorToString(int err)
         case WOLFNANO_E_ILLEGAL_PARAM: s = "illegal parameter";        break;
         case WOLFNANO_E_BAD_CERT:      s = "certificate failure";      break;
         case WOLFNANO_E_CLOSED:        s = "connection closed";        break;
+        case WOLFNANO_E_X509_DECODE:   s = "malformed x509 certificate";break;
+        case WOLFNANO_E_X509_CRITEXT:  s = "unhandled critical extension";break;
         default:                       s = "unknown error";           break;
     }
 
