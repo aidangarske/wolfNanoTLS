@@ -37,7 +37,7 @@ selfsign(){
     check_result $? "$2 CSR"
     openssl x509 -req -in "$1.csr" -signkey "$1-key.pem" -set_serial "$3" \
         -not_before "$NOT_BEFORE" -not_after "$NOT_AFTER" \
-        -extfile "$CNF" -extensions v3_ca -out "$4-cert.pem"
+        -extfile "$CNF" -extensions v3_ca ${5:+-$5} -out "$4-cert.pem"
     check_result $? "$2 cert"
     openssl x509 -in "$4-cert.pem" -outform der -out "$4-cert.der"
     check_result $? "$2 der"
@@ -70,6 +70,10 @@ run_renewcerts(){
     selfsign server/ed    wolfNanoTLS-test 12 server/ed
     echo "Updating server/rsa-cert"
     selfsign server/rsa   wolfNanoTLS-test 13 server/rsa
+    echo "Updating server/p384-cert"
+    selfsign server/p384  wolfNanoTLS-test 14 server/p384 sha384
+    echo "Updating server/rsa4096-cert"
+    selfsign server/rsa4096 wolfNanoTLS-test 15 server/rsa4096
     echo "---------------------------------------------------------------------"
 
     ############################################################
