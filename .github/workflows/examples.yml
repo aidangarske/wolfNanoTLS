@@ -41,11 +41,11 @@ jobs:
       - name: build examples
         run: |
           set -eu
-          make example example-cert example-https
+          make example example-cert example-cert-lite example-cert-min example-https example-https-lite example-x509probe
           if [ -f wolfssl/wolfcrypt/src/wc_mlkem.c ]; then
-            make example-pqc
+            make example-pqc example-cert-pqc
           else
-            echo "::notice::pinned wolfSSL predates wc_mlkem; skipping example-pqc"
+            echo "::notice::pinned wolfSSL predates wc_mlkem; skipping example-pqc/example-cert-pqc"
           fi
       - name: run examples against wolfSSL server
         run: |

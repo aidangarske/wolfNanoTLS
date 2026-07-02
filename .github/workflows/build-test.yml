@@ -10,11 +10,15 @@ permissions:
   contents: read
 
 jobs:
+  # Parallel across arch (x86_64/arm64) AND suite (protocol / x509 / cert) so the
+  # cert/X.509 work runs on its own runners instead of serializing behind `make test`.
   test:
-    name: ${{ matrix.label }}
+    name: ${{ matrix.label }} ${{ matrix.suite }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm]
+        suite: [protocol, x509, cert]
         include:
           - { os: ubuntu-latest,    label: linux-x86_64 }
           - { os: ubuntu-24.04-arm, label: linux-arm64 }
@@ -27,17 +31,19 @@ jobs:
       - if: runner.os == 'Linux'
         uses: ./.github/actions/setup
       - uses: ./.github/actions/wolfssl-checkout
-      - name: make test (all self-test suites)
-        run: make test
-      - name: ML-DSA-65 CertificateVerify test (X509 + ML-DSA)
-        run: make certmldsatest
-      - name: X.509 negative auth test (chain + hostname + ECDSA CertificateVerify)
-        run: make certnegtest
-      - name: X.509 SPKI-pin-only tier (hostname compiled out)
-        run: make certnegpintest
-      - name: X.509 generated-PKI chain-constraint test (CA flag, keyUsage, EKU)
-        run: make certgentest
-      - name: X.509 clockless tier compiles (WOLFNANO_NO_X509_TIME)
-        run: make cert-notime-build
-      - name: configs-build (compile every starter template)
-        run: make configs-build
+      - name: protocol + crypto suites
+        if: matrix.suite == 'protocol'
+        run: make test-core mlkemtest mldsatest hybridtest mockhybridtest wctestpqc
+      - name: native wn_x509 parser + cert-verify unit tests
+        if: matrix.suite == 'x509'
+        run: make test-x509
+      - name: X.509 cert-path tests (both backends) + starter-config compiles
+        if: matrix.suite == 'cert'
+        run: |
+          set -eu
+          make test-cert                      # asn.c backend (default)
+          make test-cert X509_LITE=1          # native wn_x509 backend
+          make certmldsatest                  # ML-DSA-44 leaf, asn.c
+          make certmldsatest X509_LITE=1      # ML-DSA-44 leaf, native
+          make cert-notime-build              # clockless tier compiles
+          make configs-build                  # every starter template (incl cert_p256min)
