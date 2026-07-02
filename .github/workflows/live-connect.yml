@@ -1,10 +1,12 @@
 name: live-connect
 
-# Not run on pull_request: a live external endpoint must not gate PRs on a
-# transient network blip. Runs on main, on a daily schedule, and on demand.
+# Live TLS 1.3 against real public endpoints - runs on PRs too. Every fetch and
+# handshake retries up to 3x and unreachable hosts SKIP, so a transient network
+# blip can't gate a PR; only a reachable-but-broken core endpoint fails.
 on:
   push:
     branches: [main]
+  pull_request:
   schedule:
     - cron: '0 7 * * *'
   workflow_dispatch:
@@ -27,19 +29,55 @@ jobs:
         with:
           submodules: recursive
       - uses: ./.github/actions/wolfssl-checkout
-      - name: build live HTTPS client example
-        run: make example-https
+      - name: build live HTTPS clients (both X.509 backends)
+        run: make example-https example-https-lite
       - name: fetch trust anchor (ISRG Root X1)
         run: curl -fsSL --retry 3 "$ROOT_URL" -o isrgrootx1.der
-      - name: live TLS 1.3 GET (retry on transient network)
+      - name: live TLS 1.3 GET + full chain verify (asn.c and wn_x509 LITE)
         run: |
           set -e
-          for attempt in 1 2 3; do
-            echo "attempt $attempt -> $HOST"
-            if ./build/example_client_https "$HOST" isrgrootx1.der 443; then
-              exit 0
-            fi
-            sleep 5
+          for bin in example_client_https example_client_https_lite; do
+            ok=0
+            for attempt in 1 2 3; do
+              echo "$bin attempt $attempt -> $HOST"
+              if "./build/$bin" "$HOST" isrgrootx1.der 443; then ok=1; break; fi
+              sleep 5
+            done
+            [ "$ok" = 1 ] || { echo "$bin: live connect failed after 3 attempts"; exit 1; }
           done
-          echo "live connect failed after 3 attempts"
-          exit 1
+
+  probe:
+    # Exercise the wn_x509 parser on real-world certificate diversity: fetch and
+    # parse+link the chains of a spread of live public HTTPS sites (varied CAs,
+    # key types, chain depths). Surfaces any real-world cert the parser mishandles.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: ./.github/actions/wolfssl-checkout
+      - name: build the wn_x509 cert-chain probe
+        run: make example-x509probe
+      - name: parse live chains from a spread of public HTTPS sites
+        run: |
+          sh examples/x509-probe.sh \
+            cloudflare.com google.com github.com amazon.com microsoft.com \
+            apple.com wikipedia.org mozilla.org letsencrypt.org digicert.com \
+            ecc384.badssl.com rsa2048.badssl.com rsa4096.badssl.com
+
+  matrix:
+    # Full live TLS 1.3 handshakes (not just parse) across real public endpoints
+    # x X.509 backend x KEX - the thing that catches chain/CertVerify/hostname
+    # path failures. Core hosts gate; breadth hosts are warn-only (tracked gaps).
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: ./.github/actions/wolfssl-checkout
+      - name: build HTTPS clients (asn.c + wn_x509, classical + hybrid KEX)
+        run: make example-https example-https-lite example-https-pqc
+      - name: live handshake matrix
+        run: sh tests/live_matrix.sh
