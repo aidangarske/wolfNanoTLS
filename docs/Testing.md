@@ -68,6 +68,11 @@ for the `src` floor statically (independent of any runtime malloc trap).
 | `make alloctrap` | runtime proof: zero heap calls on the handshake path (`--wrap`) |
 | `make interop` | **live TLS 1.3 handshakes vs OpenSSL/wolfSSL: PSK (X25519+P-256) + cert** |
 | `make certtest` | X.509 cert chain-link verify (ECC + RSA) |
+| `make x509diff` | native `wn_x509` parse diffed field-for-field vs wolfSSL `wc_ParseCert` over 13 embedded certs |
+| `make x509verifytest` | `wn_X509_VerifySignedBy` + `wn_X509_TimeValid` (chain verify vs wolfSSL, tamper reject) |
+| `make x509negtest` | crafted adversarial certs (critical-unknown, inner!=outer, truncation) reject |
+| `make x509negvectest` | wolfSSL `certs/test/bad-*` malformed vectors, accept/reject parity |
+| cert tests `X509_LITE=1` | rebuild the cert suite on the native `wn_x509` backend (default is asn.c; both backends run in CI) |
 | `make fipsproof` | `WOLFNANO_CRYPTO=fips` seam proof vs a wolfSSL FIPS bundle (see FIPS.md) |
 | `make bench` | all-algo speed, portable C vs Intel asm (see Benchmarks.md) |
 | `make targets` | cross-compile the floor for every non-host arch (build check) |

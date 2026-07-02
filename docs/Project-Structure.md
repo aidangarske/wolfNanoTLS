@@ -18,6 +18,8 @@ wolfNanoTLS/
     wn_keyshare.c        X25519 / ECDHE key share
     wn_hybrid.c          X25519MLKEM768 hybrid key share
     wn_msg.c             wire encode/decode primitives
+    wn_x509.c            lightweight X.509 v3 parser + verify glue (opt-in size
+                         tier via WOLFNANO_X509_LITE; default backend is asn.c)
   tests/
     floor_test.c         crypto floor KAT self-test
     wn_host_seed.c       host entropy seed hook for the self-test

@@ -34,7 +34,7 @@ component first, then X25519 (draft-kwiatkowski-tls-ecdhe-mlkem).
 
 | Adder | Capability | Status |
 |---|---|---|
-| `WOLFNANO_X509` | parse cert + verify signature against issuer key | done |
+| `WOLFNANO_X509` | parse cert + verify signature against issuer key (wolfSSL `asn.c` by default; smaller native `wn_x509` via `WOLFNANO_X509_LITE`) | done |
 | `WOLFNANO_HAVE_RSA_VERIFY` | RSA-signed chains (up to RSA-4096 roots, e.g. ISRG Root X1) | done |
 | SNI `server_name` (RFC 6066) | sent in ClientHello for a named connect so virtual-host / CDN endpoints serve the right cert | done, live vs public HTTPS |
 | handshake Certificate / CertVerify | cert-based (non-PSK) handshake | done, live vs OpenSSL + wolfSSL |
