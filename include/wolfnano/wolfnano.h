@@ -44,6 +44,8 @@
 #define WOLFNANO_E_ILLEGAL_PARAM (-8)  /* bad group / version / param */
 #define WOLFNANO_E_BAD_CERT     (-9)   /* certificate / CertVerify failure */
 #define WOLFNANO_E_CLOSED       (-10)  /* peer sent close_notify */
+#define WOLFNANO_E_X509_DECODE  (-11)  /* malformed X.509 / DER (wn_x509) */
+#define WOLFNANO_E_X509_CRITEXT (-12)  /* unhandled critical extension */
 
 /* Transport callbacks: return bytes transferred, or < 0 on error. */
 typedef int (*wn_IoSend)(void* ctx, const byte* buf, word32 len);
