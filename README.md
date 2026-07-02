@@ -33,8 +33,9 @@ interop stays identical to wolfSSL.
   entirely on caller-provided / static buffers (`WOLFSSL_NO_MALLOC`), verified
   with a malloc trap. Nothing on the heap.
 - **Tiny footprint**: a complete Cortex-M33 TLS 1.3 PSK + ECDHE client is
-  **17.6 KB** of `.text` (X25519) or **25.2 KB** (P-256); the cert / X.509
-  client is **60.8 KB**, and the slim shell itself is **~8.7 KB**; see
+  **18.2 KB** of `.text` (X25519) or **26.0 KB** (P-256); the cert / X.509
+  client is as small as **53.1 KB** with the native `wn_x509` parser
+  (`WOLFNANO_X509_LITE`), and the slim shell itself is **~8.7 KB**; see
   [Footprint](https://github.com/aidangarske/wolfNanoTLS/wiki/Footprint).
 - **Full wolfSSL asm speed**: target assembly is linked unchanged from the
   submodule. On x86_64, AES-128-GCM hits **2.7 GB/s** and ECDSA P-256 sign
@@ -68,13 +69,21 @@ so a `fips` build never advertises a primitive outside its boundary.
 Whole TLS 1.3 client linked from source for Cortex-M33 (AES-128-GCM, SHA-256),
 `arm-none-eabi-gcc -Os -flto --gc-sections` + nano specs (ArmGNU 14.2). `.text`:
 
-| Client | wolfNanoTLS `.text` |
-|---|--:|
-| PSK + ECDHE, X25519 | **17.6 KB** |
-| PSK + ECDHE, P-256 | **25.2 KB** |
-| PSK + X25519MLKEM768 (post-quantum) | **32.9 KB** |
-| cert / X.509, P-256 | **60.8 KB** |
-| cert / X.509 + ML-DSA-44 (post-quantum) | **79.3 KB** |
+| Client profile | wolfNanoTLS `.text` | Public HTTPS? |
+|---|--:|:--|
+| PSK + ECDHE, X25519 | **18.2 KB** | no — no certificates |
+| PSK + ECDHE, P-256 | **26.0 KB** | no — no certificates |
+| PSK + X25519MLKEM768 (post-quantum) | **33.6 KB** | no — no certificates |
+| cert / X.509, P-256 min | **35.6 KB** | private PKI only |
+| cert / X.509, P-256 | **53.0 KB** | **yes — full public chains** |
+| cert / X.509 + ML-DSA-44 | **67.5 KB** | **yes** + PQC auth |
+| cert / X.509 + X25519MLKEM768 | **74.3 KB** | **yes** + PQC key exchange |
+
+**PSK** rows have no certificates (private shared-key peers); **public HTTPS needs
+a cert row**. The **35.6 KB min** tier is P-256/SHA-256-only (private PKI / pinned
+P-256), not a general-web client; **53.0 KB** validates full public chains. Tiers,
+backends, and reproduction:
+[Footprint](https://github.com/aidangarske/wolfNanoTLS/wiki/Footprint).
 
 At ~17 KB the PSK client fits Cortex-M0+/M3/M4 parts from ~32 KB flash. The
 default curve is **X25519** (smallest); set `WOLFNANO_HAVE_ECDHE_P256` (or
