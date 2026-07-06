@@ -25,6 +25,6 @@ jobs:
             cc -std=gnu89 -Wall -Wextra -Wdeclaration-after-statement -Werror -fsyntax-only \
               -DWOLFSSL_USER_SETTINGS -DWOLFNANO_TARGET_PORTABLE_C \
               -DWOLFNANO_X509 -DWOLFNANO_HAVE_RSA_VERIFY -DWOLFNANO_MLKEM \
-              -DWOLFNANO_MLDSA -DWOLFNANO_ALLOW_MALLOC \
+              -DWOLFNANO_MLDSA \
               -I. -Iwolfssl -Iinclude/wolfnano -Isrc "$f"
           done

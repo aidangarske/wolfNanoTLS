@@ -66,7 +66,7 @@ A head-to-head against mbedTLS and stock wolfSSL (speed and size) is in
 ## Method
 
 - Each op runs in a time-bounded loop (~0.3s) and reports MB/s (bulk) or ops/s.
-- The bench links `-DWOLFNANO_ALLOW_MALLOC` (a measurement tool, not the
-  no-alloc product) so ML-DSA keygen/sign and RSA keygen can run in-process.
+- The bench uses the default heap build (a measurement tool, not a no-alloc
+  target) so ML-DSA keygen/sign and RSA keygen can run in-process.
 - Run it: `make bench`. Footprint comparison: `sh bench/footprint-min.sh`
   (see [Footprint](Footprint.md)).

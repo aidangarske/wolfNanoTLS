@@ -13,17 +13,22 @@ jobs:
   # Parallel across arch (x86_64/arm64) AND suite (protocol / x509 / cert) so the
   # cert/X.509 work runs on its own runners instead of serializing behind `make test`.
   test:
-    name: ${{ matrix.label }} ${{ matrix.suite }}
+    name: ${{ matrix.label }} ${{ matrix.suite }} ${{ matrix.mem }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, ubuntu-24.04-arm]
         suite: [protocol, x509, cert]
+        mem: [default, smallstack]
         include:
           - { os: ubuntu-latest,    label: linux-x86_64 }
           - { os: ubuntu-24.04-arm, label: linux-arm64 }
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
+    env:
+      # blank for default; 'MEM=smallstack' otherwise (space avoids the GHA
+      # empty-string-is-falsy ternary pitfall).
+      MEMARG: ${{ matrix.mem == 'default' && ' ' || format('MEM={0}', matrix.mem) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,17 +38,17 @@ jobs:
       - uses: ./.github/actions/wolfssl-checkout
       - name: protocol + crypto suites
         if: matrix.suite == 'protocol'
-        run: make test-core mlkemtest mldsatest hybridtest mockhybridtest wctestpqc
+        run: make test-core mlkemtest mldsatest hybridtest mockhybridtest wctestpqc $MEMARG
       - name: native wn_x509 parser + cert-verify unit tests
         if: matrix.suite == 'x509'
-        run: make test-x509
+        run: make test-x509 $MEMARG
       - name: X.509 cert-path tests (both backends) + starter-config compiles
         if: matrix.suite == 'cert'
         run: |
           set -eu
-          make test-cert                      # asn.c backend (default)
-          make test-cert X509_LITE=1          # native wn_x509 backend
-          make certmldsatest                  # ML-DSA-44 leaf, asn.c
-          make certmldsatest X509_LITE=1      # ML-DSA-44 leaf, native
-          make cert-notime-build              # clockless tier compiles
+          make test-cert $MEMARG              # asn.c backend (default)
+          make test-cert X509_LITE=1 $MEMARG  # native wn_x509 backend
+          make certmldsatest $MEMARG          # ML-DSA-44 leaf, asn.c
+          make certmldsatest X509_LITE=1 $MEMARG  # ML-DSA-44 leaf, native
+          make cert-notime-build $MEMARG      # clockless tier compiles
           make configs-build                  # every starter template (incl cert_p256min)

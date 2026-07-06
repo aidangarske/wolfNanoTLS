@@ -60,7 +60,9 @@ static void verify_pair(const byte* child, word32 cl, const byte* ca,
 {
     static byte buf[4096];
     wn_X509Cert cWn, aWn;
-    DecodedCert aDc;
+#ifndef WOLFSSL_NO_MALLOC
+    DecodedCert aDc;                         /* asn.c reference: needs heap */
+#endif
     int tparse, tverify, parsedOk;
     char msg[112];
 
@@ -75,12 +77,14 @@ static void verify_pair(const byte* child, word32 cl, const byte* ca,
     snprintf(msg, sizeof(msg), "%s: child verified by issuer (wn_x509)", label);
     check(wn_X509_VerifySignedBy(&cWn, &aWn) == WOLFNANO_SUCCESS, msg);
 
+#ifndef WOLFSSL_NO_MALLOC
     wc_InitDecodedCert(&aDc, ca, al, NULL);
     wc_ParseCert(&aDc, CERT_TYPE, NO_VERIFY, NULL);
     snprintf(msg, sizeof(msg), "%s: wolfSSL CheckCertSignaturePubKey agrees", label);
     check(CheckCertSignaturePubKey(child, cl, NULL, aDc.publicKey,
               aDc.pubKeySize, aDc.keyOID) == 0, msg);
     wc_FreeDecodedCert(&aDc);
+#endif
 
     /* tamper a signature byte: the child must no longer verify (reject at
      * parse if the signature DER breaks, else at verification) */

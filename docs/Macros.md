@@ -85,8 +85,12 @@ toolchain). See [Benchmarks](Benchmarks.md).
 
 ## Build toggles
 
-- `MALLOC=1`: relax the true-no-allocator bar during bring-up
-  (`-DWOLFNANO_ALLOW_MALLOC`).
+- Memory model: default is plain wolfSSL (heap). Set wolfSSL's own macro to
+  change it - `WOLFSSL_SMALL_STACK` (embedded) or `WOLFSSL_NO_MALLOC` (zero
+  dynamic allocation). The `MEM` build convenience emits the `-D`:
+  `MEM=smallstack` / `MEM=nomalloc`. (`WOLFSSL_STATIC_MEMORY` pool support is a
+  planned follow-up - it needs a heap hint threaded through the shell, so it is
+  not yet a selectable model.)
 - `WOLFNANO_ASM=<arch>`: select the asm/speedup bundle (see above); default
   `none`. The target macro it sets (`WOLFNANO_TARGET_*`) drives
   `wolfnano_target.h`.

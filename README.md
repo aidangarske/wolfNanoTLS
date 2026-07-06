@@ -2,14 +2,15 @@
 
 <h1>wolfNanoTLS</h1>
 
-**A condensed, TLS 1.3-only, zero-allocation embedded TLS library, built as a
-thin shell on top of [wolfSSL](https://github.com/wolfSSL/wolfssl).**
+**A condensed, TLS 1.3-only embedded TLS library with a selectable
+zero-allocation mode, built as a thin shell on top of
+[wolfSSL](https://github.com/wolfSSL/wolfssl).**
 
 </div>
 
 ## Description and project goals
 
-wolfNanoTLS is a TLS 1.3 client library with no dynamic memory allocation,
+wolfNanoTLS is a TLS 1.3 client library with a selectable zero-allocation mode,
 built as a thin shell on top of wolfSSL for resource-constrained embedded
 systems. It consumes wolfSSL as a pinned git submodule and never modifies it,
 reaching crypto only through a small `wc_*` provider seam.
@@ -23,8 +24,9 @@ wolfSSL.
 - TLS 1.3 only (RFC 8446).
 - External PSK + ECDHE by default. X.509 server-certificate authentication is
   a compile-time adder.
-- No dynamic memory allocation. All state lives in caller-provided or static
-  buffers (`WOLFSSL_NO_MALLOC`).
+- Selectable memory model: plain wolfSSL heap (default), `WOLFSSL_SMALL_STACK`
+  (embedded), or true zero dynamic allocation (`WOLFSSL_NO_MALLOC`) proven by a
+  runtime allocation probe over the full handshake.
 - SNI and full CA chain plus hostname verification, so a named connect reaches
   public HTTPS endpoints.
 - Post-quantum ML-KEM-768, X25519MLKEM768 hybrid, and ML-DSA as
