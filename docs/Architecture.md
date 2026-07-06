@@ -13,7 +13,8 @@ The shell calls crypto only through a `wc_*` facade
 provider is chosen at compile time by `WOLFNANO_CRYPTO`:
 
 - `src` (default, GPLv3): a hand-picked list of `wolfcrypt/src/*.c` from the
-  submodule, built with `WOLFSSL_NO_MALLOC`. Smallest and deterministic.
+  submodule. Memory model is selectable (see below); the default is plain
+  wolfSSL heap.
 
 The seam is what lets the shell objects link against the crypto backend with
 zero shell source changes. Protect that invariant: the shell never calls a
@@ -67,12 +68,21 @@ runs the cert suite on both.
 
 There is no `WOLF_CRYPTO_CB` on the default path; it is a fallback adder only.
 
-## True zero allocation
+## Memory model
 
-The shell and the `src` floor use no allocator at all (not even a static pool):
-all state lives in caller-provided or static buffers. The floor is built with
-`WOLFSSL_NO_MALLOC` and verified to carry no `malloc`/`calloc`/`realloc`/`free`
-references. The zero-alloc guarantee holds for the whole shell and floor.
+The default follows wolfSSL's normal behavior (heap). The model is selected with
+wolfSSL's own macros (no wolfNano wrapper):
+
+- default: plain wolfSSL, malloc on. Supports the full `asn.c` X.509 path.
+- `WOLFSSL_SMALL_STACK`: big working buffers move to the heap, keeping stack
+  frames small (embedded). The native `wn_x509` parser is small-stack aware.
+- `WOLFSSL_NO_MALLOC`: true zero dynamic allocation - all state in
+  caller-provided or static buffers, no heap. Proven two ways: the PSK, hybrid,
+  and native-ECDSA-cert paths build and run under `WOLFSSL_NO_MALLOC` (allocation
+  is disabled, so any attempt fails), and a runtime `--wrap` allocation probe
+  additionally counts zero allocations over the crypto path and the full PSK
+  handshake. The native `wn_x509` ECDSA cert path is fully no-malloc; the `asn.c`
+  backend requires heap.
 
 ## Behavioral subset
 

@@ -1,4 +1,4 @@
-/* malloc_trap_test.c
+/* noalloc_probe_test.c
  *
  * Copyright (C) 2026 wolfSSL Inc.
  *
@@ -23,7 +23,7 @@
  * path (ECDHE, key schedule, transcript, AES-GCM record protect/unprotect) with
  * the malloc trap armed and assert it made zero heap allocations. Complements
  * the static nm/grep no-alloc checks with a dynamic one. No stdio runs while
- * the trap is armed. Built with the --wrap interposer in malloc_trap.c.
+ * the trap is armed. Built with the --wrap interposer in noalloc_probe.c.
  */
 
 #include "wn_keyshare.h"
@@ -33,8 +33,8 @@
 #include "wolfnano_crypto.h"
 #include <stdio.h>
 
-extern int wn_trap_armed;
-extern unsigned long wn_trap_hits;
+extern int wn_alloc_watch;
+extern unsigned long wn_alloc_count;
 
 int main(void)
 {
@@ -57,7 +57,7 @@ int main(void)
 
     printf("wolfNanoTLS runtime no-malloc trap (handshake crypto path)\n");
 
-    wn_trap_armed = 1;
+    wn_alloc_watch = 1;
 
     rc  = wc_InitRng(&rng);
     rc |= wn_KeyShare_Init(&cli, WN_GROUP_X25519);
@@ -93,17 +93,17 @@ int main(void)
     wn_KeyShare_Free(&srv);
     wc_FreeRng(&rng);
 
-    wn_trap_armed = 0;
+    wn_alloc_watch = 0;
 
     ok = (rc == WOLFNANO_SUCCESS) && (outLen == 4) && (type == 23) &&
          (XMEMCMP(out, ping, 4) == 0);
 
     printf("%s handshake crypto path succeeded\n", ok ? "\033[32mPASS\033[0m" : "\033[31mFAIL\033[0m");
     printf("%s zero heap allocations (%lu observed)\n",
-           (wn_trap_hits == 0) ? "\033[32mPASS\033[0m" : "\033[31mFAIL\033[0m",
-           wn_trap_hits);
+           (wn_alloc_count == 0) ? "\033[32mPASS\033[0m" : "\033[31mFAIL\033[0m",
+           wn_alloc_count);
 
-    printf("\n%s\n", (ok && (wn_trap_hits == 0)) ? "\033[32mALL PASS (0 failures)\033[0m"
+    printf("\n%s\n", (ok && (wn_alloc_count == 0)) ? "\033[32mALL PASS (0 failures)\033[0m"
                                                  : "\033[31mFAILED\033[0m");
-    return (ok && (wn_trap_hits == 0)) ? 0 : 1;
+    return (ok && (wn_alloc_count == 0)) ? 0 : 1;
 }

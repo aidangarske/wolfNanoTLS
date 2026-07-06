@@ -65,12 +65,28 @@ make example
 
 ## Memory model
 
-The default build is true no-allocator (`WOLFSSL_NO_MALLOC`). During bring-up
-you can relax it:
+The default is wolfSSL's normal behavior (heap). To pick a different model,
+define wolfSSL's own macro in your `user_settings.h` (there is no wolfNano
+wrapper):
+
+```c
+#define WOLFSSL_SMALL_STACK   /* big buffers on the heap, small stack (embedded) */
+/* or */
+#define WOLFSSL_NO_MALLOC     /* true zero dynamic allocation */
+```
+
+For an ad-hoc build without editing a config, pass the macro directly
+(`make test EXTRA_CFLAGS=-DWOLFSSL_SMALL_STACK`) or use the `MEM` convenience that
+emits the same `-D`. The full `make test` runs under the default heap and
+`MEM=smallstack` (both have heap); the no-malloc model runs the heap-free subset:
 
 ```sh
-make host MALLOC=1
+make test MEM=smallstack                 # embedded model, full suite
+make test-core MEM=nomalloc              # no-malloc: PSK/floor suites (asn.c cert + ML-DSA sign need heap)
+make noalloc-crypto noalloc-handshake    # runtime allocation probe over the full handshake
 ```
+
+See [Testing](Testing.md).
 
 ## Starter configurations
 

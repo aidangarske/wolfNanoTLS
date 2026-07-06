@@ -642,7 +642,12 @@ static int wn_CvEcdsa(const byte* spki, word32 spkiLen, int hashType,
                       int curveSize, const byte* tbs, word32 tbsLen,
                       const byte* sig, word32 sigLen)
 {
-    ecc_key key;
+#ifdef WOLFSSL_SMALL_STACK
+    ecc_key* key = (ecc_key*)XMALLOC(sizeof(ecc_key), NULL,
+                                     DYNAMIC_TYPE_TMP_BUFFER);
+#else
+    ecc_key key[1];
+#endif
     byte hash[WC_MAX_DIGEST_SIZE];
 #ifndef WOLFNANO_X509_LITE
     word32 idx = 0;
@@ -653,13 +658,19 @@ static int wn_CvEcdsa(const byte* spki, word32 spkiLen, int hashType,
     int ret = WOLFNANO_SUCCESS;
     int res = 0, keyInit = 0, hashLen;
 
+#ifdef WOLFSSL_SMALL_STACK
+    if (key == NULL) {
+        ret = WOLFNANO_E_CRYPTO;
+    }
+#endif
     hashLen = wc_HashGetDigestSize((enum wc_HashType)hashType);
-    if ((hashLen <= 0) || (wc_Hash((enum wc_HashType)hashType, tbs, tbsLen,
-            hash, (word32)hashLen) != 0)) {
+    if ((ret == WOLFNANO_SUCCESS) &&
+        ((hashLen <= 0) || (wc_Hash((enum wc_HashType)hashType, tbs, tbsLen,
+            hash, (word32)hashLen) != 0))) {
         ret = WOLFNANO_E_CRYPTO;
     }
     if (ret == WOLFNANO_SUCCESS) {
-        if (wc_ecc_init(&key) != 0) {
+        if (wc_ecc_init(key) != 0) {
             ret = WOLFNANO_E_CRYPTO;
         }
         else {
@@ -670,13 +681,13 @@ static int wn_CvEcdsa(const byte* spki, word32 spkiLen, int hashType,
         /* RFC 8446 4.2.3: the ECDSA scheme binds the curve. Native imports the
          * raw point (curve from the scheme); WOLFSSL_ASN decodes the SPKI. */
 #ifndef WOLFNANO_X509_LITE
-        if ((wc_EccPublicKeyDecode(spki, &idx, &key, spkiLen) != 0) ||
-            (key.dp == NULL) || (key.dp->size != curveSize)) {
+        if ((wc_EccPublicKeyDecode(spki, &idx, key, spkiLen) != 0) ||
+            (key->dp == NULL) || (key->dp->size != curveSize)) {
             ret = WOLFNANO_E_BAD_CERT;
         }
 #else
         if ((wn_X509_SpkiRawKey(spki, spkiLen, &rawKey, &rawKeyLen) != 0) ||
-            (wc_ecc_import_x963_ex(rawKey, rawKeyLen, &key,
+            (wc_ecc_import_x963_ex(rawKey, rawKeyLen, key,
                 (curveSize == 48) ? ECC_SECP384R1 : ECC_SECP256R1) != 0)) {
             ret = WOLFNANO_E_BAD_CERT;
         }
@@ -684,13 +695,16 @@ static int wn_CvEcdsa(const byte* spki, word32 spkiLen, int hashType,
     }
     if (ret == WOLFNANO_SUCCESS) {
         if ((wc_ecc_verify_hash(sig, sigLen, hash, (word32)hashLen, &res,
-                &key) != 0) || (res != 1)) {
+                key) != 0) || (res != 1)) {
             ret = WOLFNANO_E_BAD_CERT;
         }
     }
     if (keyInit) {
-        wc_ecc_free(&key);
+        wc_ecc_free(key);
     }
+#ifdef WOLFSSL_SMALL_STACK
+    XFREE(key, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+#endif
 
     return ret;
 }
@@ -700,7 +714,12 @@ static int wn_CvEcdsa(const byte* spki, word32 spkiLen, int hashType,
 static int wn_CvEd25519(const byte* spki, word32 spkiLen, const byte* tbs,
                         word32 tbsLen, const byte* sig, word32 sigLen)
 {
-    ed25519_key key;
+#ifdef WOLFSSL_SMALL_STACK
+    ed25519_key* key = (ed25519_key*)XMALLOC(sizeof(ed25519_key), NULL,
+                                             DYNAMIC_TYPE_TMP_BUFFER);
+#else
+    ed25519_key key[1];
+#endif
 #ifndef WOLFNANO_X509_LITE
     word32 idx = 0;
 #else
@@ -710,10 +729,15 @@ static int wn_CvEd25519(const byte* spki, word32 spkiLen, const byte* tbs,
     int ret = WOLFNANO_SUCCESS;
     int res = 0, keyInit = 0;
 
-    if (wc_ed25519_init(&key) != 0) {
+#ifdef WOLFSSL_SMALL_STACK
+    if (key == NULL) {
         ret = WOLFNANO_E_CRYPTO;
     }
-    else {
+#endif
+    if ((ret == WOLFNANO_SUCCESS) && (wc_ed25519_init(key) != 0)) {
+        ret = WOLFNANO_E_CRYPTO;
+    }
+    else if (ret == WOLFNANO_SUCCESS) {
         keyInit = 1;
     }
     if (ret == WOLFNANO_SUCCESS) {
@@ -721,29 +745,32 @@ static int wn_CvEd25519(const byte* spki, word32 spkiLen, const byte* tbs,
          * WOLFSSL_ASN may pass the raw key or an SPKI. */
 #ifndef WOLFNANO_X509_LITE
         if (spkiLen == ED25519_PUB_KEY_SIZE) {
-            if (wc_ed25519_import_public(spki, spkiLen, &key) != 0) {
+            if (wc_ed25519_import_public(spki, spkiLen, key) != 0) {
                 ret = WOLFNANO_E_BAD_CERT;
             }
         }
-        else if (wc_Ed25519PublicKeyDecode(spki, &idx, &key, spkiLen) != 0) {
+        else if (wc_Ed25519PublicKeyDecode(spki, &idx, key, spkiLen) != 0) {
             ret = WOLFNANO_E_BAD_CERT;
         }
 #else
         if ((wn_X509_SpkiRawKey(spki, spkiLen, &rawKey, &rawKeyLen) != 0) ||
-            (wc_ed25519_import_public(rawKey, rawKeyLen, &key) != 0)) {
+            (wc_ed25519_import_public(rawKey, rawKeyLen, key) != 0)) {
             ret = WOLFNANO_E_BAD_CERT;
         }
 #endif
     }
     if (ret == WOLFNANO_SUCCESS) {
-        if ((wc_ed25519_verify_msg(sig, sigLen, tbs, tbsLen, &res, &key) != 0)
+        if ((wc_ed25519_verify_msg(sig, sigLen, tbs, tbsLen, &res, key) != 0)
                 || (res != 1)) {
             ret = WOLFNANO_E_BAD_CERT;
         }
     }
     if (keyInit) {
-        wc_ed25519_free(&key);
+        wc_ed25519_free(key);
     }
+#ifdef WOLFSSL_SMALL_STACK
+    XFREE(key, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+#endif
 
     return ret;
 }
@@ -754,7 +781,12 @@ static int wn_CvRsaPss(const byte* spki, word32 spkiLen, int hashType, int mgf,
                        const byte* tbs, word32 tbsLen, const byte* sig,
                        word32 sigLen)
 {
-    RsaKey key;
+#ifdef WOLFSSL_SMALL_STACK
+    RsaKey* key = (RsaKey*)XMALLOC(sizeof(RsaKey), NULL,
+                                   DYNAMIC_TYPE_TMP_BUFFER);
+#else
+    RsaKey key[1];
+#endif
     byte hash[WC_MAX_DIGEST_SIZE];
     byte out[512];
 #ifndef WOLFNANO_X509_LITE
@@ -769,13 +801,19 @@ static int wn_CvRsaPss(const byte* spki, word32 spkiLen, int hashType, int mgf,
     int ret = WOLFNANO_SUCCESS;
     int keyInit = 0, hashLen;
 
+#ifdef WOLFSSL_SMALL_STACK
+    if (key == NULL) {
+        ret = WOLFNANO_E_CRYPTO;
+    }
+#endif
     hashLen = wc_HashGetDigestSize((enum wc_HashType)hashType);
-    if ((hashLen <= 0) || (wc_Hash((enum wc_HashType)hashType, tbs, tbsLen,
-            hash, (word32)hashLen) != 0)) {
+    if ((ret == WOLFNANO_SUCCESS) &&
+        ((hashLen <= 0) || (wc_Hash((enum wc_HashType)hashType, tbs, tbsLen,
+            hash, (word32)hashLen) != 0))) {
         ret = WOLFNANO_E_CRYPTO;
     }
     if (ret == WOLFNANO_SUCCESS) {
-        if (wc_InitRsaKey(&key, NULL) != 0) {
+        if (wc_InitRsaKey(key, NULL) != 0) {
             ret = WOLFNANO_E_CRYPTO;
         }
         else {
@@ -785,27 +823,30 @@ static int wn_CvRsaPss(const byte* spki, word32 spkiLen, int hashType, int mgf,
     if (ret == WOLFNANO_SUCCESS) {
         /* Native loads the raw n/e; WOLFSSL_ASN decodes the SPKI. */
 #ifndef WOLFNANO_X509_LITE
-        if (wc_RsaPublicKeyDecode(spki, &idx, &key, spkiLen) != 0) {
+        if (wc_RsaPublicKeyDecode(spki, &idx, key, spkiLen) != 0) {
             ret = WOLFNANO_E_BAD_CERT;
         }
 #else
         if ((wn_X509_SpkiRawKey(spki, spkiLen, &rawKey, &rawKeyLen) != 0) ||
             (wn_X509_RsaRawNE(rawKey, rawKeyLen, &n, &nLen, &e, &eLen) != 0) ||
-            (wc_RsaPublicKeyDecodeRaw(n, nLen, e, eLen, &key) != 0)) {
+            (wc_RsaPublicKeyDecodeRaw(n, nLen, e, eLen, key) != 0)) {
             ret = WOLFNANO_E_BAD_CERT;
         }
 #endif
     }
     if (ret == WOLFNANO_SUCCESS) {
         if (wc_RsaPSS_VerifyCheck((byte*)sig, sigLen, out, (word32)sizeof(out),
-                hash, (word32)hashLen, (enum wc_HashType)hashType, mgf, &key)
+                hash, (word32)hashLen, (enum wc_HashType)hashType, mgf, key)
                 < 0) {
             ret = WOLFNANO_E_BAD_CERT;
         }
     }
     if (keyInit) {
-        wc_FreeRsaKey(&key);
+        wc_FreeRsaKey(key);
     }
+#ifdef WOLFSSL_SMALL_STACK
+    XFREE(key, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+#endif
 
     return ret;
 }
@@ -822,36 +863,50 @@ static int wn_CvRsaPss(const byte* spki, word32 spkiLen, int hashType, int mgf,
 static int wn_CvMlDsa(const byte* spki, word32 spkiLen, const byte* tbs,
                       word32 tbsLen, const byte* sig, word32 sigLen)
 {
-    wc_MlDsaKey key;
+#ifdef WOLFSSL_SMALL_STACK
+    wc_MlDsaKey* key = (wc_MlDsaKey*)XMALLOC(sizeof(wc_MlDsaKey), NULL,
+                                             DYNAMIC_TYPE_TMP_BUFFER);
+#else
+    wc_MlDsaKey key[1];
+#endif
     word32 idx = 0;
     int ret = WOLFNANO_SUCCESS;
     int res = 0, keyInit = 0;
 
-    if (wc_MlDsaKey_Init(&key, NULL, INVALID_DEVID) != 0) {
+#ifdef WOLFSSL_SMALL_STACK
+    if (key == NULL) {
         ret = WOLFNANO_E_CRYPTO;
     }
-    else {
+#endif
+    if ((ret == WOLFNANO_SUCCESS) &&
+        (wc_MlDsaKey_Init(key, NULL, INVALID_DEVID) != 0)) {
+        ret = WOLFNANO_E_CRYPTO;
+    }
+    else if (ret == WOLFNANO_SUCCESS) {
         keyInit = 1;
     }
     if (ret == WOLFNANO_SUCCESS) {
-        if (wc_MlDsaKey_SetParams(&key, WN_MLDSA_PARAM) != 0) {
+        if (wc_MlDsaKey_SetParams(key, WN_MLDSA_PARAM) != 0) {
             ret = WOLFNANO_E_CRYPTO;
         }
     }
     if (ret == WOLFNANO_SUCCESS) {
-        if (wc_MlDsaKey_PublicKeyDecode(&key, spki, spkiLen, &idx) != 0) {
+        if (wc_MlDsaKey_PublicKeyDecode(key, spki, spkiLen, &idx) != 0) {
             ret = WOLFNANO_E_BAD_CERT;
         }
     }
     if (ret == WOLFNANO_SUCCESS) {
-        if ((wc_MlDsaKey_VerifyCtx(&key, sig, sigLen, NULL, 0, tbs, tbsLen,
+        if ((wc_MlDsaKey_VerifyCtx(key, sig, sigLen, NULL, 0, tbs, tbsLen,
                 &res) != 0) || (res != 1)) {
             ret = WOLFNANO_E_BAD_CERT;
         }
     }
     if (keyInit) {
-        wc_MlDsaKey_Free(&key);
+        wc_MlDsaKey_Free(key);
     }
+#ifdef WOLFSSL_SMALL_STACK
+    XFREE(key, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+#endif
 
     return ret;
 }

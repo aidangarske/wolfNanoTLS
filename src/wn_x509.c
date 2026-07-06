@@ -1133,7 +1133,12 @@ static int wn_CurveId(int curve)
 
 static int wn_VerifyEcdsa(const wn_X509Cert* child, const wn_X509Cert* issuer)
 {
-    ecc_key key;
+#ifdef WOLFSSL_SMALL_STACK
+    ecc_key* key = (ecc_key*)XMALLOC(sizeof(ecc_key), NULL,
+                                     DYNAMIC_TYPE_TMP_BUFFER);
+#else
+    ecc_key key[1];
+#endif
     byte    hash[WC_MAX_DIGEST_SIZE];
     int     ret = WOLFNANO_SUCCESS;
     int     hashType = wn_HashForSig(child->sigAlg);
@@ -1141,7 +1146,13 @@ static int wn_VerifyEcdsa(const wn_X509Cert* child, const wn_X509Cert* issuer)
     int     hashLen = wc_HashGetDigestSize((enum wc_HashType)hashType);
     int     res = 0, keyInit = 0;
 
-    if ((curveId == ECC_CURVE_INVALID) || (hashLen <= 0)) {
+#ifdef WOLFSSL_SMALL_STACK
+    if (key == NULL) {
+        ret = WOLFNANO_E_CRYPTO;
+    }
+#endif
+    if ((ret == WOLFNANO_SUCCESS) &&
+        ((curveId == ECC_CURVE_INVALID) || (hashLen <= 0))) {
         ret = WOLFNANO_E_BAD_CERT;
     }
     if ((ret == WOLFNANO_SUCCESS) &&
@@ -1149,26 +1160,29 @@ static int wn_VerifyEcdsa(const wn_X509Cert* child, const wn_X509Cert* issuer)
                  (word32)hashLen) != 0)) {
         ret = WOLFNANO_E_CRYPTO; /* LCOV_EXCL_LINE: wc_* init/hash cannot fail on validated input (FIPS/hw only) */
     }
-    if ((ret == WOLFNANO_SUCCESS) && (wc_ecc_init(&key) != 0)) {
+    if ((ret == WOLFNANO_SUCCESS) && (wc_ecc_init(key) != 0)) {
         ret = WOLFNANO_E_CRYPTO; /* LCOV_EXCL_LINE: wc_* init/hash cannot fail on validated input (FIPS/hw only) */
     }
     else if (ret == WOLFNANO_SUCCESS) {
         keyInit = 1;
     }
     if ((ret == WOLFNANO_SUCCESS) &&
-        (wc_ecc_import_x963_ex(issuer->pubKey, issuer->pubKeyLen, &key,
+        (wc_ecc_import_x963_ex(issuer->pubKey, issuer->pubKeyLen, key,
                                curveId) != 0)) {
         ret = WOLFNANO_E_BAD_CERT;
     }
     if (ret == WOLFNANO_SUCCESS) {
         if ((wc_ecc_verify_hash(child->sig, child->sigLen, hash,
-                (word32)hashLen, &res, &key) != 0) || (res != 1)) {
+                (word32)hashLen, &res, key) != 0) || (res != 1)) {
             ret = WOLFNANO_E_BAD_CERT;
         }
     }
     if (keyInit) {
-        wc_ecc_free(&key);
+        wc_ecc_free(key);
     }
+#ifdef WOLFSSL_SMALL_STACK
+    XFREE(key, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+#endif
     return ret;
 }
 #endif /* HAVE_ECC */
@@ -1228,7 +1242,12 @@ WOLFNANO_LOCAL int wn_X509_RsaRawNE(const byte* in, word32 inLen, const byte** n
 
 static int wn_VerifyRsa(const wn_X509Cert* child, const wn_X509Cert* issuer)
 {
-    RsaKey      key;
+#ifdef WOLFSSL_SMALL_STACK
+    RsaKey*     key = (RsaKey*)XMALLOC(sizeof(RsaKey), NULL,
+                                       DYNAMIC_TYPE_TMP_BUFFER);
+#else
+    RsaKey      key[1];
+#endif
     byte        hash[WC_MAX_DIGEST_SIZE];
     byte        encoded[128];               /* DigestInfo(hash): <= ~83 bytes */
     byte        decoded[512];               /* recovered block, up to RSA-4096 */
@@ -1242,7 +1261,12 @@ static int wn_VerifyRsa(const wn_X509Cert* child, const wn_X509Cert* issuer)
     int         hashOID = wc_HashGetOID((enum wc_HashType)hashType);
     int         keyInit = 0, verSz = 0;
 
-    if ((hashLen <= 0) || (hashOID <= 0)) {
+#ifdef WOLFSSL_SMALL_STACK
+    if (key == NULL) {
+        ret = WOLFNANO_E_CRYPTO;
+    }
+#endif
+    if ((ret == WOLFNANO_SUCCESS) && ((hashLen <= 0) || (hashOID <= 0))) {
         ret = WOLFNANO_E_BAD_CERT; /* LCOV_EXCL_LINE: unreachable; guarded earlier by wn_SigAlgMatchesKey */
     }
     if (ret == WOLFNANO_SUCCESS) {
@@ -1254,14 +1278,14 @@ static int wn_VerifyRsa(const wn_X509Cert* child, const wn_X509Cert* issuer)
                  (word32)hashLen) != 0)) {
         ret = WOLFNANO_E_CRYPTO; /* LCOV_EXCL_LINE: wc_* init/hash cannot fail on validated input (FIPS/hw only) */
     }
-    if ((ret == WOLFNANO_SUCCESS) && (wc_InitRsaKey(&key, NULL) != 0)) {
+    if ((ret == WOLFNANO_SUCCESS) && (wc_InitRsaKey(key, NULL) != 0)) {
         ret = WOLFNANO_E_CRYPTO; /* LCOV_EXCL_LINE: wc_* init/hash cannot fail on validated input (FIPS/hw only) */
     }
     else if (ret == WOLFNANO_SUCCESS) {
         keyInit = 1;
     }
     if ((ret == WOLFNANO_SUCCESS) &&
-        (wc_RsaPublicKeyDecodeRaw(n, nLen, e, eLen, &key) != 0)) {
+        (wc_RsaPublicKeyDecodeRaw(n, nLen, e, eLen, key) != 0)) {
         ret = WOLFNANO_E_BAD_CERT;
     }
     /* PKCS#1 v1.5: recover the block and compare to the expected DigestInfo
@@ -1269,15 +1293,18 @@ static int wn_VerifyRsa(const wn_X509Cert* child, const wn_X509Cert* issuer)
     if (ret == WOLFNANO_SUCCESS) {
         encSz = wc_EncodeSignature(encoded, hash, (word32)hashLen, hashOID);
         verSz = wc_RsaSSL_Verify(child->sig, child->sigLen, decoded,
-                                 (word32)sizeof(decoded), &key);
+                                 (word32)sizeof(decoded), key);
         if ((verSz < 0) || ((word32)verSz != encSz) ||
             !wn_MemEq(decoded, encoded, encSz)) {
             ret = WOLFNANO_E_BAD_CERT;
         }
     }
     if (keyInit) {
-        wc_FreeRsaKey(&key);
+        wc_FreeRsaKey(key);
     }
+#ifdef WOLFSSL_SMALL_STACK
+    XFREE(key, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+#endif
     return ret;
 }
 #endif /* !NO_RSA */
@@ -1285,30 +1312,43 @@ static int wn_VerifyRsa(const wn_X509Cert* child, const wn_X509Cert* issuer)
 #ifdef HAVE_ED25519
 static int wn_VerifyEd25519(const wn_X509Cert* child, const wn_X509Cert* issuer)
 {
-    ed25519_key key;
+#ifdef WOLFSSL_SMALL_STACK
+    ed25519_key* key = (ed25519_key*)XMALLOC(sizeof(ed25519_key), NULL,
+                                             DYNAMIC_TYPE_TMP_BUFFER);
+#else
+    ed25519_key key[1];
+#endif
     int ret = WOLFNANO_SUCCESS;
     int res = 0, keyInit = 0;
 
-    if (wc_ed25519_init(&key) != 0) {
+#ifdef WOLFSSL_SMALL_STACK
+    if (key == NULL) {
+        ret = WOLFNANO_E_CRYPTO;
+    }
+#endif
+    if ((ret == WOLFNANO_SUCCESS) && (wc_ed25519_init(key) != 0)) {
         ret = WOLFNANO_E_CRYPTO; /* LCOV_EXCL_LINE: wc_* init/hash cannot fail on validated input (FIPS/hw only) */
     }
-    else {
+    else if (ret == WOLFNANO_SUCCESS) {
         keyInit = 1;
     }
     if ((ret == WOLFNANO_SUCCESS) &&
-        (wc_ed25519_import_public(issuer->pubKey, issuer->pubKeyLen, &key)
+        (wc_ed25519_import_public(issuer->pubKey, issuer->pubKeyLen, key)
             != 0)) {
         ret = WOLFNANO_E_BAD_CERT;
     }
     if (ret == WOLFNANO_SUCCESS) {
         if ((wc_ed25519_verify_msg(child->sig, child->sigLen, child->tbs,
-                child->tbsLen, &res, &key) != 0) || (res != 1)) {
+                child->tbsLen, &res, key) != 0) || (res != 1)) {
             ret = WOLFNANO_E_BAD_CERT;
         }
     }
     if (keyInit) {
-        wc_ed25519_free(&key);
+        wc_ed25519_free(key);
     }
+#ifdef WOLFSSL_SMALL_STACK
+    XFREE(key, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+#endif
     return ret;
 }
 #endif /* HAVE_ED25519 */

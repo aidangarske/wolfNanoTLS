@@ -107,12 +107,8 @@
 extern int wn_seed(unsigned char* output, unsigned int sz);
 #endif
 
-/* ---- memory model: true no-allocator (wolfCOSE bar) ---- *
- * Pass -DWOLFNANO_ALLOW_MALLOC during bring-up to temporarily relax. */
-#ifndef WOLFNANO_ALLOW_MALLOC
-    #define WOLFSSL_NO_MALLOC
-    #define WOLFSSL_SP_NO_MALLOC
-#endif
+/* Memory model: plain wolfSSL (heap) by default; set WOLFSSL_SMALL_STACK or
+ * WOLFSSL_NO_MALLOC to change it (NO_MALLOC auto-adds WOLFSSL_SP_NO_MALLOC). */
 
 /* ---- X25519MLKEM768 hybrid key exchange: pulls in ML-KEM-768 + X25519 ---- */
 #ifdef WOLFNANO_HAVE_MLKEM_HYBRID

@@ -35,6 +35,9 @@
 #define HAVE_CURVE25519
 #define HAVE_ED25519
 
+/* Memory model: default is plain wolfSSL (heap). Define WOLFSSL_SMALL_STACK
+ * (embedded) or WOLFSSL_NO_MALLOC (zero dynamic allocation) to change it. */
+
 #include "wolfnano_target.h"   /* target → asm/SP bundle (one macro selects) */
 #include "wolfnano_config.h"   /* capability completion + standing size cuts */
 

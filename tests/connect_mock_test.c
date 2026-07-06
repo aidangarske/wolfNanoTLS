@@ -41,6 +41,11 @@
 #include <sys/socket.h>
 #include <sys/wait.h>
 
+#ifdef WN_ALLOC_WATCH
+extern int wn_alloc_watch;
+extern unsigned long wn_alloc_count;
+#endif
+
 static int fails = 0;
 
 static void check(int ok, const char* name)
@@ -459,6 +464,9 @@ static int drive_ex(int mode, int failAt, int wrapper)
 
     ioc.fd = sv[0]; ioc.failAt = failAt; ioc.n = 0;
     wc_InitRng(&rng);
+#ifdef WN_ALLOC_WATCH
+    wn_alloc_watch = 1;              /* count allocations across the handshake */
+#endif
     if (wrapper) {
         rc = wn_Connect_Psk(&rng, sock_send, sock_recv, &ioc, g_psk,
                             sizeof(g_psk), g_id, scratch, sizeof(scratch));
@@ -471,6 +479,9 @@ static int drive_ex(int mode, int failAt, int wrapper)
             g_failSessClean = 0;        /* failure left a non-clean session */
         }
     }
+#ifdef WN_ALLOC_WATCH
+    wn_alloc_watch = 0;
+#endif
     wc_FreeRng(&rng);
     close(sv[0]);
     waitpid(pid, &status, 0);
@@ -482,10 +493,27 @@ static int drive(int mode)
     return drive_ex(mode, 0, 0);
 }
 
+#ifndef WN_ALLOC_WATCH
 static char g_bigid[0x10001];                   /* 65536 chars > 0xFFFF identity */
+#endif
 
 int main(void)
 {
+#ifdef WN_ALLOC_WATCH
+    int rc;
+
+    signal(SIGPIPE, SIG_IGN);
+    rc = drive(0);
+    check(rc == WOLFNANO_SUCCESS, "PSK handshake completes (alloc trap)");
+    check(wn_alloc_count == 0, "zero heap allocations during full PSK handshake");
+    if (fails == 0) {
+        printf("connect_mock_test: all checks passed (alloc trap)\n");
+    }
+    else {
+        printf("connect_mock_test: %d FAILED\n", fails);
+    }
+    return fails == 0 ? 0 : 1;
+#else
     byte scratch[8];
     byte bscratch[2048];
     wn_Session bsess;
@@ -550,4 +578,5 @@ int main(void)
         printf("connect_mock_test: %d FAILED\n", fails);
     }
     return fails == 0 ? 0 : 1;
+#endif
 }

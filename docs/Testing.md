@@ -40,9 +40,11 @@ make host
 
 ## Zero-allocation check
 
-The floor is compiled to objects and inspected so no translation unit references
-`malloc`/`calloc`/`realloc`/`free`. This proves the true-no-allocator property
-for the `src` floor statically (independent of any runtime malloc trap).
+The product source is scanned so no translation unit references raw
+`malloc`/`calloc`/`realloc`/`free` (the portable `XMALLOC`/`XFREE` macros are
+allowed: they are `WOLFSSL_SMALL_STACK`-guarded and compiled out under
+`WOLFSSL_NO_MALLOC`). This is the static half; the runtime allocation probe
+below proves the no-malloc build allocates nothing.
 
 ## Shell test suites (`make test`)
 
@@ -65,7 +67,8 @@ for the `src` floor statically (independent of any runtime malloc trap).
 | `make flighttest` | adversarial encrypted-flight ordering gate (out-of-order/duplicate/unknown rejected) |
 | `make alerttest` | internal error to RFC 8446 6.2 alert-description mapping |
 | `make matrixtest` | data-driven negotiation matrix (cipher x group x PSK/cert) |
-| `make alloctrap` | runtime proof: zero heap calls on the handshake path (`--wrap`) |
+| `make noalloc-crypto` | runtime proof: zero heap allocations on the crypto path (`--wrap`, no-malloc) |
+| `make noalloc-handshake` | runtime proof: zero heap allocations over the full PSK handshake (`--wrap`, no-malloc) |
 | `make interop` | **live TLS 1.3 handshakes vs OpenSSL/wolfSSL: PSK (X25519+P-256) + cert** |
 | `make certtest` | X.509 cert chain-link verify (ECC + RSA) |
 | `make x509diff` | native `wn_x509` parse diffed field-for-field vs wolfSSL `wc_ParseCert` over 13 embedded certs |

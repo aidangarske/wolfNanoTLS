@@ -34,20 +34,20 @@ $CC -I"$(cfg minimal)" $WN_BASE $WN_SUP_PSK $WN_SHELL bench/min/wn_psk_client.c 
 WN_SUP_P256="$WC/wc_port.c $WC/memory.c $WC/error.c $WC/hash.c $WC/random.c $WC/wolfmath.c $WC/logging.c $WC/coding.c $WC/sha256.c $WC/hmac.c $WC/kdf.c $WC/aes.c $WC/ecc.c $WC/asn.c $WC/sp_int.c"
 $CC -I"$(cfg psk_p256)" $WN_BASE $WN_SUP_P256 $WN_SHELL bench/min/wn_psk_client.c $LINK -o "$OUT/wn_psk_p256.elf" 2>/dev/null
 # cert / X.509 P-256: wolfSSL asn.c (default) and native wn_x509 (WOLFNANO_X509_LITE)
-$CC -I"$(cfg cert)" -DWOLFNANO_ALLOW_MALLOC $WN_BASE \
+$CC -I"$(cfg cert)" $WN_BASE \
    $WN_SUP $WC/ecc.c $WC/asn.c $WC/rsa.c src/wn_clienthello.c $WN_SHELL \
    bench/min/wn_client.c $LINK -o "$OUT/wn_cert.elf" 2>/dev/null
-$CC -I"$(cfg cert)" -DWOLFNANO_X509_LITE -DWOLFNANO_ALLOW_MALLOC $WN_BASE \
+$CC -I"$(cfg cert)" -DWOLFNANO_X509_LITE $WN_BASE \
    $WN_SUP $WC/ecc.c $WC/asn.c $WC/rsa.c src/wn_x509.c src/wn_clienthello.c $WN_SHELL \
    bench/min/wn_client.c $LINK -o "$OUT/wn_cert_lite.elf" 2>/dev/null
 # cert / X.509 P-256 minimal (private PKI): single-curve P-256 + SHA-256 only, no
 # SHA-384/512, no P-384, no RSA, no Ed25519; drops rsa.c/sha512.c/ed25519.c.
 WN_SUP_P256MIN="$WC/wc_port.c $WC/memory.c $WC/error.c $WC/hash.c $WC/random.c $WC/wolfmath.c $WC/logging.c $WC/coding.c $WC/sha256.c $WC/hmac.c $WC/kdf.c $WC/aes.c $WC/curve25519.c $WC/fe_operations.c $WC/sp_int.c $WC/ecc.c $WC/asn.c"
-$CC -I"$(cfg cert_p256min)" -DWOLFNANO_X509_LITE -DWOLFNANO_ALLOW_MALLOC $WN_BASE \
+$CC -I"$(cfg cert_p256min)" -DWOLFNANO_X509_LITE $WN_BASE \
    $WN_SUP_P256MIN src/wn_x509.c src/wn_clienthello.c $WN_SHELL \
    bench/min/wn_client.c $LINK -o "$OUT/wn_cert_p256min.elf" 2>/dev/null
 # cert / X.509 + X25519MLKEM768 hybrid KEX (PQC key exchange + classical cert)
-$CC -I"$(cfg cert_pqc)" -DWOLFNANO_X509_LITE -DWOLFNANO_ALLOW_MALLOC $WN_BASE \
+$CC -I"$(cfg cert_pqc)" -DWOLFNANO_X509_LITE $WN_BASE \
    $WN_SUP $WC/sha3.c $WC/wc_mlkem.c $WC/wc_mlkem_poly.c \
    $WC/ecc.c $WC/asn.c $WC/rsa.c src/wn_x509.c src/wn_clienthello.c src/wn_hybrid.c $WN_SHELL \
    bench/min/wn_client.c $LINK -o "$OUT/wn_cert_pqc.elf" 2>/dev/null
@@ -64,11 +64,11 @@ WN_SUP_MLDSA="$WN_SUP $WC/ecc.c $WC/asn.c $WC/sha3.c $WC/wc_mldsa.c"
 WN_BASE_NOLTO="-Os -ffunction-sections -fdata-sections $ARCH -DWOLFSSL_USER_SETTINGS -DWOLFNANO_TARGET_PORTABLE_C -I. -Iwolfssl -Iinclude/wolfnano -Isrc"
 # ML-DSA-44 leaf: wolfSSL asn.c (default) and native wn_x509 (WOLFNANO_X509_LITE)
 # for the ECDSA chain + ML-DSA CertificateVerify.
-$CC -I"$(cfg cert_mldsa)" -DWOLFNANO_ALLOW_MALLOC $WN_BASE_NOLTO \
+$CC -I"$(cfg cert_mldsa)" $WN_BASE_NOLTO \
    $WN_SUP_MLDSA src/wn_clienthello.c $WN_SHELL \
    bench/min/wn_client.c -Wl,--gc-sections --specs=nano.specs --specs=nosys.specs \
    -o "$OUT/wn_cert_mldsa.elf" 2>/dev/null
-$CC -I"$(cfg cert_mldsa)" -DWOLFNANO_X509_LITE -DWOLFNANO_ALLOW_MALLOC $WN_BASE_NOLTO \
+$CC -I"$(cfg cert_mldsa)" -DWOLFNANO_X509_LITE $WN_BASE_NOLTO \
    $WN_SUP_MLDSA src/wn_x509.c src/wn_clienthello.c $WN_SHELL \
    bench/min/wn_client.c -Wl,--gc-sections --specs=nano.specs --specs=nosys.specs \
    -o "$OUT/wn_cert_mldsa_lite.elf" 2>/dev/null

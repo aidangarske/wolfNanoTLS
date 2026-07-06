@@ -19,8 +19,10 @@ jobs:
         with:
           submodules: recursive
       - uses: ./.github/actions/setup
-      - name: enforce wolfNanoTLS stack budget
+      - name: enforce stack budget (default, worst-case on-stack buffers)
         run: make stackcheck
+      - name: enforce stack budget (WOLFSSL_SMALL_STACK, buffers on heap)
+        run: make stackcheck MEM=smallstack
       - name: largest stack frames (informational)
         if: always()
         run: |
