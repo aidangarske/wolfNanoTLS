@@ -35,7 +35,7 @@ wolfSSL while `main` rides known-good master.
   Linux x86_64, Linux arm64, macOS x86_64, macOS arm64 (OS- and arch-agnostic).
 - `wolfssl-versions.yml` - the pinned/stable/master matrix.
 - `build-matrix.yml` - feature toggles (floor, +MLKEM, +MLDSA, +X509, +RSA,
-  +CHACHA, approved-FIPS) each build cleanly; off-state has no undefined refs.
+  +CHACHA) each build cleanly; off-state has no undefined refs.
 - `arch-build.yml` - host asm bench (none+intel); bare-metal cross-compile of
   the floor (thumb2/aarch64/armv7/riscv64); and a `qemu` job that **runs** the
   suites under qemu-user for arm/aarch64/riscv64 Linux cross-targets (real
@@ -64,9 +64,6 @@ wolfSSL while `main` rides known-good master.
 - `coverage.yml` - lcov of `make test`.
 - `stack-bounds.yml` - `-fstack-usage` report.
 - `coverity.yml` - Coverity Scan (token-gated; skips without `COVERITY_TOKEN`).
-
-### FIPS
-- `fips-seam.yml` - `make fipsproof` against the FIPS-Ready bundle.
 
 Footprint/speed comparison vs mbedTLS is run locally via
 `sh bench/footprint-clients.sh` / `make bench`, not as a CI workflow.

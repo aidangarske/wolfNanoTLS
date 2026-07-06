@@ -27,7 +27,6 @@ applies the standing size cuts).
 | `WOLFNANO_MLKEM` | ML-KEM-768 + X25519MLKEM768 hybrid | `WOLFSSL_HAVE_MLKEM` |
 | `WOLFNANO_MLDSA` | ML-DSA-65 verify (no-malloc) | `WOLFSSL_HAVE_MLDSA`, verify-only |
 | `WOLFNANO_MLDSA_SIGN` | adds ML-DSA keygen/sign (needs memory) | drops verify-only |
-| `WOLFNANO_FIPS` | approved-mode suites (ECDHE P-256 + AES-GCM only) | drops X25519/ChaCha/Ed25519 from offers |
 | `WOLFNANO_SEND_ALERTS` | emit a fatal TLS alert on handshake failure (off by default) | RFC 8446 6.2 alert codes |
 
 When a feature is off, the build has no undefined references for it.
@@ -40,14 +39,11 @@ single-curve per build to keep the footprint minimal.
 | Build flags | Negotiated group | PSK client `.text` | Use when |
 |---|---|---|---|
 | *(default)* | X25519 (0x001d) | **17.2 KB** | smallest build; X25519 is cryptographically strong (Curve25519) |
-| `WOLFNANO_HAVE_ECDHE_P256` | secp256r1 (0x0017) | **24.8 KB** | FIPS / CNSA, or maximum enterprise interop |
-| `WOLFNANO_FIPS` | secp256r1 only | 24.8 KB | approved-mode (also drops X25519/ChaCha/Ed25519 from offers) |
+| `WOLFNANO_HAVE_ECDHE_P256` | secp256r1 (0x0017) | **24.8 KB** | CNSA, or maximum enterprise interop |
 
-Both are interop-verified live against OpenSSL and wolfSSL. Note on FIPS:
-X25519 is **not** weaker than P-256 - it was simply standardized later (NIST
-SP 800-186, 2023), so FIPS 140-3 boundaries historically covered only the NIST
-prime curves. Default to X25519 for size; select P-256 when a validated module
-or broad interop requires it.
+Both are interop-verified live against OpenSSL and wolfSSL. X25519 is **not**
+weaker than P-256 - it was simply standardized later (NIST SP 800-186, 2023).
+Default to X25519 for size; select P-256 when broad interop requires it.
 
 ## Asm / speedup selection (`WOLFNANO_ASM=<arch>`)
 
@@ -73,7 +69,6 @@ toolchain). See [Benchmarks](Benchmarks.md).
 ## Backend selection
 
 - `WOLFNANO_CRYPTO=src` (default): submodule crypto, GPLv3.
-- `WOLFNANO_CRYPTO=fips`: customer-supplied FIPS bundle (see [FIPS](FIPS.md)).
 
 ## Build toggles
 

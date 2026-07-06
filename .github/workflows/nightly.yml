@@ -18,5 +18,3 @@ jobs:
     uses: ./.github/workflows/stack-bounds.yml
   semgrep:
     uses: ./.github/workflows/semgrep.yml
-  fips-seam:
-    uses: ./.github/workflows/fips-seam.yml
