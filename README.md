@@ -31,7 +31,7 @@ wolfSSL.
   compile-out-able adders.
 - Per-algorithm compile flags (`WOLFNANO_HAVE_*`). Off means no undefined
   references.
-- wolfssl direct assembly speedupds
+- wolfSSL direct assembly speedups
   (`WOLFNANO_ASM=intel|thumb2|aarch64|armv7|riscv64`).
 
 ## Supported algorithms
