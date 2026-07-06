@@ -1,4 +1,11 @@
-# wolfNanoTLS
+<div align="center">
+
+<h1>wolfNanoTLS</h1>
+
+**A condensed, TLS 1.3-only, zero-allocation embedded TLS library, built as a
+thin shell on top of [wolfSSL](https://github.com/wolfSSL/wolfssl).**
+
+</div>
 
 ## Description and project goals
 
@@ -7,13 +14,13 @@ built as a thin shell on top of wolfSSL for resource-constrained embedded
 systems. It consumes wolfSSL as a pinned git submodule and never modifies it,
 reaching crypto only through a small `wc_*` provider seam.
 
-wolfNanoTLS is a behavioral subset of wolfSSL. It never offers a primitive,
+wolfNanoTLS is a behavioral subset of wolfSSL so it never offers a primitive,
 group, suite, or extension that wolfSSL lacks, so interop stays identical to
 wolfSSL.
 
 ## Features supported
 
-- TLS 1.3 only (RFC 8446). No TLS 1.2 and no compatibility layer.
+- TLS 1.3 only (RFC 8446).
 - External PSK + ECDHE by default. X.509 server-certificate authentication is
   a compile-time adder.
 - No dynamic memory allocation. All state lives in caller-provided or static
@@ -24,19 +31,17 @@ wolfSSL.
   compile-out-able adders.
 - Per-algorithm compile flags (`WOLFNANO_HAVE_*`). Off means no undefined
   references.
-- Target assembly linked unchanged from wolfSSL
+- wolfSSL direct assembly speedups
   (`WOLFNANO_ASM=intel|thumb2|aarch64|armv7|riscv64`).
 
 ## Supported algorithms
 
-| Category | Algorithms |
-|---|---|
+| Category | Algorithms |                                                                                                                                    
+|---|---|                                                                                                                                                    
 | Key exchange | ECDHE P-256/P-384, X25519, ML-KEM-768, X25519MLKEM768 (hybrid) |
 | Signatures | ECDSA P-256/P-384, Ed25519, RSA-PSS (verify), ML-DSA (verify) |
 | AEAD | AES-128/256-GCM, ChaCha20-Poly1305 |
 | Hash / KDF | SHA-256, SHA-384, SHA3-256, HMAC, HKDF |
-
-The offered suite and group lists are a function of the active backend.
 
 ## Build
 
