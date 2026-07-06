@@ -20,8 +20,8 @@
 
 /**
  * Provider seam. The slim shell reaches crypto ONLY through this header, so the
- * same shell links against WOLFNANO_CRYPTO=src or =fips unchanged. Never call a
- * wolfSSL TLS/SSL API from the shell.
+ * shell stays independent of the crypto backend. Never call a wolfSSL TLS/SSL
+ * API from the shell.
  */
 
 #ifndef WOLFNANO_CRYPTO_H

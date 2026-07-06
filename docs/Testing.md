@@ -73,7 +73,6 @@ for the `src` floor statically (independent of any runtime malloc trap).
 | `make x509negtest` | crafted adversarial certs (critical-unknown, inner!=outer, truncation) reject |
 | `make x509negvectest` | wolfSSL `certs/test/bad-*` malformed vectors, accept/reject parity |
 | cert tests `X509_LITE=1` | rebuild the cert suite on the native `wn_x509` backend (default is asn.c; both backends run in CI) |
-| `make fipsproof` | `WOLFNANO_CRYPTO=fips` seam proof vs a wolfSSL FIPS bundle (see FIPS.md) |
 | `make bench` | all-algo speed, portable C vs Intel asm (see Benchmarks.md) |
 | `make targets` | cross-compile the floor for every non-host arch (build check) |
 | `make m33mu` | **run** the Thumb2 floor on an emulated Cortex-M33 (STM32H563) under m33mu: KATs, UART, `bkpt #0x7e` pass-gate |

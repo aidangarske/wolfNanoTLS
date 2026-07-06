@@ -11,4 +11,3 @@
 - [Benchmarks](Benchmarks.md)
 - [Footprint](Footprint.md)
 - [Comparison](Comparison.md)
-- [FIPS](FIPS.md)

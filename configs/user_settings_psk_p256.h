@@ -19,7 +19,7 @@
  */
 
 /* wolfNanoTLS client: TLS 1.3 PSK + ECDHE P-256, AES-128-GCM, SHA-256. P-256 is
- * the broad-interop / FIPS-approved curve. ~25 KB .text on Cortex-M33
+ * the broad-interop curve. ~25 KB .text on Cortex-M33
  * (docs/Footprint.md). Copy to your project as user_settings.h. */
 
 #ifndef WOLFNANO_USER_SETTINGS_H

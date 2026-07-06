@@ -21,8 +21,7 @@
 /**
  * TLS 1.3 ClientHello encoder (RFC 8446 section 4.1.2). Offers
  * TLS_AES_128_GCM_SHA256, the configured (EC)DHE group, and the signature
- * algorithms wolfNanoTLS supports. A WOLFNANO_FIPS build offers ECDHE P-256 and
- * drops the non-approved X25519 / Ed25519. Caller-provided output; no allocation.
+ * algorithms wolfNanoTLS supports. Caller-provided output; no allocation.
  */
 
 #ifndef WN_CLIENTHELLO_H

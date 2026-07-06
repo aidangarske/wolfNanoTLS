@@ -45,11 +45,6 @@ interop stays identical to wolfSSL.
   compile-out-able adders.
 - **Per-algorithm compile flags** (`WOLFNANO_HAVE_*`): every algorithm and
   feature is behind one switch; off means no undefined references.
-- **FIPS 140-3**: a `WOLFNANO_CRYPTO=fips` build runs all TLS 1.3 crypto through
-  the **validated wolfCrypt module** (verified against v5.2.4, Cert #4718:
-  in-core integrity self-test + CASTs pass through the seam). The TLS shell is
-  outside the boundary, so only the validated module does cryptography; see
-  [FIPS](https://github.com/aidangarske/wolfNanoTLS/wiki/FIPS).
 
 ## Supported Algorithms
 
@@ -62,7 +57,7 @@ interop stays identical to wolfSSL.
 **Hash / KDF:** `SHA-256, SHA-384, SHA3-256, HMAC, HKDF`
 
 The offered cipher-suite and group lists are a function of the active backend,
-so a `fips` build never advertises a primitive outside its boundary.
+so the offered lists always match what the backend supports.
 
 ## Footprint (Cortex-M33, measured)
 
@@ -85,9 +80,9 @@ validates a P-256/SHA-256 pinned chain (private PKI), not full public chains; th
 [Footprint](https://github.com/aidangarske/wolfNanoTLS/wiki/Footprint).
 
 At ~17 KB the PSK client fits Cortex-M0+/M3/M4 parts from ~32 KB flash. The
-default curve is **X25519** (smallest); set `WOLFNANO_HAVE_ECDHE_P256` (or
-`WOLFNANO_FIPS`) to negotiate **P-256** for FIPS / broad interop. Both are
-interop-verified against OpenSSL and wolfSSL.
+default curve is **X25519** (smallest); set `WOLFNANO_HAVE_ECDHE_P256` to
+negotiate **P-256** for broad interop. Both are interop-verified against
+OpenSSL and wolfSSL.
 
 Per-config sizes and reproduction steps are in
 [Footprint](https://github.com/aidangarske/wolfNanoTLS/wiki/Footprint).
@@ -121,7 +116,7 @@ then exchanges application data and closes cleanly via `wn_Send` / `wn_Recv` /
 `wn_Close` (post-handshake NewSessionTicket and KeyUpdate are handled
 transparently). The crypto floor is validated by RFC-vector KATs and wolfSSL's
 own crypto test, true no-allocation is verified, and side-channel hardening is
-on. PQC, X.509, and the FIPS 140-3 backend are wired and proven.
+on. PQC and X.509 are wired and proven.
 
 ## Usage
 
@@ -165,7 +160,6 @@ make bench       # all-algo speed table (portable C vs Intel asm)
 | `make interop` | Live handshake vs OpenSSL, wolfSSL, mbedTLS |
 | `make bench` | All-algo benchmark, `WOLFNANO_ASM=none` vs `=intel` |
 | `make targets` | Cross-compile the floor for every `WOLFNANO_ASM` arch |
-| `make fipsproof` | Build the shell against a wolfCrypt FIPS bundle |
 | `make clean` | Remove build artifacts |
 
 Pick the accelerated backend with `WOLFNANO_ASM=intel|thumb2|aarch64|armv7|riscv64`
@@ -203,7 +197,6 @@ Full documentation lives in the
 - [Footprint](https://github.com/aidangarske/wolfNanoTLS/wiki/Footprint)
 - [Benchmarks](https://github.com/aidangarske/wolfNanoTLS/wiki/Benchmarks)
 - [Comparison](https://github.com/aidangarske/wolfNanoTLS/wiki/Comparison)
-- [FIPS](https://github.com/aidangarske/wolfNanoTLS/wiki/FIPS)
 - [Testing](https://github.com/aidangarske/wolfNanoTLS/wiki/Testing)
 - [CI](https://github.com/aidangarske/wolfNanoTLS/wiki/CI)
 
@@ -211,7 +204,7 @@ Full documentation lives in the
 
 wolfNanoTLS is free software licensed under
 [GPLv3](https://www.gnu.org/licenses/gpl-3.0.html); see [LICENSING](LICENSING)
-and [COPYING](COPYING). The `fips` build path is not GPLv3-only.
+and [COPYING](COPYING).
 
 Copyright (C) 2006-2026 wolfSSL Inc.
 
