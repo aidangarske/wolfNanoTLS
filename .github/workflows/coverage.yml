@@ -20,9 +20,9 @@ jobs:
           submodules: recursive
       - uses: ./.github/actions/setup
       - run: sudo apt-get install -y lcov
-      - name: make test with coverage
+      - name: make test with coverage (default asn.c backend)
         run: make test EXTRA_CFLAGS="--coverage -O0"
-      - name: capture src/ line coverage
+      - name: capture default-backend coverage
         run: |
           lcov --capture --directory . --output-file cov.info \
             --rc lcov_branch_coverage=0 2>/dev/null || true
@@ -30,9 +30,23 @@ jobs:
             --output-file cov.info 2>/dev/null || true
       - name: enforce 100% on completed files (.github/ci/coverage-100.txt)
         run: sh scripts/check_coverage.sh cov.info .github/ci/coverage-100.txt
-      - name: report table to summary
+      # wn_x509.c only compiles under WOLFNANO_X509_LITE, so it needs its own pass.
+      # Captured separately (fresh .gcda) so it can't perturb the asn-backend gate.
+      - name: X509_LITE coverage pass (wn_x509.c)
+        run: |
+          find . -name '*.gcda' -delete
+          make test-x509 test-cert certmldsatest X509_LITE=1 EXTRA_CFLAGS="--coverage -O0"
+          lcov --capture --directory . --output-file cov-lite.info \
+            --rc lcov_branch_coverage=0 2>/dev/null || true
+          lcov --remove cov-lite.info '*/wolfssl/*' '/usr/*' '*/tests/*' \
+            --output-file cov-lite.info 2>/dev/null || true
+      - name: enforce 100% on wn_x509.c (.github/ci/coverage-100-lite.txt)
+        run: sh scripts/check_coverage.sh cov-lite.info .github/ci/coverage-100-lite.txt
+      - name: report tables to summary
         if: always()
         run: |
-          { echo '## Coverage (src/)'; echo '```';
+          { echo '## Coverage (default asn.c backend)'; echo '```';
             sh scripts/check_coverage.sh cov.info .github/ci/coverage-100.txt || true;
+            echo '```'; echo '## Coverage (X509_LITE: wn_x509.c)'; echo '```';
+            sh scripts/check_coverage.sh cov-lite.info .github/ci/coverage-100-lite.txt || true;
             echo '```'; } >> "$GITHUB_STEP_SUMMARY"

@@ -69,20 +69,19 @@ so a `fips` build never advertises a primitive outside its boundary.
 Whole TLS 1.3 client linked from source for Cortex-M33 (AES-128-GCM, SHA-256),
 `arm-none-eabi-gcc -Os -flto --gc-sections` + nano specs (ArmGNU 14.2). `.text`:
 
-| Client profile | wolfNanoTLS `.text` | Public HTTPS? |
-|---|--:|:--|
-| PSK + ECDHE, X25519 | **18.2 KB** | no — no certificates |
-| PSK + ECDHE, P-256 | **26.0 KB** | no — no certificates |
-| PSK + X25519MLKEM768 (post-quantum) | **33.6 KB** | no — no certificates |
-| cert / X.509, P-256 min | **35.6 KB** | private PKI only |
-| cert / X.509, P-256 | **53.0 KB** | **yes — full public chains** |
-| cert / X.509 + ML-DSA-44 | **67.5 KB** | **yes** + PQC auth |
-| cert / X.509 + X25519MLKEM768 | **74.3 KB** | **yes** + PQC key exchange |
+| Client profile | wolfNanoTLS `.text` |
+|---|--:|
+| PSK + ECDHE, X25519 | **18.2 KB** |
+| PSK + ECDHE, P-256 | **26.0 KB** |
+| PSK + X25519MLKEM768 | **33.6 KB** |
+| cert / X.509, P-256 min | **35.6 KB** |
+| cert / X.509, P-256 | **53.0 KB** |
+| cert / X.509 + ML-DSA-44 | **67.5 KB** |
+| cert / X.509 + X25519MLKEM768 | **74.3 KB** |
 
-**PSK** rows have no certificates (private shared-key peers); **public HTTPS needs
-a cert row**. The **35.6 KB min** tier is P-256/SHA-256-only (private PKI / pinned
-P-256), not a general-web client; **53.0 KB** validates full public chains. Tiers,
-backends, and reproduction:
+PSK rows have no certificates, so they cannot do public HTTPS. The P-256 min tier
+validates a P-256/SHA-256 pinned chain (private PKI), not full public chains; the
+53.0 KB P-256 tier does. Tiers, backends, and reproduction:
 [Footprint](https://github.com/aidangarske/wolfNanoTLS/wiki/Footprint).
 
 At ~17 KB the PSK client fits Cortex-M0+/M3/M4 parts from ~32 KB flash. The

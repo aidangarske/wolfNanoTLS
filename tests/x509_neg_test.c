@@ -67,6 +67,35 @@ static int wolfssl_rejects(const byte* der, word32 len)
     return rc != 0;
 }
 
+/* byte-flip sweep: returns count of tampers that still parse AND self-verify (want 0) */
+static int mutation_sweep(const byte* ca, word32 caLen)
+{
+    static byte b[8192];
+    static const byte muts[] = {0x00, 0xFF, 0x01, 0x30, 0x02};
+    wn_X509Cert c;
+    word32 i;
+    word32 mi;
+    int over = 0;
+
+    if (caLen > (word32)sizeof(b)) {
+        return -1;
+    }
+    for (i = 0; i < caLen; i++) {
+        for (mi = 0; mi < (word32)sizeof(muts); mi++) {
+            if (ca[i] == muts[mi]) {
+                continue;
+            }
+            XMEMCPY(b, ca, caLen);
+            b[i] = muts[mi];
+            if ((wn_X509_Parse(&c, b, caLen) == WOLFNANO_SUCCESS) &&
+                (wn_X509_VerifySignedBy(&c, &c) == WOLFNANO_SUCCESS)) {
+                over++;
+            }
+        }
+    }
+    return over;
+}
+
 int main(void)
 {
     static byte buf[4096];
@@ -146,6 +175,12 @@ int main(void)
     buf[caLen] = 0x00;
     check(wn_X509_Parse(&wn, buf, caLen + 1) == WOLFNANO_E_X509_DECODE,
           "trailing byte after Certificate SEQUENCE rejected");
+
+    /* ---- byte-mutation sweep over ECDSA + RSA self-signed CAs ---- */
+    check(mutation_sweep(ca, caLen) == 0,
+          "ECDSA CA sweep: every 1-byte tamper fails parse or verify");
+    check(mutation_sweep(ca_cert_der_2048, (word32)sizeof_ca_cert_der_2048) == 0,
+          "RSA CA sweep: every 1-byte tamper fails parse or verify");
 
     /* ---- basicConstraints explicit cA=FALSE rejected (DER omits DEFAULT) ---- */
     XMEMCPY(buf, ca, caLen);

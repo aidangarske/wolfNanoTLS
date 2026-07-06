@@ -1110,8 +1110,8 @@ static int wn_HashForSig(int sigAlg)
             h = WC_HASH_TYPE_SHA512;
             break;
 #endif
-        default:
-            break;                          /* Ed25519: signs the message */
+        default: /* LCOV_EXCL_LINE: unreachable; guarded earlier by wn_SigAlgMatchesKey */
+            break;                          /* Ed25519: signs the message */ /* LCOV_EXCL_LINE: unreachable; guarded earlier by wn_SigAlgMatchesKey */
     }
     return h;
 }
@@ -1147,10 +1147,10 @@ static int wn_VerifyEcdsa(const wn_X509Cert* child, const wn_X509Cert* issuer)
     if ((ret == WOLFNANO_SUCCESS) &&
         (wc_Hash((enum wc_HashType)hashType, child->tbs, child->tbsLen, hash,
                  (word32)hashLen) != 0)) {
-        ret = WOLFNANO_E_CRYPTO;
+        ret = WOLFNANO_E_CRYPTO; /* LCOV_EXCL_LINE: wc_* init/hash cannot fail on validated input (FIPS/hw only) */
     }
     if ((ret == WOLFNANO_SUCCESS) && (wc_ecc_init(&key) != 0)) {
-        ret = WOLFNANO_E_CRYPTO;
+        ret = WOLFNANO_E_CRYPTO; /* LCOV_EXCL_LINE: wc_* init/hash cannot fail on validated input (FIPS/hw only) */
     }
     else if (ret == WOLFNANO_SUCCESS) {
         keyInit = 1;
@@ -1243,7 +1243,7 @@ static int wn_VerifyRsa(const wn_X509Cert* child, const wn_X509Cert* issuer)
     int         keyInit = 0, verSz = 0;
 
     if ((hashLen <= 0) || (hashOID <= 0)) {
-        ret = WOLFNANO_E_BAD_CERT;
+        ret = WOLFNANO_E_BAD_CERT; /* LCOV_EXCL_LINE: unreachable; guarded earlier by wn_SigAlgMatchesKey */
     }
     if (ret == WOLFNANO_SUCCESS) {
         ret = wn_X509_RsaRawNE(issuer->pubKey, issuer->pubKeyLen, &n, &nLen,
@@ -1252,10 +1252,10 @@ static int wn_VerifyRsa(const wn_X509Cert* child, const wn_X509Cert* issuer)
     if ((ret == WOLFNANO_SUCCESS) &&
         (wc_Hash((enum wc_HashType)hashType, child->tbs, child->tbsLen, hash,
                  (word32)hashLen) != 0)) {
-        ret = WOLFNANO_E_CRYPTO;
+        ret = WOLFNANO_E_CRYPTO; /* LCOV_EXCL_LINE: wc_* init/hash cannot fail on validated input (FIPS/hw only) */
     }
     if ((ret == WOLFNANO_SUCCESS) && (wc_InitRsaKey(&key, NULL) != 0)) {
-        ret = WOLFNANO_E_CRYPTO;
+        ret = WOLFNANO_E_CRYPTO; /* LCOV_EXCL_LINE: wc_* init/hash cannot fail on validated input (FIPS/hw only) */
     }
     else if (ret == WOLFNANO_SUCCESS) {
         keyInit = 1;
@@ -1290,7 +1290,7 @@ static int wn_VerifyEd25519(const wn_X509Cert* child, const wn_X509Cert* issuer)
     int res = 0, keyInit = 0;
 
     if (wc_ed25519_init(&key) != 0) {
-        ret = WOLFNANO_E_CRYPTO;
+        ret = WOLFNANO_E_CRYPTO; /* LCOV_EXCL_LINE: wc_* init/hash cannot fail on validated input (FIPS/hw only) */
     }
     else {
         keyInit = 1;
@@ -1366,9 +1366,9 @@ int wn_X509_VerifySignedBy(const wn_X509Cert* child, const wn_X509Cert* issuer)
                 ret = wn_VerifyEd25519(child, issuer);
                 break;
 #endif
-            default:
-                ret = WOLFNANO_E_UNSUPPORTED;
-                break;
+            default: /* LCOV_EXCL_LINE: unreachable; guarded earlier by wn_SigAlgMatchesKey */
+                ret = WOLFNANO_E_UNSUPPORTED; /* LCOV_EXCL_LINE: unreachable; guarded earlier by wn_SigAlgMatchesKey */
+                break; /* LCOV_EXCL_LINE: unreachable; guarded earlier by wn_SigAlgMatchesKey */
         }
     }
     return ret;
