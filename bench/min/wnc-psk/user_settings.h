@@ -9,11 +9,10 @@
 
 #define WOLFCRYPT_ONLY
 
-#define WOLFNANO_HAVE_SHA256
-#define WOLFNANO_HAVE_HKDF
-#define WOLFNANO_HAVE_AESGCM
-#define WOLFNANO_HAVE_ECC
-#define WOLFNANO_HAVE_CURVE25519
+#define HAVE_HKDF
+#define HAVE_AESGCM
+#define HAVE_ECC
+#define HAVE_CURVE25519
 
 /* size knobs */
 #define GCM_SMALL

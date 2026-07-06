@@ -18,8 +18,9 @@ only through a thin `wc_*` provider seam.
   at all, only caller-provided or static buffers (the wolfCOSE bar).
 - **Provider seam** selected at build time:
   - `src` (default, GPLv3): selected `wolfcrypt/src/*.c` from the submodule.
-- **Per-feature compile flags** (`WOLFNANO_HAVE_*`). ML-KEM and ML-DSA are
-  compile-out-able adders.
+- **Per-feature compile flags**: crypto capabilities use wolfSSL's own macros,
+  wolfNano policy behind `WOLFNANO_*`. ML-KEM and ML-DSA are compile-out-able
+  adders.
 - **Clean-room provenance**: copy wolfSSL-family code verbatim, write everything
   else strictly from the RFC, never from third-party sources.
 

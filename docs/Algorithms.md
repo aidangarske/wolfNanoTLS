@@ -14,7 +14,7 @@ locally:
 | Signature | ECDSA P-256/P-384, Ed25519 |
 | RNG | Hash-DRBG, seeded via the `wn_seed` hook |
 
-ChaCha20-Poly1305 is available behind `WOLFNANO_HAVE_CHACHA`.
+ChaCha20-Poly1305 is available behind `HAVE_CHACHA`.
 
 ## PQC adders (done)
 

@@ -586,7 +586,7 @@ benchrun:
 	@mkdir -p $(BUILD)
 	$(ASM_CC) $(CFLAGS_COMMON) $(SHELL_INC) $(ASM_FLAGS) \
 	   -DWOLFNANO_MLKEM -DWOLFNANO_MLDSA -DWOLFNANO_MLDSA_SIGN \
-	   -DWOLFNANO_HAVE_CHACHA -DWOLFNANO_HAVE_RSA_VERIFY -DWOLFNANO_RSA_FULL \
+	   -DHAVE_CHACHA -DWOLFNANO_HAVE_RSA_VERIFY -DWOLFNANO_RSA_FULL \
 	   -DWOLFNANO_ALLOW_MALLOC \
 	   $(WC)/sha3.c $(WC)/wc_mlkem.c $(WC)/wc_mlkem_poly.c $(WC)/wc_mldsa.c \
 	   $(WC)/chacha.c $(WC)/poly1305.c $(WC)/chacha20_poly1305.c $(WC)/rsa.c \

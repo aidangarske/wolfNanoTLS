@@ -21,9 +21,9 @@
 #ifndef WOLFNANO_CONFIG_H
 #define WOLFNANO_CONFIG_H
 
-/* Translate WOLFNANO_HAVE_* selections to wolfSSL macros, apply the standing
- * size cuts, and set the memory model. Include only macro definitions here:
- * no wolfSSL headers (this is pulled in early from user_settings.h). */
+/* Complete crypto-capability prerequisites, apply the standing size cuts, and
+ * set the memory model. Include only macro definitions here: no wolfSSL headers
+ * (this is pulled in early from user_settings.h). */
 
 /* ---- standing size cuts (always) ---- */
 #define NO_OLD_TLS
@@ -119,53 +119,33 @@ extern int wn_seed(unsigned char* output, unsigned int sz);
     #ifndef WOLFNANO_MLKEM
         #define WOLFNANO_MLKEM
     #endif
-    #ifndef WOLFNANO_HAVE_CURVE25519
-        #define WOLFNANO_HAVE_CURVE25519
+    #ifndef HAVE_CURVE25519
+        #define HAVE_CURVE25519
     #endif
 #endif
 
-/* ---- hashes ---- */
-#ifndef WOLFNANO_HAVE_SHA256
-    #define NO_SHA256
-#endif
-#ifdef WOLFNANO_HAVE_SHA384
-    #define WOLFSSL_SHA384
-    #define WOLFSSL_SHA512
-#endif
-
-/* ---- HKDF (TLS 1.3 key schedule) ---- */
-#ifdef WOLFNANO_HAVE_HKDF
-    #define HAVE_HKDF
+/* ---- crypto-capability dependency completion + size cuts ----
+ * Capabilities are selected with wolfSSL's own macros (HAVE_AESGCM, HAVE_ECC,
+ * HAVE_CURVE25519, HAVE_ED25519, HAVE_HKDF, WOLFSSL_SHA384, HAVE_CHACHA). Here
+ * we only fill in prerequisites and drop what a TLS 1.3 build never uses. */
+#ifdef WOLFSSL_SHA384
+    #ifndef WOLFSSL_SHA512
+        #define WOLFSSL_SHA512
+    #endif
 #endif
 
-/* ---- AEAD ---- */
-#ifdef WOLFNANO_HAVE_AESGCM
-    #define HAVE_AESGCM
-#else
-    #define NO_AES
+#ifndef HAVE_AESGCM
+    #define NO_AES            /* TLS 1.3 AEAD is AES-GCM or ChaCha only */
 #endif
-#ifdef WOLFNANO_HAVE_CHACHA
-    #define HAVE_CHACHA
+#ifdef HAVE_CHACHA
     #define HAVE_POLY1305
 #endif
 
-/* ---- ECC (ECDHE + ECDSA), user-selected curves only ---- */
-#ifdef WOLFNANO_HAVE_ECC
-    #define HAVE_ECC
+#ifdef HAVE_ECC
     #define ECC_USER_CURVES   /* P-256 stays unless NO_ECC256; others opt-in */
-    #ifdef WOLFNANO_HAVE_ECC384
-        #define HAVE_ECC384
-    #endif
 #endif
 
-/* ---- X25519 ---- */
-#ifdef WOLFNANO_HAVE_CURVE25519
-    #define HAVE_CURVE25519
-#endif
-
-/* ---- Ed25519 (requires SHA-512) ---- */
-#ifdef WOLFNANO_HAVE_ED25519
-    #define HAVE_ED25519
+#ifdef HAVE_ED25519
     #ifndef WOLFSSL_SHA512
         #define WOLFSSL_SHA512
     #endif

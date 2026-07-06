@@ -29,8 +29,9 @@ wolfSSL.
   public HTTPS endpoints.
 - Post-quantum ML-KEM-768, X25519MLKEM768 hybrid, and ML-DSA as
   compile-out-able adders.
-- Per-algorithm compile flags (`WOLFNANO_HAVE_*`). Off means no undefined
-  references.
+- Per-feature compile flags: crypto capabilities use wolfSSL's own macros
+  (`HAVE_AESGCM`, `HAVE_ECC`, ...), wolfNano policy behind `WOLFNANO_*`. Off
+  means no undefined references.
 - wolfSSL direct assembly speedups
   (`WOLFNANO_ASM=intel|thumb2|aarch64|armv7|riscv64`).
 
