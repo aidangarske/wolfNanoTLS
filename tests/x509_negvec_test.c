@@ -44,6 +44,9 @@ static word32 load(const char* path, byte* buf, word32 max)
         return 0;
     }
     n = fread(buf, 1, max, f);
+    if (((n == (size_t)max) && (fgetc(f) != EOF)) || ferror(f)) {
+        n = 0;                              /* oversized/truncated: fail the load */
+    }
     fclose(f);
     return (word32)n;
 }

@@ -1,0 +1,6 @@
+# Files that must be 100% line-covered in the WOLFNANO_X509_LITE build.
+# Captured from the X509_LITE coverage pass in coverage.yml (wn_x509.c only
+# compiles under that macro). check_coverage.sh prints uncovered line numbers
+# for any file here below 100%. Genuinely-unreachable defensive lines are
+# marked /* LCOV_EXCL_LINE */ in the source so 100% is real, not gamed.
+src/wn_x509.c
