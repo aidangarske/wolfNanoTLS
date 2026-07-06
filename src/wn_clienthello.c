@@ -115,13 +115,11 @@ int wn_ClientHello_Build_ex(byte* out, word32* outLen, word32 outCap,
         wn_Write_U16(&w, WN_EXT_SIG_ALGS);
         saExt  = wn_Write_LenStart(&w, 2);
         saList = wn_Write_LenStart(&w, 2);
-#ifndef WOLFNANO_FIPS
-    #ifdef WOLFSSL_HAVE_MLDSA
+#ifdef WOLFSSL_HAVE_MLDSA
         wn_Write_U16(&w, WN_MLDSA_SCHEME);     /* ML-DSA (WOLFNANO_MLDSA_LEVEL) */
-    #endif
-    #ifdef HAVE_ED25519
+#endif
+#ifdef HAVE_ED25519
         wn_Write_U16(&w, 0x0807);              /* ed25519 */
-    #endif
 #endif
 #if defined(HAVE_ECC384) && defined(WOLFSSL_SHA384)
         wn_Write_U16(&w, 0x0503);              /* ecdsa_secp384r1_sha384 */

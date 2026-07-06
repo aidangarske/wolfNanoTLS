@@ -51,6 +51,5 @@ it is not part of the true-no-allocator guarantee.
 
 ## Backend boundary note
 
-The offered cipher suites and groups are a function of the active backend. A
-`fips` build excludes primitives outside its boundary (for example
-ChaCha20-Poly1305 and X25519), and PQC under FIPS is pending, not validated.
+The offered cipher suites and groups are a function of the active backend, so
+the offered lists always match what the backend supports.

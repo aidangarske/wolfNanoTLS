@@ -129,11 +129,6 @@ MOCKHYB_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
   src/wn_keyshare.c src/wn_serverhello.c src/wn_hybrid.c src/wn_connect.c \
   src/wn_session.c tests/wn_host_seed.c
 
-# WOLFNANO_CRYPTO=fips backend (Phase 5 seam proof). Override with the path to
-# your own built wolfSSL FIPS bundle (FIPS Ready or a licensed validated module).
-WOLFNANO_FIPS_DIR ?= $(HOME)/wolfssl-fips
-FIPS_LIB := $(WOLFNANO_FIPS_DIR)/src/.libs/libwolfssl.a
-
 # ---- WOLFNANO_ASM: per-arch speedup bundle (mirrors wolfSSL --enable-*asm) ----
 # Default 'none' = lightweight portable C (WOLFSSL_SP_MATH_ALL, no asm). Each
 # accelerated arch selects its toolchain, flags, specialized SP file + asm files.
@@ -195,7 +190,7 @@ ASM_CC    := $(CC_$(WOLFNANO_ASM))
 ASM_FLAGS := $(FLAGS_$(WOLFNANO_ASM))
 ASM_SRC   := $(SPSRC_$(WOLFNANO_ASM)) $(ASMSRC_$(WOLFNANO_ASM))
 
-.PHONY: host kstest keyupdatetest sessiontest mocktest mockhybridtest errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest certmldsatest certnegtest certnegpintest certgentest hybridtest certtest x509diff x509verifytest x509negtest x509negvectest x509probetest fipsproof bench benchrun targets test-qemu test test-core test-x509 test-cert check example example-cert example-cert-min example-cert-pqc cert-notime-build example-https example-https-lite example-pqc configs-build m33mu coverage stackcheck clean
+.PHONY: host kstest keyupdatetest sessiontest mocktest mockhybridtest errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest certmldsatest certnegtest certnegpintest certgentest hybridtest certtest x509diff x509verifytest x509negtest x509negvectest x509probetest bench benchrun targets test-qemu test test-core test-x509 test-cert check example example-cert example-cert-min example-cert-pqc cert-notime-build example-https example-https-lite example-pqc configs-build m33mu coverage stackcheck clean
 test: test-core test-x509 mlkemtest mldsatest hybridtest mockhybridtest wctestpqc ## build + run all local self-tests (certmldsatest runs separately; compiling X509 here would drag the interop-only cert path into the coverage build)
 test-core: host kstest keyupdatetest sessiontest mocktest errtest rfctest tstest rectest ksharetest hstest wctest msgtest chtest shtest negtest flighttest alerttest matrixtest ## protocol + crypto suites (no cert/X.509; those are test-x509 / test-cert)
 test-x509: certtest x509diff x509verifytest x509negtest x509negvectest x509probetest ## native wn_x509 parser + cert-verify unit tests
@@ -575,35 +570,6 @@ interop: ## live TLS 1.3 PSK handshake vs OpenSSL and wolfSSL
 	@echo "== cert(RSA-PSS) vs wolfSSL =="; sh tests/interop_cert_wolfssl.sh rsa
 	@echo "== cert(Ed25519) vs wolfSSL =="; sh tests/interop_cert_wolfssl.sh ed
 	@echo "== cert(chain leaf<-inter<-root) vs wolfSSL =="; sh tests/interop_cert_wolfssl.sh chain
-	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_X509 $(X509_BACKEND_FLAG) \
-	   -DWOLFNANO_HAVE_RSA_VERIFY \
-	   -DWOLFNANO_ALLOW_MALLOC -DWOLFNANO_FIPS -DWOLFNANO_TARGET_PORTABLE_C \
-	   $(CONN_CERT_SRC) $(WC)/rsa.c $(X509_BACKEND_SRC) tests/interop_cert_test.c \
-	   -o $(BUILD)/interop_cert_fips_client
-	@echo "== cert(ECDSA, approved ECDHE P-256 suites) vs OpenSSL =="; \
-	   WN_CERT_CLIENT=interop_cert_fips_client sh tests/interop_cert.sh ecdsa
-	@echo "== cert(ECDSA, approved ECDHE P-256 suites) vs wolfSSL =="; \
-	   WN_CERT_CLIENT=interop_cert_fips_client sh tests/interop_cert_wolfssl.sh ecdsa
-
-fipsproof: ## Phase 5: same shell sources link against the FIPS backend; CASTs pass
-	@mkdir -p $(BUILD)
-	@test -f $(FIPS_LIB) || { echo "SKIP fipsproof (no FIPS lib at $(FIPS_LIB); set WOLFNANO_FIPS_DIR)"; exit 0; }
-	@echo "== seam crypto vs wolfCrypt FIPS module =="
-	@sh tests/fips_seam_proof.sh $(WOLFNANO_FIPS_DIR)
-	@echo "== shell seam surface is backend-identical (zero source changes) =="
-	@cc $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C \
-	   -c src/wn_keyschedule.c -o $(BUILD)/ks_src.o
-	@cc -Os -DWOLFSSL_USE_OPTIONS_H -I$(WOLFNANO_FIPS_DIR) $(SHELL_INC) \
-	   -DWOLFNANO_TARGET_PORTABLE_C \
-	   -c src/wn_keyschedule.c -o $(BUILD)/ks_fips.o
-	@nm -u $(BUILD)/ks_src.o  | grep '_wc_' | sort > $(BUILD)/seam_src.txt
-	@# FIPS headers route each wc_* call to its _fips boundary wrapper; strip the
-	@# suffix to compare the logical crypto surface (the .c is byte-identical).
-	@nm -u $(BUILD)/ks_fips.o | grep '_wc_' | sed 's/_fips$$//' | sort > $(BUILD)/seam_fips.txt
-	@if diff -q $(BUILD)/seam_src.txt $(BUILD)/seam_fips.txt >/dev/null; then \
-	   echo "PASS same wc_* seam surface on src and fips (fips routes via _fips wrappers)"; \
-	   sed 's/^/    /' $(BUILD)/seam_src.txt; \
-	 else echo "FAIL seam surface differs"; diff $(BUILD)/seam_src.txt $(BUILD)/seam_fips.txt; exit 1; fi
 
 # Build + run the all-algo bench for the active WOLFNANO_ASM arch.
 benchrun:
