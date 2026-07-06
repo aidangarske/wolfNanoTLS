@@ -4,7 +4,7 @@
 wolfNanoTLS/
   Makefile               plain build, no ./configure
   user_settings.h        the one config file (feature selection)
-  wolfnano_config.h      WOLFNANO_HAVE_* to wolfSSL macro mapping + size cuts
+  wolfnano_config.h      capability completion + standing size cuts
   wolfnano_target.h      target to asm/SP bundle (PORTABLE_C active; hw deferred)
   COPYING, LICENSING     GPLv3 + commercial, copyright wolfSSL Inc.
   include/wolfnano/       public API (wn_*) and provider seam (added with the shell)

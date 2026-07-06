@@ -26,17 +26,16 @@
 /* Phase 1: crypto floor only (no TLS shell yet). */
 #define WOLFCRYPT_ONLY
 
-/* ---- wolfNanoTLS feature selection (WOLFNANO_HAVE_*) ---- */
-#define WOLFNANO_HAVE_SHA256
-#define WOLFNANO_HAVE_SHA384
-#define WOLFNANO_HAVE_HKDF
-#define WOLFNANO_HAVE_AESGCM
-#define WOLFNANO_HAVE_ECC
-#define WOLFNANO_HAVE_ECC384
-#define WOLFNANO_HAVE_CURVE25519
-#define WOLFNANO_HAVE_ED25519
+/* ---- crypto capabilities (wolfSSL's own macros; SHA-256 is on by default) ---- */
+#define WOLFSSL_SHA384
+#define HAVE_HKDF
+#define HAVE_AESGCM
+#define HAVE_ECC
+#define HAVE_ECC384
+#define HAVE_CURVE25519
+#define HAVE_ED25519
 
 #include "wolfnano_target.h"   /* target → asm/SP bundle (one macro selects) */
-#include "wolfnano_config.h"   /* WOLFNANO_HAVE_* → wolfSSL macros + size cuts */
+#include "wolfnano_config.h"   /* capability completion + standing size cuts */
 
 #endif /* WOLFNANO_USER_SETTINGS_H */

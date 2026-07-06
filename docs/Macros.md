@@ -1,31 +1,44 @@
 # Macros
 
-Configuration lives in `user_settings.h`, which selects `WOLFNANO_HAVE_*`
-features and includes `wolfnano_target.h` (asm/SP bundle) and
-`wolfnano_config.h` (which maps the selections to real wolfSSL macros and
-applies the standing size cuts).
+Configuration lives in `user_settings.h`. Crypto capabilities are selected with
+wolfSSL's own macros; `wolfnano_config.h` fills in prerequisites and applies the
+standing size cuts, and `wolfnano_target.h` selects the asm/SP bundle.
+wolfNano-owned `WOLFNANO_*` macros are reserved for policy that wolfSSL has no
+macro for: the TLS group offer, X.509 sub-options, PQC level, and memory model.
 
-## Feature selection (`WOLFNANO_HAVE_*`)
+## Crypto capabilities (wolfSSL macros)
 
-| Flag | Enables | wolfSSL macro(s) |
+Set these directly in `user_settings.h`; `wolfnano_config.h` completes the
+prerequisites and cuts. SHA-256 is on by default.
+
+| wolfSSL macro | Enables |
+|---|---|
+| `WOLFSSL_SHA384` | SHA-384 (pulls SHA-512) |
+| `HAVE_HKDF` | HKDF (TLS 1.3 key schedule) |
+| `HAVE_AESGCM` | AES-GCM |
+| `HAVE_CHACHA` | ChaCha20-Poly1305 (pulls `HAVE_POLY1305`) |
+| `HAVE_ECC` | ECDHE + ECDSA P-256 (pulls `ECC_USER_CURVES`) |
+| `HAVE_ECC384` | adds P-384 |
+| `HAVE_CURVE25519` | X25519 |
+| `HAVE_ED25519` | Ed25519 (pulls SHA-512) |
+
+## wolfNanoTLS policy macros (`WOLFNANO_*`)
+
+Owned by wolfNanoTLS; no wolfSSL equivalent.
+
+| Flag | Enables | Effect |
 |---|---|---|
-| `WOLFNANO_HAVE_SHA256` | SHA-256 (default on) | default; `NO_SHA256` drops it |
-| `WOLFNANO_HAVE_SHA384` | SHA-384/512 | `WOLFSSL_SHA384`, `WOLFSSL_SHA512` |
-| `WOLFNANO_HAVE_HKDF` | HKDF (TLS 1.3 key schedule) | `HAVE_HKDF` |
-| `WOLFNANO_HAVE_AESGCM` | AES-GCM | `HAVE_AESGCM` |
-| `WOLFNANO_HAVE_CHACHA` | ChaCha20-Poly1305 | `HAVE_CHACHA`, `HAVE_POLY1305` |
-| `WOLFNANO_HAVE_ECC` | ECDHE + ECDSA (P-256) | `HAVE_ECC`, `ECC_USER_CURVES` |
-| `WOLFNANO_HAVE_ECC384` | adds P-384 | `HAVE_ECC384` |
-| `WOLFNANO_HAVE_CURVE25519` | X25519 | `HAVE_CURVE25519` |
-| `WOLFNANO_HAVE_ED25519` | Ed25519 | `HAVE_ED25519` (pulls SHA-512) |
-| `WOLFNANO_HAVE_RSA_VERIFY` | RSA verify (cert chains, RSA-PSS) | `WOLFSSL_RSA_VERIFY_ONLY`, `WC_RSA_PSS` |
+| `WOLFNANO_HAVE_ECDHE_P256` | offer secp256r1 as the (EC)DHE group | single-group-per-build selector |
+| `WOLFNANO_HAVE_MLKEM_HYBRID` | offer X25519MLKEM768 as the group | pulls ML-KEM-768 + X25519 |
+| `WOLFNANO_HAVE_RSA_VERIFY` | RSA verify (cert chains, RSA-PSS) | `WOLFSSL_RSA_VERIFY_ONLY`, `WC_RSA_PSS`, 4096 ceiling |
 | `WOLFNANO_RSA_FULL` | adds RSA keygen/sign (tooling, not the no-alloc product) | `WOLFSSL_KEY_GEN` |
 | `WOLFNANO_X509` | X.509 cert path; parses/verifies with wolfSSL's full `asn.c`/`DecodedCert` by default (complete, proven) | cert path + `WOLFSSL_SMALL_CERT_VERIFY` |
 | `WOLFNANO_X509_LITE` | opt into the smaller native `wn_x509` parser instead of `asn.c` (~15% / ~10 KB less `.text`). A stricter-but-narrower size tier: no name constraints/policies/CRL/OCSP, capped SAN pool; the handshake enforces the same `wn_VerifyChain` checks on both backends. Default off = asn.c. `make ... X509_LITE=1` | swaps the cert parse + CertificateVerify key-import backend |
 | `WOLFNANO_X509_HOSTNAME` | leaf hostname (SAN/CN, RFC 6125) matching; default on with `WOLFNANO_X509`. Set `0` for a key-pin-only cert build (~0.5 KB smaller) | gates `wn_CheckServerName` |
 | `WOLFNANO_NO_X509_TIME` | opt out of leaf/intermediate validity (notBefore/notAfter) checking; for clockless devices only. Default: cert builds enforce dates via the `XTIME` clock seam | drops `wn_CertTimeValid` |
 | `WOLFNANO_MLKEM` | ML-KEM-768 + X25519MLKEM768 hybrid | `WOLFSSL_HAVE_MLKEM` |
-| `WOLFNANO_MLDSA` | ML-DSA-65 verify (no-malloc) | `WOLFSSL_HAVE_MLDSA`, verify-only |
+| `WOLFNANO_MLDSA` | ML-DSA verify (no-malloc) | `WOLFSSL_HAVE_MLDSA`, verify-only |
+| `WOLFNANO_MLDSA_LEVEL` | ML-DSA security level 2/3/5 (default 2) | selects ML-DSA-44/65/87 |
 | `WOLFNANO_MLDSA_SIGN` | adds ML-DSA keygen/sign (needs memory) | drops verify-only |
 | `WOLFNANO_SEND_ALERTS` | emit a fatal TLS alert on handshake failure (off by default) | RFC 8446 6.2 alert codes |
 
