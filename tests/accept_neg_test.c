@@ -26,6 +26,7 @@
 
 #include "wn_accept.h"
 #include "wn_servercert.h"
+#include "wn_handshake.h"
 #include "wolfnano_crypto.h"
 #include <stdio.h>
 #include <string.h>
@@ -120,13 +121,30 @@ static int run_psk(const byte* rec, word32 recLen, int sendFailAt, int recvFailA
 int main(void)
 {
     WC_RNG rng;
+    wn_Session sc, ss;
     byte scratch[4096];
     byte rec[512];
     byte body[256];
+    byte hs32[32], eh[32], z32[32], th32[32];
     word32 rl;
-    int rc;
+    int rc, k;
 
     wc_InitRng(&rng);
+
+    /* ----- wn_SessionEstablish: client and server key polarity are inverse ----- */
+    for (k = 0; k < 32; k++) {
+        hs32[k] = (byte)k; eh[k] = (byte)(k + 1); z32[k] = 0;
+        th32[k] = (byte)(k + 2);
+    }
+    XMEMSET(&sc, 0, sizeof(sc));
+    XMEMSET(&ss, 0, sizeof(ss));
+    (void)wn_SessionEstablish(WN_ROLE_CLIENT, &sc, hs32, eh, z32, th32, m_send,
+                              m_recv, NULL, scratch, sizeof(scratch));
+    (void)wn_SessionEstablish(WN_ROLE_SERVER, &ss, hs32, eh, z32, th32, m_send,
+                              m_recv, NULL, scratch, sizeof(scratch));
+    check((memcmp(sc.cKey, ss.sKey, 16) == 0) &&
+          (memcmp(sc.sKey, ss.cKey, 16) == 0),
+          "session-establish client/server key polarity is inverse");
 
     /* ----- argument validation ----- */
     rc = wn_Accept_Psk(NULL, m_send, m_recv, NULL, g_psk, sizeof(g_psk), g_id,

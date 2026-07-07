@@ -316,6 +316,9 @@ servercerttest: ## build + run the TLS 1.3 cert server vs the real cert client (
 	@echo "---- run (ECDSA P-256) ----"
 	@./$(BUILD)/accept_cert_mock_test tests/pki/server/ec-cert.der \
 	   tests/pki/server/ec-key-sec1.der 0403
+	@echo "---- run (ECDSA P-384) ----"
+	@./$(BUILD)/accept_cert_mock_test tests/pki/server/p384-cert.der \
+	   tests/pki/server/p384-key-sec1.der 0503
 	@echo "---- run (Ed25519) ----"
 	@./$(BUILD)/accept_cert_mock_test tests/pki/server/ed-cert.der \
 	   tests/pki/server/ed-key.der 0807
@@ -324,17 +327,25 @@ servercerttest: ## build + run the TLS 1.3 cert server vs the real cert client (
 	   -DWOLFNANO_TARGET_PORTABLE_C \
 	   $(SERVER_CERT_SRC) $(WC)/rsa.c $(X509_BACKEND_SRC) \
 	   tests/accept_cert_mock_test.c -o $(BUILD)/accept_cert_mock_rsa_test
-	@echo "---- run (RSA-PSS 2048) ----"
+	@echo "---- run (RSA-PSS SHA-256/384/512) ----"
 	@./$(BUILD)/accept_cert_mock_rsa_test tests/pki/server/rsa-cert.der \
 	   tests/pki/server/rsa-key-trad.der 0804
-	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER -DWOLFNANO_X509 \
-	   $(X509_BACKEND_FLAG) -DWOLFNANO_MLDSA -DWOLFNANO_MLDSA_SIGN \
-	   -DWOLFNANO_MLDSA_LEVEL=2 -DWOLFNANO_TARGET_PORTABLE_C \
-	   $(SERVER_CERT_SRC) $(WC)/wc_mldsa.c $(WC)/sha3.c $(X509_BACKEND_SRC) \
-	   tests/accept_cert_mock_test.c -o $(BUILD)/accept_cert_mock_mldsa_test
-	@echo "---- run (ML-DSA-44) ----"
-	@./$(BUILD)/accept_cert_mock_mldsa_test tests/pki/server/mldsa44-cert.der \
-	   tests/pki/server/mldsa44-key.der 0904
+	@./$(BUILD)/accept_cert_mock_rsa_test tests/pki/server/rsa-cert.der \
+	   tests/pki/server/rsa-key-trad.der 0805
+	@./$(BUILD)/accept_cert_mock_rsa_test tests/pki/server/rsa-cert.der \
+	   tests/pki/server/rsa-key-trad.der 0806
+	@for lvl in 2 3 5; do \
+	   sch=$$( [ $$lvl = 2 ] && echo 0904 || { [ $$lvl = 3 ] && echo 0905 || echo 0906; } ); \
+	   cert=$$( [ $$lvl = 2 ] && echo mldsa44 || { [ $$lvl = 3 ] && echo mldsa65 || echo mldsa87; } ); \
+	   $(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER -DWOLFNANO_X509 \
+	      $(X509_BACKEND_FLAG) -DWOLFNANO_MLDSA -DWOLFNANO_MLDSA_SIGN \
+	      -DWOLFNANO_MLDSA_LEVEL=$$lvl -DWOLFNANO_TARGET_PORTABLE_C \
+	      $(SERVER_CERT_SRC) $(WC)/wc_mldsa.c $(WC)/sha3.c $(X509_BACKEND_SRC) \
+	      tests/accept_cert_mock_test.c -o $(BUILD)/accept_cert_mock_mldsa_test; \
+	   echo "---- run (ML-DSA level $$lvl) ----"; \
+	   ./$(BUILD)/accept_cert_mock_mldsa_test tests/pki/server/$$cert-cert.der \
+	      tests/pki/server/$$cert-key.der $$sch; \
+	 done
 
 mockhybridtest: ## build + run the X25519MLKEM768 hybrid mock-server handshake test
 	@mkdir -p $(BUILD)

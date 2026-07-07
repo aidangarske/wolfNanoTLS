@@ -166,6 +166,26 @@ int main(int argc, char** argv)
     close(sv[0]);
     waitpid(pid, &status, 0);
 
+    /* second round: exercise the handshake-only wrapper wn_Accept_Cert */
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) == 0) {
+        pid = fork();
+        if (pid == 0) {
+            close(sv[0]);
+            run_client(sv[1]);
+            close(sv[1]);
+            _exit(0);
+        }
+        close(sv[1]);
+        ioc.fd = sv[0];
+        wc_InitRng(&rng);
+        rc = wn_Accept_Cert(&rng, sock_send, sock_recv, &ioc, g_cert, g_certLen,
+                            g_key, g_keyLen, scheme, scratch, sizeof(scratch));
+        check(rc == WOLFNANO_SUCCESS, "cert handshake-only wrapper completes");
+        wc_FreeRng(&rng);
+        close(sv[0]);
+        waitpid(pid, &status, 0);
+    }
+
     if (fails == 0) {
         printf("accept_cert_mock_test: all checks passed\n");
     }
