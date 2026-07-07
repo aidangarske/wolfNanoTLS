@@ -160,3 +160,107 @@ int wn_ClientHello_Build_ex(byte* out, word32* outLen, word32 outCap,
 
     return ret;
 }
+
+#ifdef WOLFNANO_SERVER
+#define WN_EXT_PRE_SHARED_KEY 41
+
+int wn_ClientHello_Parse(const byte* msg, word32 msgLen, wn_ClientHello* out)
+{
+    wn_Reader r;
+    word32 hsLen, extEnd, ksEnd, idsEnd, ksVec;
+    word16 vecLen, et, el, csLen, i, klen, idLen, idsLen, cs;
+    word16 g;
+    byte sidLen, compLen, blen;
+    const byte* p;
+    int ret = WOLFNANO_SUCCESS;
+
+    if ((msg == NULL) || (out == NULL)) {
+        return WOLFNANO_E_INVALID_ARG;
+    }
+    XMEMSET(out, 0, sizeof(*out));
+
+    wn_Reader_Init(&r, msg, msgLen);
+    if (wn_Read_U8(&r) != WN_HS_CLIENT_HELLO) {
+        ret = WOLFNANO_E_UNEXPECTED_MSG;
+    }
+    hsLen = wn_Read_U24(&r);
+    if ((ret == WOLFNANO_SUCCESS) && (r.pos + hsLen != msgLen)) {
+        ret = WOLFNANO_E_DECODE;
+    }
+    if (ret == WOLFNANO_SUCCESS) {
+        (void)wn_Read_U16(&r);                  /* legacy_version */
+        (void)wn_Read_Bytes(&r, 32);            /* random */
+        sidLen = wn_Read_U8(&r);
+        out->sessionId = wn_Read_Bytes(&r, sidLen);
+        out->sessionIdLen = sidLen;
+        csLen = wn_Read_U16(&r);
+        if ((csLen & 1) != 0) {
+            ret = WOLFNANO_E_DECODE;
+        }
+    }
+    for (i = 0; (ret == WOLFNANO_SUCCESS) && (i < csLen); i += 2) {
+        cs = wn_Read_U16(&r);
+        if (cs == WN_CIPHER_AES_128_GCM_SHA256) {
+            out->cipher = cs;                   /* first supported suite offered */
+        }
+    }
+    if (ret == WOLFNANO_SUCCESS) {
+        compLen = wn_Read_U8(&r);
+        (void)wn_Read_Bytes(&r, compLen);
+        vecLen = wn_Read_U16(&r);
+        extEnd = r.pos + vecLen;
+        if ((r.err != 0) || (extEnd != msgLen)) {
+            ret = WOLFNANO_E_DECODE;
+        }
+    }
+    while ((ret == WOLFNANO_SUCCESS) && (r.pos < extEnd) && (r.err == 0)) {
+        et = wn_Read_U16(&r);
+        el = wn_Read_U16(&r);
+        if (et == WN_EXT_KEY_SHARE) {
+            ksVec = wn_Read_U16(&r);            /* client_shares vector */
+            ksEnd = r.pos + ksVec;
+            while ((r.pos < ksEnd) && (r.err == 0)) {
+                g = wn_Read_U16(&r);
+                klen = wn_Read_U16(&r);
+                p = wn_Read_Bytes(&r, klen);
+                if ((g == WN_DEFAULT_GROUP) && (p != NULL)) {
+                    out->keyShare = p;
+                    out->keyShareLen = klen;
+                    out->group = g;
+                    out->haveKeyShare = 1;
+                }
+            }
+        }
+        else if (et == WN_EXT_PRE_SHARED_KEY) {
+            idsLen = wn_Read_U16(&r);           /* identities vector */
+            idsEnd = r.pos + idsLen;
+            idLen = wn_Read_U16(&r);
+            out->pskIdentity = wn_Read_Bytes(&r, idLen);
+            out->pskIdentityLen = idLen;
+            if (idsEnd >= r.pos) {              /* skip any further identities */
+                (void)wn_Read_Bytes(&r, idsEnd - r.pos);
+            }
+            out->binderTruncLen = r.pos;        /* binders section starts here */
+            (void)wn_Read_U16(&r);              /* binders vector length */
+            blen = wn_Read_U8(&r);              /* first binder length */
+            out->binder = wn_Read_Bytes(&r, blen);
+            out->binderLen = blen;
+            out->havePsk = 1;
+        }
+        else {
+            (void)wn_Read_Bytes(&r, el);
+        }
+        if (r.err != 0) {
+            ret = WOLFNANO_E_DECODE;
+        }
+    }
+    if ((ret == WOLFNANO_SUCCESS) &&
+        ((out->cipher == 0) || (out->haveKeyShare == 0) ||
+         (out->keyShareLen != WN_DEFAULT_PUB_SZ) || (out->havePsk == 0) ||
+         (out->binderLen != 32))) {
+        ret = WOLFNANO_E_ILLEGAL_PARAM;
+    }
+
+    return ret;
+}
+#endif /* WOLFNANO_SERVER */

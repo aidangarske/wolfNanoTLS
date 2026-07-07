@@ -152,3 +152,75 @@ int wn_ServerHello_Parse(const byte* msg, word32 msgLen, wn_ServerHello* out)
 
     return ret;
 }
+
+#ifdef WOLFNANO_SERVER
+int wn_ServerHello_Build(byte* out, word32* outLen, word32 outCap,
+                         const byte* random32, const byte* sessionId,
+                         byte sessionIdLen, word16 cipher, word16 group,
+                         const byte* srvPub, word32 srvPubLen,
+                         word16 pskIdentity)
+{
+    wn_Writer w;
+    word32 body, ext;
+    int ret = WOLFNANO_SUCCESS;
+
+    if ((out == NULL) || (random32 == NULL) || (srvPub == NULL)) {
+        return WOLFNANO_E_INVALID_ARG;
+    }
+    wn_Writer_Init(&w, out, outCap);
+    wn_Write_U8(&w, WN_HS_SERVER_HELLO);
+    body = wn_Write_LenStart(&w, 3);
+    wn_Write_U16(&w, 0x0303);
+    wn_Write_Bytes(&w, random32, 32);
+    wn_Write_U8(&w, sessionIdLen);
+    wn_Write_Bytes(&w, sessionId, sessionIdLen);
+    wn_Write_U16(&w, cipher);
+    wn_Write_U8(&w, 0);                          /* legacy_compression_method */
+    ext = wn_Write_LenStart(&w, 2);
+    wn_Write_U16(&w, WN_EXT_SUPPORTED_VER);
+    wn_Write_U16(&w, 2);
+    wn_Write_U16(&w, 0x0304);
+    wn_Write_U16(&w, WN_EXT_KEY_SHARE);
+    wn_Write_U16(&w, (word16)(4 + srvPubLen));
+    wn_Write_U16(&w, group);
+    wn_Write_U16(&w, (word16)srvPubLen);
+    wn_Write_Bytes(&w, srvPub, srvPubLen);
+    wn_Write_U16(&w, WN_EXT_PRE_SHARED);
+    wn_Write_U16(&w, 2);
+    wn_Write_U16(&w, pskIdentity);
+    wn_Write_LenEnd(&w, ext, 2);
+    wn_Write_LenEnd(&w, body, 3);
+    if (w.err != 0) {
+        ret = WOLFNANO_E_CRYPTO;
+    }
+    else {
+        *outLen = w.len;
+    }
+
+    return ret;
+}
+
+int wn_EncExt_Build(byte* out, word32* outLen, word32 outCap)
+{
+    wn_Writer w;
+    word32 body;
+    int ret = WOLFNANO_SUCCESS;
+
+    if (out == NULL) {
+        return WOLFNANO_E_INVALID_ARG;
+    }
+    wn_Writer_Init(&w, out, outCap);
+    wn_Write_U8(&w, 8);                          /* EncryptedExtensions */
+    body = wn_Write_LenStart(&w, 3);
+    wn_Write_U16(&w, 0);                         /* empty extensions vector */
+    wn_Write_LenEnd(&w, body, 3);
+    if (w.err != 0) {
+        ret = WOLFNANO_E_CRYPTO;
+    }
+    else {
+        *outLen = w.len;
+    }
+
+    return ret;
+}
+#endif /* WOLFNANO_SERVER */

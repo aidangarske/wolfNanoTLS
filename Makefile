@@ -57,6 +57,10 @@ CONN_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
   src/wn_keyshare.c src/wn_serverhello.c \
   src/wn_connect.c src/wn_session.c tests/wn_host_seed.c
 
+# TLS 1.3 server adder (WOLFNANO_SERVER): the client shell plus the server state
+# machine, the ClientHello decoder, and the shared handshake helpers.
+SERVER_SRC := $(CONN_SRC) src/wn_accept.c src/wn_handshake.c src/wn_clienthello.c
+
 # P-256 PSK handshake build (ECDHE secp256r1; FLOOR_SRC links ecc/asn/sp).
 CONN_P256_SRC := $(FLOOR_SRC) $(WC)/sp_int.c \
   src/wn_msg.c src/wn_keyschedule.c \
@@ -200,7 +204,7 @@ ASM_CC    := $(CC_$(WOLFNANO_ASM))
 ASM_FLAGS := $(FLAGS_$(WOLFNANO_ASM))
 ASM_SRC   := $(SPSRC_$(WOLFNANO_ASM)) $(ASMSRC_$(WOLFNANO_ASM))
 
-.PHONY: host kstest keyupdatetest sessiontest mocktest mockhybridtest errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest certmldsatest certnegtest certnegpintest certgentest hybridtest certtest x509diff x509verifytest x509negtest x509negvectest x509probetest x509covtest noalloc-crypto noalloc-handshake bench benchrun targets test-qemu test test-core test-x509 test-cert check example example-cert example-cert-min example-cert-pqc cert-notime-build example-https example-https-lite example-pqc configs-build m33mu coverage stackcheck clean
+.PHONY: host kstest keyupdatetest sessiontest mocktest mockhybridtest servertest errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest certmldsatest certnegtest certnegpintest certgentest hybridtest certtest x509diff x509verifytest x509negtest x509negvectest x509probetest x509covtest noalloc-crypto noalloc-handshake bench benchrun targets test-qemu test test-core test-x509 test-cert check example example-server example-cert example-cert-min example-cert-pqc cert-notime-build example-https example-https-lite example-pqc configs-build m33mu coverage stackcheck clean
 test: test-core test-x509 mlkemtest mldsatest hybridtest mockhybridtest wctestpqc ## build + run all local self-tests (certmldsatest runs separately; compiling X509 here would drag the interop-only cert path into the coverage build)
 test-core: host kstest keyupdatetest sessiontest mocktest errtest rfctest tstest rectest ksharetest hstest wctest msgtest chtest shtest negtest flighttest alerttest matrixtest ## protocol + crypto suites (no cert/X.509; those are test-x509 / test-cert)
 test-x509: certtest x509diff x509verifytest x509negtest x509negvectest x509covtest x509probetest ## native wn_x509 parser + cert-verify unit tests
@@ -262,6 +266,14 @@ mocktest: ## build + run the in-process mock-server handshake test (PORTABLE_C)
 	   $(CONN_SRC) tests/connect_mock_test.c -o $(BUILD)/connect_mock_test
 	@echo "---- run ----"
 	@./$(BUILD)/connect_mock_test
+
+servertest: ## build + run the TLS 1.3 PSK server vs the real client (WOLFNANO_SERVER)
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER \
+	   -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(SERVER_SRC) tests/accept_mock_test.c -o $(BUILD)/accept_mock_test
+	@echo "---- run ----"
+	@./$(BUILD)/accept_mock_test
 
 mockhybridtest: ## build + run the X25519MLKEM768 hybrid mock-server handshake test
 	@mkdir -p $(BUILD)
@@ -665,6 +677,13 @@ example: ## build the minimal PSK client example (examples/client.c)
 	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C \
 	   $(CONN_SRC) examples/client.c -o $(BUILD)/example_client
 	@echo "built $(BUILD)/example_client"
+
+example-server: ## build the minimal PSK server example (examples/server.c)
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER \
+	   -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(SERVER_SRC) examples/server.c -o $(BUILD)/example_server
+	@echo "built $(BUILD)/example_server"
 
 example-cert: ## build the X.509 server-cert client example (examples/client_cert.c)
 	@mkdir -p $(BUILD)

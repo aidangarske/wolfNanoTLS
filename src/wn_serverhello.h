@@ -45,4 +45,19 @@ typedef struct wn_ServerHello {
 WOLFNANO_API int wn_ServerHello_Parse(const byte* msg, word32 msgLen,
                                       wn_ServerHello* out);
 
+#ifdef WOLFNANO_SERVER
+/* Encode a ServerHello (type 2 + length + body) into out for a PSK+(EC)DHE
+ * handshake: negotiated cipher, echoed session id, server key_share, and the
+ * selected pre_shared_key identity index. */
+WOLFNANO_LOCAL int wn_ServerHello_Build(byte* out, word32* outLen, word32 outCap,
+                                        const byte* random32,
+                                        const byte* sessionId, byte sessionIdLen,
+                                        word16 cipher, word16 group,
+                                        const byte* srvPub, word32 srvPubLen,
+                                        word16 pskIdentity);
+
+/* Encode an empty EncryptedExtensions (type 8 + length + empty vector). */
+WOLFNANO_LOCAL int wn_EncExt_Build(byte* out, word32* outLen, word32 outCap);
+#endif /* WOLFNANO_SERVER */
+
 #endif /* WN_SERVERHELLO_H */
