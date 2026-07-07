@@ -219,7 +219,7 @@ ASM_SRC   := $(SPSRC_$(WOLFNANO_ASM)) $(ASMSRC_$(WOLFNANO_ASM))
 
 .PHONY: host kstest keyupdatetest sessiontest mocktest mockhybridtest servertest servercerttest servernegtest example-server-cert errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest certmldsatest certnegtest certnegpintest certgentest hybridtest certtest x509diff x509verifytest x509negtest x509negvectest x509probetest x509covtest noalloc-crypto noalloc-handshake bench benchrun targets test-qemu test test-core test-x509 test-cert check example example-server example-cert example-cert-min example-cert-pqc cert-notime-build example-https example-https-lite example-pqc configs-build m33mu coverage stackcheck clean
 test: test-core test-x509 mlkemtest mldsatest hybridtest mockhybridtest wctestpqc ## build + run all local self-tests (certmldsatest runs separately; compiling X509 here would drag the interop-only cert path into the coverage build)
-test-core: host kstest keyupdatetest sessiontest mocktest servertest errtest rfctest tstest rectest ksharetest hstest wctest msgtest chtest shtest negtest flighttest alerttest matrixtest ## protocol + crypto suites (no cert/X.509; those are test-x509 / test-cert)
+test-core: host kstest keyupdatetest sessiontest mocktest errtest rfctest tstest rectest ksharetest hstest wctest msgtest chtest shtest negtest flighttest alerttest matrixtest ## protocol + crypto suites (no cert/X.509/server; those are test-x509 / test-cert)
 test-x509: certtest x509diff x509verifytest x509negtest x509negvectest x509covtest x509probetest ## native wn_x509 parser + cert-verify unit tests
 test-cert: certnegtest certnegpintest certgentest servercerttest servernegtest ## X.509 cert-path chain-constraint tests (backend selected by X509_LITE)
 
@@ -932,7 +932,7 @@ coverage: ## Linux: run the suites under --coverage and enforce 100% (.github/ci
 	lcov --remove cov.info '*/wolfssl/*' '/usr/*' '*/tests/*' --output-file cov.info 2>/dev/null || true
 	sh scripts/check_coverage.sh cov.info .github/ci/coverage-100.txt
 	find . -name '*.gcda' -delete
-	$(MAKE) test-x509 test-cert certmldsatest X509_LITE=1 EXTRA_CFLAGS="--coverage -O0"
+	$(MAKE) test-x509 test-cert certmldsatest servertest X509_LITE=1 EXTRA_CFLAGS="--coverage -O0"
 	lcov --capture --directory . --output-file cov-lite.info --rc lcov_branch_coverage=0 2>/dev/null || true
 	lcov --remove cov-lite.info '*/wolfssl/*' '/usr/*' '*/tests/*' --output-file cov-lite.info 2>/dev/null || true
 	sh scripts/check_coverage.sh cov-lite.info .github/ci/coverage-100-lite.txt

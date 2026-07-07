@@ -199,6 +199,42 @@ int main(void)
     check((rc == WOLFNANO_SUCCESS) && (mlen == 12) && (body[0] == 1),
           "handshake message reassembled across two records");
 
+    /* CCS before the handshake message is skipped during reassembly */
+    rec[0] = 20; rec[1] = 3; rec[2] = 3; rec[3] = 0; rec[4] = 1; rec[5] = 1;
+    rec[6] = 22; rec[7] = 3; rec[8] = 3; rec[9] = 0; rec[10] = 4;
+    rec[11] = 1; rec[12] = 0; rec[13] = 0; rec[14] = 0;   /* hs type 1, len 0 */
+    XMEMSET(&mr, 0, sizeof(mr));
+    mr.in = rec; mr.inLen = 15; mlen = 0;
+    rc = wn_RecvHandshake(m_recv, &mr, body, sizeof(body), scratch,
+                          sizeof(scratch), &mlen);
+    check((rc == WOLFNANO_SUCCESS) && (mlen == 4),
+          "reassembly skips ChangeCipherSpec before the message");
+
+    /* a record body larger than the accumulator is rejected */
+    rec[0] = 22; rec[1] = 3; rec[2] = 3; rec[3] = 0; rec[4] = 8;
+    XMEMSET(&mr, 0, sizeof(mr));
+    mr.in = rec; mr.inLen = 13; mlen = 0;
+    check(wn_RecvHandshake(m_recv, &mr, body, 4, scratch, sizeof(scratch), &mlen)
+              != WOLFNANO_SUCCESS, "reassembly rejects record overrunning acc");
+
+    /* a message claiming an oversized length is rejected */
+    rec[0] = 22; rec[1] = 3; rec[2] = 3; rec[3] = 0; rec[4] = 4;
+    rec[5] = 1; rec[6] = 0xff; rec[7] = 0xff; rec[8] = 0xff;   /* len 0xffffff */
+    XMEMSET(&mr, 0, sizeof(mr));
+    mr.in = rec; mr.inLen = 9; mlen = 0;
+    check(wn_RecvHandshake(m_recv, &mr, body, sizeof(body), scratch,
+                           sizeof(scratch), &mlen) != WOLFNANO_SUCCESS,
+          "reassembly rejects oversized message length");
+
+    /* trailing bytes after a complete message are rejected */
+    rec[0] = 22; rec[1] = 3; rec[2] = 3; rec[3] = 0; rec[4] = 6;
+    rec[5] = 1; rec[6] = 0; rec[7] = 0; rec[8] = 0; rec[9] = 0; rec[10] = 0;
+    XMEMSET(&mr, 0, sizeof(mr));
+    mr.in = rec; mr.inLen = 11; mlen = 0;
+    check(wn_RecvHandshake(m_recv, &mr, body, sizeof(body), scratch,
+                           sizeof(scratch), &mlen) != WOLFNANO_SUCCESS,
+          "reassembly rejects trailing bytes after the message");
+
     /* ----- wn_SessionEstablish: client and server key polarity are inverse ----- */
     for (k = 0; k < 32; k++) {
         hs32[k] = (byte)k; eh[k] = (byte)(k + 1); z32[k] = 0;
