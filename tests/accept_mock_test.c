@@ -49,11 +49,19 @@ static const char g_id[] = "Client_identity";
 
 typedef struct {
     int fd;
+    int sendFailAt;    /* fail the Nth send (1-based); 0 = never */
+    int sendCount;
 } io_ctx;
 
 static int sock_send(void* ctx, const byte* buf, word32 len)
 {
-    return (int)send(((io_ctx*)ctx)->fd, buf, len, 0);
+    io_ctx* c = (io_ctx*)ctx;
+
+    c->sendCount++;
+    if ((c->sendFailAt != 0) && (c->sendCount == c->sendFailAt)) {
+        return -1;
+    }
+    return (int)send(c->fd, buf, len, 0);
 }
 
 static int sock_recv(void* ctx, byte* buf, word32 len)
@@ -71,6 +79,7 @@ static void run_client(int fd)
     byte buf[64];
     word32 got = 0;
 
+    XMEMSET(&ioc, 0, sizeof(ioc));
     ioc.fd = fd;
     wc_InitRng(&rng);
     if (wn_Connect_Psk_ex(&sess, &rng, sock_send, sock_recv, &ioc, g_psk,
@@ -111,6 +120,7 @@ int main(void)
     }
     close(sv[1]);
 
+    XMEMSET(&ioc, 0, sizeof(ioc));
     ioc.fd = sv[0];
     wc_InitRng(&rng);
     rc = wn_Accept_Psk_ex(&sess, &rng, sock_send, sock_recv, &ioc, g_psk,
@@ -138,11 +148,34 @@ int main(void)
             _exit(0);
         }
         close(sv[1]);
+        XMEMSET(&ioc, 0, sizeof(ioc));
         ioc.fd = sv[0];
         wc_InitRng(&rng);
         rc = wn_Accept_Psk(&rng, sock_send, sock_recv, &ioc, g_psk,
                            sizeof(g_psk), g_id, scratch, sizeof(scratch));
         check(rc == WOLFNANO_SUCCESS, "PSK handshake-only wrapper completes");
+        wc_FreeRng(&rng);
+        close(sv[0]);
+        waitpid(pid, &status, 0);
+    }
+
+    /* third round: a send failure during the server flight is surfaced */
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, sv) == 0) {
+        pid = fork();
+        if (pid == 0) {
+            close(sv[0]);
+            run_client(sv[1]);
+            close(sv[1]);
+            _exit(0);
+        }
+        close(sv[1]);
+        XMEMSET(&ioc, 0, sizeof(ioc));
+        ioc.fd = sv[0];
+        ioc.sendFailAt = 1;             /* fail the ServerHello send */
+        wc_InitRng(&rng);
+        rc = wn_Accept_Psk_ex(&sess, &rng, sock_send, sock_recv, &ioc, g_psk,
+                              sizeof(g_psk), g_id, scratch, sizeof(scratch));
+        check(rc != WOLFNANO_SUCCESS, "server surfaces a ServerHello send failure");
         wc_FreeRng(&rng);
         close(sv[0]);
         waitpid(pid, &status, 0);
