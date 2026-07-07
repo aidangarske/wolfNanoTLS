@@ -217,7 +217,7 @@ ASM_CC    := $(CC_$(WOLFNANO_ASM))
 ASM_FLAGS := $(FLAGS_$(WOLFNANO_ASM))
 ASM_SRC   := $(SPSRC_$(WOLFNANO_ASM)) $(ASMSRC_$(WOLFNANO_ASM))
 
-.PHONY: host kstest keyupdatetest sessiontest mocktest mockhybridtest servertest servercerttest servernegtest servercertnomalloc example-server-cert errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest certmldsatest certnegtest certnegpintest certgentest hybridtest certtest x509diff x509verifytest x509negtest x509negvectest x509probetest x509covtest noalloc-crypto noalloc-handshake bench benchrun targets test-qemu test test-core test-x509 test-cert check example example-server example-cert example-cert-min example-cert-pqc cert-notime-build example-https example-https-lite example-pqc configs-build m33mu coverage stackcheck clean
+.PHONY: host kstest keyupdatetest sessiontest mocktest mockhybridtest servertest servercerttest servernegtest servercertnomalloc example-server-cert errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest certmldsatest certnegtest certnegpintest certgentest hybridtest certtest x509diff x509verifytest x509negtest x509negvectest x509probetest x509covtest noalloc-crypto noalloc-handshake bench benchrun targets test-qemu test test-core test-x509 test-cert check example example-server example-cert example-cert-min example-cert-pqc cert-notime-build example-https example-https-lite example-pqc configs-build m33mu coverage stackcheck servercov clean
 test: test-core test-x509 mlkemtest mldsatest hybridtest mockhybridtest wctestpqc ## build + run all local self-tests (certmldsatest runs separately; compiling X509 here would drag the interop-only cert path into the coverage build)
 test-core: host kstest keyupdatetest sessiontest mocktest errtest rfctest tstest rectest ksharetest hstest wctest msgtest chtest shtest negtest flighttest alerttest matrixtest ## protocol + crypto suites (no cert/X.509/server; those are test-x509 / test-cert)
 test-x509: certtest x509diff x509verifytest x509negtest x509negvectest x509covtest x509probetest ## native wn_x509 parser + cert-verify unit tests
@@ -940,6 +940,30 @@ stackcheck: ## fail if any wolfNanoTLS function exceeds the stack budget (-fstac
 	done
 	@sh scripts/check_stack.sh $(BUILD)/su/*.su
 
+# One consistent --coverage build of the server shell (SERVER + X509 + RSA_FULL):
+# compile the shell once, then link + run the PSK, all-algo cert, and adversarial
+# drivers against the shared objects so their gcov data accumulates and merges.
+SERVERCOV_FLAGS := --coverage -O0 -DWOLFSSL_USER_SETTINGS $(SHELL_INC) -I. \
+  -I$(WOLFSSL) -DWOLFNANO_SERVER -DWOLFNANO_X509 -DWOLFNANO_RSA_FULL \
+  -DWOLFNANO_HAVE_RSA_VERIFY -DWOLFNANO_TARGET_PORTABLE_C
+SERVERCOV_SRC := $(SERVER_CERT_SRC) $(WC)/rsa.c
+servercov: ## single consistent --coverage build; PSK + all-algo cert + neg merge to 100%
+	@rm -rf $(BUILD)/scov && mkdir -p $(BUILD)/scov
+	@for f in $(SERVERCOV_SRC); do \
+	  $(CC) $(SERVERCOV_FLAGS) -c $$f -o $(BUILD)/scov/`basename $$f .c`.o || exit 1; \
+	done
+	@$(CC) $(SERVERCOV_FLAGS) $(BUILD)/scov/*.o tests/accept_mock_test.c -o $(BUILD)/scov/pm
+	@./$(BUILD)/scov/pm
+	@$(CC) $(SERVERCOV_FLAGS) $(BUILD)/scov/*.o tests/accept_neg_test.c -o $(BUILD)/scov/neg
+	@./$(BUILD)/scov/neg
+	@$(CC) $(SERVERCOV_FLAGS) $(BUILD)/scov/*.o tests/accept_cert_mock_test.c -o $(BUILD)/scov/cm
+	@./$(BUILD)/scov/cm tests/pki/server/ec-cert.der tests/pki/server/ec-key-sec1.der 0403
+	@./$(BUILD)/scov/cm tests/pki/server/p384-cert.der tests/pki/server/p384-key-sec1.der 0503
+	@./$(BUILD)/scov/cm tests/pki/server/ed-cert.der tests/pki/server/ed-key.der 0807
+	@./$(BUILD)/scov/cm tests/pki/server/rsa-cert.der tests/pki/server/rsa-key-trad.der 0804
+	@./$(BUILD)/scov/cm tests/pki/server/rsa-cert.der tests/pki/server/rsa-key-trad.der 0805
+	@./$(BUILD)/scov/cm tests/pki/server/rsa-cert.der tests/pki/server/rsa-key-trad.der 0806
+
 coverage: ## Linux: run the suites under --coverage and enforce 100% (.github/ci/coverage-100.txt)
 	@command -v lcov >/dev/null 2>&1 || { echo "SKIP coverage (no lcov; Linux/CI only)"; exit 0; }
 	$(MAKE) test EXTRA_CFLAGS="--coverage -O0"
@@ -947,10 +971,15 @@ coverage: ## Linux: run the suites under --coverage and enforce 100% (.github/ci
 	lcov --remove cov.info '*/wolfssl/*' '/usr/*' '*/tests/*' --output-file cov.info 2>/dev/null || true
 	sh scripts/check_coverage.sh cov.info .github/ci/coverage-100.txt
 	find . -name '*.gcda' -delete
-	$(MAKE) test-x509 test-cert certmldsatest servertest X509_LITE=1 EXTRA_CFLAGS="--coverage -O0"
+	$(MAKE) test-x509 test-cert certmldsatest X509_LITE=1 EXTRA_CFLAGS="--coverage -O0"
 	lcov --capture --directory . --output-file cov-lite.info --rc lcov_branch_coverage=0 2>/dev/null || true
 	lcov --remove cov-lite.info '*/wolfssl/*' '/usr/*' '*/tests/*' --output-file cov-lite.info 2>/dev/null || true
 	sh scripts/check_coverage.sh cov-lite.info .github/ci/coverage-100-lite.txt
+	find . -name '*.gcda' -delete
+	$(MAKE) servercov
+	lcov --capture --directory $(BUILD)/scov --output-file cov-server.info --rc lcov_branch_coverage=0 2>/dev/null || true
+	lcov --remove cov-server.info '*/wolfssl/*' '/usr/*' '*/tests/*' --output-file cov-server.info 2>/dev/null || true
+	sh scripts/check_coverage.sh cov-server.info .github/ci/coverage-100-server.txt
 
 clean:
 	rm -rf $(BUILD) *.o *.gcda *.gcno cov.info cov-lite.info

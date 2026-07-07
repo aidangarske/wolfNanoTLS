@@ -4,6 +4,3 @@
 # for any file here below 100%. Genuinely-unreachable defensive lines are
 # marked /* LCOV_EXCL_LINE */ in the source so 100% is real, not gamed.
 src/wn_x509.c
-src/wn_accept.c
-src/wn_handshake.c
-src/wn_servercert.c
