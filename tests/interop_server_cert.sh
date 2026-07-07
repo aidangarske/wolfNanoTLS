@@ -9,9 +9,10 @@ PORT=15470
 SRV=${SERVER:-./build/example_server_cert}
 
 case "$TYPE" in
-    ecdsa) CERT=ec-cert.der;  KEY=ec-key-sec1.der; SCHEME=0403;;
-    ed)    CERT=ed-cert.der;  KEY=ed-key.der;      SCHEME=0807;;
-    rsa)   CERT=rsa-cert.der; KEY=rsa-key-trad.der; SCHEME=0804;;
+    ecdsa) CERT=ec-cert.der;    KEY=ec-key-sec1.der;  SCHEME=0403;;
+    ed)    CERT=ed-cert.der;    KEY=ed-key.der;       SCHEME=0807;;
+    rsa)   CERT=rsa-cert.der;   KEY=rsa-key-trad.der; SCHEME=0804;;
+    mldsa) CERT=mldsa44-cert.der; KEY=mldsa44-key.der; SCHEME=0904;;
     *)     printf "unknown type %s\n" "$TYPE"; exit 1;;
 esac
 CERTF="tests/pki/server/$CERT"

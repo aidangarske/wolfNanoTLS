@@ -74,8 +74,8 @@ static word32 load(const char* path, byte* buf, word32 cap)
     return (word32)n;
 }
 
-static byte g_cert[4096];
-static byte g_key[4096];
+static byte g_cert[8192];
+static byte g_key[8192];
 static word32 g_certLen, g_keyLen;
 
 /* Forked client: cert connect (anchor == self-signed leaf), ping, expect pong. */
@@ -84,7 +84,7 @@ static void run_client(int fd)
     wn_Session sess;
     WC_RNG rng;
     io_ctx ioc;
-    byte scratch[16384];
+    byte scratch[32768];
     byte buf[64];
     word32 got = 0;
 
@@ -110,7 +110,7 @@ int main(int argc, char** argv)
     wn_Session sess;
     WC_RNG rng;
     io_ctx ioc;
-    byte scratch[16384];
+    byte scratch[32768];
     byte buf[64];
     word32 got = 0;
     word16 scheme;

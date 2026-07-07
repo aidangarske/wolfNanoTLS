@@ -78,6 +78,10 @@ run_renewcerts(){
     openssl ec   -in server/ec-key.pem  -outform DER -out server/ec-key-sec1.der
     openssl pkey -in server/ed-key.pem  -outform DER -out server/ed-key.der
     openssl rsa  -in server/rsa-key.pem -outform DER -out server/rsa-key-trad.der
+    # ML-DSA-44 server cert/key: from the wolfSSL example PKI (OpenSSL lacks ML-DSA)
+    cp ../../wolfssl/certs/mldsa/mldsa44-cert.der server/mldsa44-cert.der
+    awk '/BEGIN/{f=1;next}/END/{f=0}f' ../../wolfssl/certs/mldsa/mldsa44-key.pem \
+        | base64 -d > server/mldsa44-key.der
     echo "---------------------------------------------------------------------"
 
     ############################################################

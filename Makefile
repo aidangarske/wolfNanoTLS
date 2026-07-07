@@ -318,6 +318,14 @@ servercerttest: ## build + run the TLS 1.3 cert server vs the real cert client (
 	@echo "---- run (RSA-PSS 2048) ----"
 	@./$(BUILD)/accept_cert_mock_rsa_test tests/pki/server/rsa-cert.der \
 	   tests/pki/server/rsa-key-trad.der 0804
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER -DWOLFNANO_X509 \
+	   $(X509_BACKEND_FLAG) -DWOLFNANO_MLDSA -DWOLFNANO_MLDSA_SIGN \
+	   -DWOLFNANO_MLDSA_LEVEL=2 -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(SERVER_CERT_SRC) $(WC)/wc_mldsa.c $(WC)/sha3.c $(X509_BACKEND_SRC) \
+	   tests/accept_cert_mock_test.c -o $(BUILD)/accept_cert_mock_mldsa_test
+	@echo "---- run (ML-DSA-44) ----"
+	@./$(BUILD)/accept_cert_mock_mldsa_test tests/pki/server/mldsa44-cert.der \
+	   tests/pki/server/mldsa44-key.der 0904
 
 mockhybridtest: ## build + run the X25519MLKEM768 hybrid mock-server handshake test
 	@mkdir -p $(BUILD)
@@ -674,6 +682,7 @@ interop: ## live TLS 1.3 PSK handshake vs OpenSSL and wolfSSL
 	@echo "== cert server (Ed25519) vs wolfSSL =="; PEER=wolfssl sh tests/interop_server_cert.sh ed
 	@echo "== cert server (RSA-PSS) vs OpenSSL =="; SERVER=$(BUILD)/example_server_cert_rsa PEER=openssl sh tests/interop_server_cert.sh rsa
 	@echo "== cert server (RSA-PSS) vs wolfSSL =="; SERVER=$(BUILD)/example_server_cert_rsa PEER=wolfssl sh tests/interop_server_cert.sh rsa
+	@echo "== cert server (ML-DSA-44) vs wolfSSL =="; SERVER=$(BUILD)/example_server_cert_mldsa PEER=wolfssl sh tests/interop_server_cert.sh mldsa
 
 # Build + run the all-algo bench for the active WOLFNANO_ASM arch.
 benchrun:
@@ -764,7 +773,12 @@ example-server-cert: ## build the cert server example (ECDSA/Ed25519, plus an RS
 	   -DWOLFNANO_TARGET_PORTABLE_C \
 	   $(SERVER_CERT_SRC) $(WC)/rsa.c $(X509_BACKEND_SRC) examples/server_cert.c \
 	   -o $(BUILD)/example_server_cert_rsa
-	@echo "built $(BUILD)/example_server_cert{,_rsa}"
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER -DWOLFNANO_X509 \
+	   $(X509_BACKEND_FLAG) -DWOLFNANO_MLDSA -DWOLFNANO_MLDSA_SIGN \
+	   -DWOLFNANO_MLDSA_LEVEL=2 -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(SERVER_CERT_SRC) $(WC)/wc_mldsa.c $(WC)/sha3.c $(X509_BACKEND_SRC) \
+	   examples/server_cert.c -o $(BUILD)/example_server_cert_mldsa
+	@echo "built $(BUILD)/example_server_cert{,_rsa,_mldsa}"
 
 example-cert: ## build the X.509 server-cert client example (examples/client_cert.c)
 	@mkdir -p $(BUILD)
