@@ -77,11 +77,6 @@ static int wn_Accept_MaybeHrr(wn_Transcript* tc, wn_IoSend ioSend,
     if (ch->haveKeyShare != 0) {
         return WOLFNANO_SUCCESS;
     }
-    /* LCOV_EXCL_START: HRR needs a multi-group ClientHello (lead group != our
-     * group, our group offered in supported_groups); the single-group
-     * wn_Connect mock cannot produce one. Exercised end-to-end by the HRR
-     * interop legs (interop_server_hrr.sh, OpenSSL leading a non-matching
-     * key_share group) for both PSK and certificate servers. */
     synth[0] = 0xFE;                    /* handshake type message_hash */
     synth[1] = 0;
     synth[2] = 0;
@@ -121,7 +116,6 @@ static int wn_Accept_MaybeHrr(wn_Transcript* tc, wn_IoSend ioSend,
     }
 
     return ret;
-    /* LCOV_EXCL_STOP */
 }
 
 int wn_Accept_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,

@@ -178,6 +178,7 @@ int main(void)
     byte rec[512];
     byte body[256];
     byte hs32[32], eh[32], z32[32], th32[32];
+    byte ch1hrr[225], hrrbuf[450];
     wn_ServerHello shp;
     word32 rl, mlen, hrrLen;
     int rc, k;
@@ -259,6 +260,31 @@ int main(void)
     check(wn_HelloRetryRequest_Build(scratch, NULL, sizeof(scratch), body, 8,
               0x1301, 0x001d) == WOLFNANO_E_INVALID_ARG,
           "HelloRetryRequest_Build NULL outLen");
+
+    /* ----- HelloRetryRequest negotiation (RFC 8446 4.1.4) via mock I/O -----
+     * ch1hrr = the captured ClientHello with its key_share group flipped from
+     * x25519 to secp256r1 (offset 116): our group is still in supported_groups
+     * so the server must retry; ClientHello2 restores the real key_share. */
+    XMEMCPY(ch1hrr, g_valid_psk_ch, sizeof(g_valid_psk_ch));
+    ch1hrr[116] = 0x17;                          /* key_share x25519 -> secp256r1 */
+    XMEMCPY(hrrbuf, ch1hrr, sizeof(ch1hrr));
+    XMEMCPY(hrrbuf + sizeof(ch1hrr), g_valid_psk_ch, sizeof(g_valid_psk_ch));
+    XMEMSET(&mr, 0, sizeof(mr));
+    mr.in = hrrbuf; mr.inLen = 2 * sizeof(g_valid_psk_ch);
+    XMEMSET(&sc, 0, sizeof(sc));
+    rc = wn_Accept_Psk_ex(&sc, &rng, m_send, m_recv, &mr, g_psk, sizeof(g_psk),
+                          g_id, scratch, sizeof(scratch));
+    check(rc == WOLFNANO_E_BAD_MAC,
+          "HRR: no matching key_share retries, ClientHello2 reaches the binder");
+
+    XMEMCPY(hrrbuf + sizeof(ch1hrr), ch1hrr, sizeof(ch1hrr));  /* CH2 also omits it */
+    XMEMSET(&mr, 0, sizeof(mr));
+    mr.in = hrrbuf; mr.inLen = 2 * sizeof(ch1hrr);
+    XMEMSET(&sc, 0, sizeof(sc));
+    rc = wn_Accept_Psk_ex(&sc, &rng, m_send, m_recv, &mr, g_psk, sizeof(g_psk),
+                          g_id, scratch, sizeof(scratch));
+    check(rc == WOLFNANO_E_ILLEGAL_PARAM,
+          "HRR: client that ignores the retry is rejected");
 
     /* ----- wn_SessionEstablish: client and server key polarity are inverse ----- */
     for (k = 0; k < 32; k++) {
