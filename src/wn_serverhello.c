@@ -164,7 +164,8 @@ int wn_ServerHello_Build(byte* out, word32* outLen, word32 outCap,
     word32 body, ext;
     int ret = WOLFNANO_SUCCESS;
 
-    if ((out == NULL) || (random32 == NULL) || (srvPub == NULL)) {
+    if ((out == NULL) || (outLen == NULL) || (random32 == NULL) ||
+        (srvPub == NULL)) {
         return WOLFNANO_E_INVALID_ARG;
     }
     wn_Writer_Init(&w, out, outCap);
@@ -208,7 +209,7 @@ int wn_EncExt_Build(byte* out, word32* outLen, word32 outCap)
     word32 body;
     int ret = WOLFNANO_SUCCESS;
 
-    if (out == NULL) {
+    if ((out == NULL) || (outLen == NULL)) {
         return WOLFNANO_E_INVALID_ARG;
     }
     wn_Writer_Init(&w, out, outCap);

@@ -70,6 +70,7 @@ below proves the no-malloc build allocates nothing.
 | `make servertest` | PSK server (`wn_Accept_Psk`) vs the real client, all groups (X25519/P-256/hybrid), + send-failure and handshake-only wrapper coverage |
 | `make servercerttest` | cert server (`wn_Accept_Cert`) vs the real client: ECDSA P-256/P-384, Ed25519, RSA-PSS SHA-256/384/512, ML-DSA level 2/3/5 |
 | `make servernegtest` | adversarial server: arg checks, malformed/oversize ClientHello, IO failures, session-establish polarity |
+| `make servercertnomalloc` | ECDSA/Ed25519 cert server on the zero-allocation tier: native X.509 + `WOLFSSL_NO_MALLOC` |
 | `make noalloc-crypto` | runtime proof: zero heap allocations on the crypto path (`--wrap`, no-malloc) |
 | `make noalloc-handshake` | runtime proof: zero heap allocations over the full PSK handshake (`--wrap`, no-malloc) |
 | `make interop` | **live TLS 1.3 handshakes, both directions (our client and our server) vs OpenSSL/wolfSSL/mbedTLS: PSK (X25519/P-256/hybrid) + cert (ECDSA/Ed25519/RSA/ML-DSA)** |

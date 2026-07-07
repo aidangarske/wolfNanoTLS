@@ -76,15 +76,21 @@ run_renewcerts(){
     selfsign server/rsa4096 wolfNanoTLS-test 15 server/rsa4096
     echo "Updating server DER private keys (wn_Accept_Cert)"
     openssl ec   -in server/ec-key.pem   -outform DER -out server/ec-key-sec1.der
+    check_result $? "server ec-key DER"
     openssl ec   -in server/p384-key.pem -outform DER -out server/p384-key-sec1.der
+    check_result $? "server p384-key DER"
     openssl pkey -in server/ed-key.pem   -outform DER -out server/ed-key.der
+    check_result $? "server ed-key DER"
     openssl rsa  -in server/rsa-key.pem  -outform DER -out server/rsa-key-trad.der
+    check_result $? "server rsa-key DER"
     # ML-DSA server cert/key: from the wolfSSL example PKI (OpenSSL lacks ML-DSA)
     for lvl in 44 65 87; do
         cp ../../wolfssl/certs/mldsa/mldsa$lvl-cert.der server/mldsa$lvl-cert.der
+        check_result $? "server mldsa$lvl-cert copy"
         awk '/BEGIN/{f=1;next}/END/{f=0}f' \
             ../../wolfssl/certs/mldsa/mldsa$lvl-key.pem \
             | base64 -d > server/mldsa$lvl-key.der
+        check_result $? "server mldsa$lvl-key decode"
     done
     echo "---------------------------------------------------------------------"
 

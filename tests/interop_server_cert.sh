@@ -31,10 +31,16 @@ case "$PEER" in
             >/tmp/wn_certcli.log 2>&1 ;;
     wolfssl)
         WD=${WOLFSSL_DIR:-$HOME/wolfssl-psk}
+        [ -x "$WD/examples/client/client" ] || { kill "$SPID" 2>/dev/null; wait "$SPID" 2>/dev/null
+            printf "\033[33mSKIP cert server ($TYPE vs wolfssl: client unavailable)\033[0m\n"
+            exit 0; }
         ( cd "$WD" && exec examples/client/client -v 4 -d -t \
             -h 127.0.0.1 -p "$PORT" ) >/tmp/wn_certcli.log 2>&1 ;;
     mbedtls)
         MB=${MBEDTLS_CLIENT:-$HOME/mbedtls/programs/ssl/ssl_client2}
+        [ -x "$MB" ] || { kill "$SPID" 2>/dev/null; wait "$SPID" 2>/dev/null
+            printf "\033[33mSKIP cert server ($TYPE vs mbedtls: ssl_client2 unavailable)\033[0m\n"
+            exit 0; }
         "$MB" server_addr=127.0.0.1 server_port="$PORT" force_version=tls13 \
             groups=x25519 auth_mode=none \
             ca_file="tests/pki/server/${CERT%.der}.pem" \

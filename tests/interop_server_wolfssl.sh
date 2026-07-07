@@ -35,10 +35,15 @@ sleep 0.5
 
 ( cd "$WOLFSSL_DIR" && exec examples/client/client -v 4 -s $KXFLAG \
     -h 127.0.0.1 -p "$PORT" ) >/tmp/wn_wsclient.log 2>&1
+
+# Never block forever if the client exited before connecting: poll, then reap.
+i=0
+while [ $i -lt 30 ] && kill -0 "$SPID" 2>/dev/null; do sleep 0.1; i=$((i + 1)); done
+kill "$SPID" 2>/dev/null
 wait "$SPID" 2>/dev/null
 SRC=$?
 
-if [ "$SRC" -eq 0 ] && grep -q "handshake complete" /tmp/wn_server_ws.log; then
+if grep -q "handshake complete" /tmp/wn_server_ws.log; then
     printf "\033[32mPASS\033[0m TLS 1.3 PSK server (wolfSSL client, $WNGROUP)\n"
     exit 0
 fi

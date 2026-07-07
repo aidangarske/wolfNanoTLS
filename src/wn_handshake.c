@@ -78,6 +78,10 @@ int wn_RecvHandshake(wn_IoRecv ioRecv, void* ioCtx, byte* acc, word32 accCap,
     int ret = WOLFNANO_SUCCESS;
     int complete = 0;
 
+    if ((ioRecv == NULL) || (acc == NULL) || (tmp == NULL) || (msgLen == NULL)) {
+        return WOLFNANO_E_INVALID_ARG;
+    }
+
     while ((ret == WOLFNANO_SUCCESS) && (complete == 0)) {
         ret = wn_RecvRecord(ioRecv, ioCtx, tmp, tmpCap, &rtype, &recLen);
         if ((ret == WOLFNANO_SUCCESS) && (rtype == WN_REC_CHANGE_CIPHER)) {

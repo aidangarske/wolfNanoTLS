@@ -27,6 +27,7 @@
 #include "wn_accept.h"
 #include "wn_servercert.h"
 #include "wn_handshake.h"
+#include "wn_serverhello.h"
 #include "wn_keyshare.h"
 #include "wolfnano_crypto.h"
 #include <stdio.h>
@@ -234,6 +235,19 @@ int main(void)
     check(wn_RecvHandshake(m_recv, &mr, body, sizeof(body), scratch,
                            sizeof(scratch), &mlen) != WOLFNANO_SUCCESS,
           "reassembly rejects trailing bytes after the message");
+
+    /* ----- helper output-pointer / callback validation ----- */
+    check(wn_RecvHandshake(NULL, &mr, body, sizeof(body), scratch,
+                           sizeof(scratch), &mlen) == WOLFNANO_E_INVALID_ARG,
+          "RecvHandshake NULL ioRecv");
+    check(wn_RecvHandshake(m_recv, &mr, body, sizeof(body), scratch,
+                           sizeof(scratch), NULL) == WOLFNANO_E_INVALID_ARG,
+          "RecvHandshake NULL msgLen");
+    check(wn_ServerHello_Build(scratch, NULL, sizeof(scratch), rec, rec, 0,
+                               0x1301, 0x001d, rec, 32, 0, 0)
+              == WOLFNANO_E_INVALID_ARG, "ServerHello_Build NULL outLen");
+    check(wn_EncExt_Build(scratch, NULL, sizeof(scratch))
+              == WOLFNANO_E_INVALID_ARG, "EncExt_Build NULL outLen");
 
     /* ----- wn_SessionEstablish: client and server key polarity are inverse ----- */
     for (k = 0; k < 32; k++) {

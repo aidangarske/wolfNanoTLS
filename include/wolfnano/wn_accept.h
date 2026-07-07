@@ -30,6 +30,8 @@
 #include "wn_session.h"
 #include "wolfnano_crypto.h"
 
+#ifdef WOLFNANO_SERVER
+
 /* Complete a TLS 1.3 PSK + ECDHE server handshake with a connecting client and
  * retain the application session in sess for wn_Send / wn_Recv / wn_Close. psk /
  * identity are the shared external PSK and its identity. scratch is a caller
@@ -64,5 +66,7 @@ WOLFNANO_API int wn_Accept_Cert(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv,
                                 const byte* keyDer, word32 keyLen, word16 scheme,
                                 byte* scratch, word32 scratchLen);
 #endif /* WOLFNANO_X509 */
+
+#endif /* WOLFNANO_SERVER */
 
 #endif /* WN_ACCEPT_H */

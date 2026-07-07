@@ -259,8 +259,12 @@ int wn_Accept_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     ForceZero(sKey, sizeof(sKey));
     ForceZero(sIv, sizeof(sIv));
     ForceZero(ecdhe, sizeof(ecdhe));
+    ForceZero(mac, sizeof(mac));
+    ForceZero(recvMac, sizeof(recvMac));
+    ForceZero(flight, sizeof(flight));
     if (ret != WOLFNANO_SUCCESS) {   /* never leave a half-open established session */
         ForceZero(sess, sizeof(*sess));
+        ForceZero(scratch, scratchLen);   /* handshake plaintext lingered in scratch */
     }
     return ret;
 }
@@ -490,8 +494,12 @@ int wn_Accept_Cert_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     ForceZero(sKey, sizeof(sKey));
     ForceZero(sIv, sizeof(sIv));
     ForceZero(ecdhe, sizeof(ecdhe));
+    ForceZero(mac, sizeof(mac));
+    ForceZero(recvMac, sizeof(recvMac));
+    ForceZero(thCv, sizeof(thCv));
     if (ret != WOLFNANO_SUCCESS) {   /* never leave a half-open established session */
         ForceZero(sess, sizeof(*sess));
+        ForceZero(scratch, scratchLen);   /* Certificate/CV/Finished plaintext in scratch */
     }
     return ret;
 }
