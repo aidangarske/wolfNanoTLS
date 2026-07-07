@@ -62,6 +62,30 @@ At ~17 KB the X25519 PSK client fits where even a hard-minimized mbedTLS 4.1.0
 wolfSSL also ship **no ML-KEM / ML-DSA**, so wolfNanoTLS's PQC client rows have no
 counterpart.
 
+## Footprint: whole TLS 1.3 server (Cortex-M33, `.text` bytes)
+
+The `WOLFNANO_SERVER` adder (off by default) built the same way: linked from
+source for Cortex-M33, same minimal scope, all three libraries server-only
+(wolfSSL `NO_WOLFSSL_CLIENT`, mbedTLS `IS_SERVER`, wolfNanoTLS `wn_Accept_*`).
+The cert row is an ECDSA P-256 server certificate (server signs
+CertificateVerify). Reproduce with `sh bench/footprint-servers.sh`:
+
+| Server | wolfNanoTLS | mbedTLS 3.6.0 | wolfSSL | vs mbedTLS | vs wolfSSL |
+|---|--:|--:|--:|--:|--:|
+| PSK + ECDHE, X25519 | **20,084** | 42,100 | - | 48% | - |
+| PSK + ECDHE, P-256 | **28,008** | 47,727 | - | 59% | - |
+| cert / X.509, P-256 | **46,768** | 102,696 | 152,562 | 46% | 31% |
+
+The server shell adds the ClientHello decoder, ServerHello/EncryptedExtensions/
+Certificate/CertificateVerify encoders, the accept state machine, and
+HelloRetryRequest on top of the shared handshake core, so it runs a little larger
+than the matching client (X25519 PSK: 20.1 KB server vs 18.7 KB client). It stays
+roughly **half** the size of a comparably-scoped mbedTLS 3.6.0 server and about a
+**third** of a full wolfSSL server. As with the client, mbedTLS 4.x narrows the
+PSK gap but wolfNanoTLS remains smaller; the cert server signs with ECDSA P-256
+(ECC + `wn_servercert`, no X.509 chain-verify or RSA), which is leaner than the
+verifying client cert path.
+
 ## TLS-layer source + `.text` (host clang, `-Os`)
 
 The crypto floor is the same wolfcrypt objects in both, so it is not the
