@@ -217,7 +217,7 @@ ASM_CC    := $(CC_$(WOLFNANO_ASM))
 ASM_FLAGS := $(FLAGS_$(WOLFNANO_ASM))
 ASM_SRC   := $(SPSRC_$(WOLFNANO_ASM)) $(ASMSRC_$(WOLFNANO_ASM))
 
-.PHONY: host kstest keyupdatetest sessiontest mocktest mockhybridtest servertest servercerttest servernegtest example-server-cert errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest certmldsatest certnegtest certnegpintest certgentest hybridtest certtest x509diff x509verifytest x509negtest x509negvectest x509probetest x509covtest noalloc-crypto noalloc-handshake bench benchrun targets test-qemu test test-core test-x509 test-cert check example example-server example-cert example-cert-min example-cert-pqc cert-notime-build example-https example-https-lite example-pqc configs-build m33mu coverage stackcheck clean
+.PHONY: host kstest keyupdatetest sessiontest mocktest mockhybridtest servertest servercerttest servernegtest servercertnomalloc example-server-cert errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest certmldsatest certnegtest certnegpintest certgentest hybridtest certtest x509diff x509verifytest x509negtest x509negvectest x509probetest x509covtest noalloc-crypto noalloc-handshake bench benchrun targets test-qemu test test-core test-x509 test-cert check example example-server example-cert example-cert-min example-cert-pqc cert-notime-build example-https example-https-lite example-pqc configs-build m33mu coverage stackcheck clean
 test: test-core test-x509 mlkemtest mldsatest hybridtest mockhybridtest wctestpqc ## build + run all local self-tests (certmldsatest runs separately; compiling X509 here would drag the interop-only cert path into the coverage build)
 test-core: host kstest keyupdatetest sessiontest mocktest errtest rfctest tstest rectest ksharetest hstest wctest msgtest chtest shtest negtest flighttest alerttest matrixtest ## protocol + crypto suites (no cert/X.509/server; those are test-x509 / test-cert)
 test-x509: certtest x509diff x509verifytest x509negtest x509negvectest x509covtest x509probetest ## native wn_x509 parser + cert-verify unit tests
@@ -298,6 +298,19 @@ servertest: ## build + run the TLS 1.3 PSK server vs the real client (WOLFNANO_S
 	   $(SERVER_HYBRID_SRC) tests/accept_mock_test.c -o $(BUILD)/accept_mock_hybrid_test
 	@echo "---- run (X25519MLKEM768) ----"
 	@./$(BUILD)/accept_mock_hybrid_test
+
+servercertnomalloc: ## ECDSA/Ed25519 cert server on the zero-allocation tier (native X.509 + WOLFSSL_NO_MALLOC)
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS_BASE) $(SHELL_INC) -DWOLFNANO_SERVER -DWOLFNANO_X509 \
+	   -DWOLFNANO_X509_LITE -DWOLFSSL_NO_MALLOC -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(SERVER_CERT_SRC) src/wn_x509.c tests/accept_cert_mock_test.c \
+	   -o $(BUILD)/accept_cert_nomalloc_test
+	@echo "---- run (ECDSA P-256, no-malloc) ----"
+	@./$(BUILD)/accept_cert_nomalloc_test tests/pki/server/ec-cert.der \
+	   tests/pki/server/ec-key-sec1.der 0403
+	@echo "---- run (Ed25519, no-malloc) ----"
+	@./$(BUILD)/accept_cert_nomalloc_test tests/pki/server/ed-cert.der \
+	   tests/pki/server/ed-key.der 0807
 
 servernegtest: ## adversarial server test: arg checks, malformed ClientHello, IO failures
 	@mkdir -p $(BUILD)

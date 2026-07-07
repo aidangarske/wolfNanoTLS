@@ -23,6 +23,6 @@ jobs:
         # asn.c cert parsing, RSA cert chains, and ML-DSA sign need heap, so the
         # no-malloc build runs the PSK/floor/ML-KEM/hybrid suites + the native
         # wn_x509 ECDSA cert-verify.
-        run: make test-core mlkemtest hybridtest mockhybridtest x509verifytest servertest MEM=nomalloc
+        run: make test-core mlkemtest hybridtest mockhybridtest x509verifytest servertest MEM=nomalloc && make servercertnomalloc
       - name: runtime allocation probe (crypto path + full PSK handshake)
         run: make noalloc-crypto noalloc-handshake
