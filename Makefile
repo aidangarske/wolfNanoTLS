@@ -482,10 +482,14 @@ matrixtest: ## build + run the data-driven negotiation matrix (PORTABLE_C)
 FUZZ_TIME ?= 60
 FUZZ_CC ?= clang
 fuzz: ## coverage-guided fuzz of the wire parsers (clang libFuzzer + ASan)
-	@mkdir -p $(BUILD)/corp_sh $(BUILD)/corp_msg $(BUILD)/corp_rec $(BUILD)/corp_x509
+	@mkdir -p $(BUILD)/corp_sh $(BUILD)/corp_ch $(BUILD)/corp_msg $(BUILD)/corp_rec $(BUILD)/corp_x509
 	$(FUZZ_CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C \
 	   -fsanitize=fuzzer,address,undefined -g \
 	   src/wn_x509.c tests/fuzz_x509.c -o $(BUILD)/fuzz_x509
+	$(FUZZ_CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER \
+	   -DWOLFNANO_TARGET_PORTABLE_C -fsanitize=fuzzer,address -g \
+	   src/wn_msg.c src/wn_clienthello.c tests/fuzz_clienthello.c \
+	   -o $(BUILD)/fuzz_clienthello
 	$(FUZZ_CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C \
 	   -fsanitize=fuzzer,address -g \
 	   src/wn_msg.c src/wn_serverhello.c tests/fuzz_serverhello.c \
@@ -501,6 +505,7 @@ fuzz: ## coverage-guided fuzz of the wire parsers (clang libFuzzer + ASan)
 	@echo "---- run ($(FUZZ_TIME)s each) ----"
 	@./$(BUILD)/fuzz_x509       -max_total_time=$(FUZZ_TIME) -timeout=10 $(BUILD)/corp_x509
 	@./$(BUILD)/fuzz_serverhello -max_total_time=$(FUZZ_TIME) -timeout=10 $(BUILD)/corp_sh
+	@./$(BUILD)/fuzz_clienthello -max_total_time=$(FUZZ_TIME) -timeout=10 $(BUILD)/corp_ch
 	@./$(BUILD)/fuzz_msg        -max_total_time=$(FUZZ_TIME) -timeout=10 $(BUILD)/corp_msg
 	@./$(BUILD)/fuzz_record     -max_total_time=$(FUZZ_TIME) -timeout=10 $(BUILD)/corp_rec
 
