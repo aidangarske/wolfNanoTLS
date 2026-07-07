@@ -228,6 +228,36 @@ int main(void)
                            1, rec, 1, 0x0403, scratch, 100);
     check(rc == WOLFNANO_E_INVALID_ARG, "Cert tiny scratch rejected");
 
+    /* ----- full NULL / zero-input validation on the _ex entry points ----- */
+    XMEMSET(&mr, 0, sizeof(mr));
+    check(wn_Accept_Psk_ex(&sc, &rng, NULL, m_recv, &mr, g_psk, sizeof(g_psk),
+              g_id, scratch, sizeof(scratch)) == WOLFNANO_E_INVALID_ARG,
+          "PSK_ex NULL ioSend");
+    check(wn_Accept_Psk_ex(&sc, &rng, m_send, NULL, &mr, g_psk, sizeof(g_psk),
+              g_id, scratch, sizeof(scratch)) == WOLFNANO_E_INVALID_ARG,
+          "PSK_ex NULL ioRecv");
+    check(wn_Accept_Psk_ex(&sc, &rng, m_send, m_recv, &mr, NULL, sizeof(g_psk),
+              g_id, scratch, sizeof(scratch)) == WOLFNANO_E_INVALID_ARG,
+          "PSK_ex NULL psk");
+    check(wn_Accept_Psk_ex(&sc, &rng, m_send, m_recv, &mr, g_psk, 0, g_id,
+              scratch, sizeof(scratch)) == WOLFNANO_E_INVALID_ARG,
+          "PSK_ex zero pskLen");
+    check(wn_Accept_Psk_ex(&sc, &rng, m_send, m_recv, &mr, g_psk, sizeof(g_psk),
+              NULL, scratch, sizeof(scratch)) == WOLFNANO_E_INVALID_ARG,
+          "PSK_ex NULL identity");
+    check(wn_Accept_Psk_ex(&sc, &rng, m_send, m_recv, &mr, g_psk, sizeof(g_psk),
+              g_id, NULL, sizeof(scratch)) == WOLFNANO_E_INVALID_ARG,
+          "PSK_ex NULL scratch");
+    check(wn_Accept_Cert_ex(&sc, &rng, NULL, m_recv, &mr, rec, 8, rec, 8, 0x0403,
+              scratch, sizeof(scratch)) == WOLFNANO_E_INVALID_ARG,
+          "cert_ex NULL ioSend");
+    check(wn_Accept_Cert_ex(&sc, &rng, m_send, m_recv, &mr, NULL, 8, rec, 8,
+              0x0403, scratch, sizeof(scratch)) == WOLFNANO_E_INVALID_ARG,
+          "cert_ex NULL certDer");
+    check(wn_Accept_Cert_ex(&sc, &rng, m_send, m_recv, &mr, rec, 8, NULL, 8,
+              0x0403, scratch, sizeof(scratch)) == WOLFNANO_E_INVALID_ARG,
+          "cert_ex NULL keyDer");
+
     /* ----- first record not a handshake (alert type 21) ----- */
     body[0] = 0;
     rl = wrap_record(rec, body, 1);

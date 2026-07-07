@@ -225,7 +225,8 @@ test-cert: certnegtest certnegpintest certgentest servercerttest servernegtest #
 
 SUITES := host kstest keyupdatetest sessiontest mocktest mockhybridtest errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc \
   msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest certmldsatest certnegtest certnegpintest certgentest hybridtest certtest \
-  x509diff x509verifytest x509negtest x509negvectest x509covtest
+  x509diff x509verifytest x509negtest x509negvectest x509covtest \
+  servertest servercerttest servernegtest
 
 check: ## run every suite, continue past failures, print one colored PASS/FAIL tally
 	@mkdir -p $(BUILD)
@@ -906,12 +907,20 @@ m33mu: ## build + run the wolfNanoTLS floor on an emulated Cortex-M33 (STM32H563
 
 STACK_SRC := wn_connect.c wn_session.c wn_record.c wn_keyschedule.c \
   wn_keyshare.c wn_transcript.c wn_msg.c wn_serverhello.c wn_clienthello.c
+STACK_SERVER_SRC := wn_accept.c wn_handshake.c wn_servercert.c
 stackcheck: ## fail if any wolfNanoTLS function exceeds the stack budget (-fstack-usage)
 	@mkdir -p $(BUILD)/su
 	@for b in $(STACK_SRC); do \
 	  $(CC) -Os -fstack-usage -c $(SHELL_INC) -DWOLFSSL_USER_SETTINGS \
 	    -DWOLFNANO_TARGET_PORTABLE_C $(MEM_FLAG) -DWOLFNANO_X509 \
 	    -DWOLFNANO_HAVE_RSA_VERIFY \
+	    -I. -I$(WOLFSSL) src/$$b -o $(BUILD)/su/$${b%.c}.o; \
+	done
+	@for b in $(STACK_SERVER_SRC); do \
+	  $(CC) -Os -fstack-usage -c $(SHELL_INC) -DWOLFSSL_USER_SETTINGS \
+	    -DWOLFNANO_TARGET_PORTABLE_C -DWOLFSSL_SMALL_STACK -DWOLFNANO_SERVER \
+	    -DWOLFNANO_X509 -DWOLFNANO_HAVE_RSA_VERIFY -DWOLFNANO_RSA_FULL \
+	    -DWOLFNANO_MLDSA -DWOLFNANO_MLDSA_SIGN \
 	    -I. -I$(WOLFSSL) src/$$b -o $(BUILD)/su/$${b%.c}.o; \
 	done
 	@sh scripts/check_stack.sh $(BUILD)/su/*.su

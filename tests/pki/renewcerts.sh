@@ -75,13 +75,17 @@ run_renewcerts(){
     echo "Updating server/rsa4096-cert"
     selfsign server/rsa4096 wolfNanoTLS-test 15 server/rsa4096
     echo "Updating server DER private keys (wn_Accept_Cert)"
-    openssl ec   -in server/ec-key.pem  -outform DER -out server/ec-key-sec1.der
-    openssl pkey -in server/ed-key.pem  -outform DER -out server/ed-key.der
-    openssl rsa  -in server/rsa-key.pem -outform DER -out server/rsa-key-trad.der
-    # ML-DSA-44 server cert/key: from the wolfSSL example PKI (OpenSSL lacks ML-DSA)
-    cp ../../wolfssl/certs/mldsa/mldsa44-cert.der server/mldsa44-cert.der
-    awk '/BEGIN/{f=1;next}/END/{f=0}f' ../../wolfssl/certs/mldsa/mldsa44-key.pem \
-        | base64 -d > server/mldsa44-key.der
+    openssl ec   -in server/ec-key.pem   -outform DER -out server/ec-key-sec1.der
+    openssl ec   -in server/p384-key.pem -outform DER -out server/p384-key-sec1.der
+    openssl pkey -in server/ed-key.pem   -outform DER -out server/ed-key.der
+    openssl rsa  -in server/rsa-key.pem  -outform DER -out server/rsa-key-trad.der
+    # ML-DSA server cert/key: from the wolfSSL example PKI (OpenSSL lacks ML-DSA)
+    for lvl in 44 65 87; do
+        cp ../../wolfssl/certs/mldsa/mldsa$lvl-cert.der server/mldsa$lvl-cert.der
+        awk '/BEGIN/{f=1;next}/END/{f=0}f' \
+            ../../wolfssl/certs/mldsa/mldsa$lvl-key.pem \
+            | base64 -d > server/mldsa$lvl-key.der
+    done
     echo "---------------------------------------------------------------------"
 
     ############################################################

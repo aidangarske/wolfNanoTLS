@@ -187,9 +187,9 @@ int wn_ClientHello_HasSigAlg(const wn_ClientHello* ch, word16 scheme)
 int wn_ClientHello_Parse(const byte* msg, word32 msgLen, wn_ClientHello* out)
 {
     wn_Reader r;
-    word32 hsLen, extEnd, eEnd, ksEnd, idsEnd, ksVec;
+    word32 hsLen, extEnd, eEnd, ksEnd, idsEnd, bndEnd, ksVec;
     word16 vecLen, et, el, csLen, i, klen, idLen, idsLen, cs;
-    word16 g;
+    word16 g, nId, nBnd;
     byte sidLen, compLen, comp, blen, nver, pmLen, j;
     byte seenPsk = 0, dup, nSeen = 0;
     byte haveTls13 = 0, havePskDhe = 0, haveGroups = 0, groupOffered = 0;
@@ -283,9 +283,10 @@ int wn_ClientHello_Parse(const byte* msg, word32 msgLen, wn_ClientHello* out)
             out->sigAlgsLen = idsLen;
         }
         else if (et == WN_EXT_SUPPORTED_GRPS) {
-            glen = wn_Read_U16(&r);             /* named_group_list */
+            glen = wn_Read_U16(&r);             /* named_group_list length */
             haveGroups = 1;
-            for (j = 0; (j + 1) < glen; j += 2) {
+            ksEnd = r.pos + glen;               /* word32 bound; no byte overflow */
+            while ((r.err == 0) && ((r.pos + 2) <= ksEnd)) {
                 if (wn_Read_U16(&r) == WN_DEFAULT_GROUP) {
                     groupOffered = 1;
                 }
@@ -310,26 +311,40 @@ int wn_ClientHello_Parse(const byte* msg, word32 msgLen, wn_ClientHello* out)
         }
         else if (et == WN_EXT_PRE_SHARED_KEY) {
             seenPsk = 1;
-            idsLen = wn_Read_U16(&r);           /* identities vector */
+            idsLen = wn_Read_U16(&r);           /* identities vector length */
             idsEnd = r.pos + idsLen;
-            idLen = wn_Read_U16(&r);
-            out->pskIdentity = wn_Read_Bytes(&r, idLen);
-            out->pskIdentityLen = idLen;
-            if ((idsEnd >= r.pos) && (idsEnd <= eEnd)) {  /* skip further identities */
-                (void)wn_Read_Bytes(&r, idsEnd - r.pos);
+            if (idsEnd > eEnd) { r.err = 1; }
+            /* each PskIdentity = identity<1..> + obfuscated_ticket_age (4) */
+            nId = 0;
+            while ((r.pos < idsEnd) && (r.err == 0)) {
+                idLen = wn_Read_U16(&r);
+                p = wn_Read_Bytes(&r, idLen);
+                (void)wn_Read_Bytes(&r, 4);     /* obfuscated_ticket_age */
+                if (idLen == 0) { r.err = 1; }
+                if (nId == 0) {                 /* keep the first identity */
+                    out->pskIdentity = p;
+                    out->pskIdentityLen = idLen;
+                }
+                nId++;
             }
-            else {
-                r.err = 1;
+            if (r.pos != idsEnd) { r.err = 1; } /* identities must end exactly */
+            out->binderTruncLen = r.pos;        /* binder MAC boundary (RFC 4.2.11.2) */
+            idsLen = wn_Read_U16(&r);           /* binders vector length */
+            bndEnd = r.pos + idsLen;
+            if (bndEnd != eEnd) { r.err = 1; }  /* binders fill the extension */
+            nBnd = 0;
+            while ((r.pos < bndEnd) && (r.err == 0)) {
+                blen = wn_Read_U8(&r);
+                p = wn_Read_Bytes(&r, blen);
+                if (nBnd == 0) {                /* keep the first binder */
+                    out->binder = p;
+                    out->binderLen = blen;
+                }
+                nBnd++;
             }
-            out->binderTruncLen = r.pos;        /* binders section starts here */
-            (void)wn_Read_U16(&r);              /* binders vector length */
-            blen = wn_Read_U8(&r);              /* first binder length */
-            out->binder = wn_Read_Bytes(&r, blen);
-            out->binderLen = blen;
+            /* one binder per identity (RFC 8446 4.2.11) */
+            if ((r.pos != bndEnd) || (nId == 0) || (nId != nBnd)) { r.err = 1; }
             out->havePsk = 1;
-            if ((r.err == 0) && (r.pos < eEnd)) {  /* consume any further binders */
-                (void)wn_Read_Bytes(&r, eEnd - r.pos);
-            }
         }
         else {
             (void)wn_Read_Bytes(&r, el);
