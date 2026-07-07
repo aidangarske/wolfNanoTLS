@@ -51,5 +51,6 @@ jobs:
           make certmldsatest $MEMARG          # ML-DSA-44 leaf, asn.c
           make certmldsatest X509_LITE=1 $MEMARG  # ML-DSA-44 leaf, native
           make servercerttest $MEMARG         # cert server (ECDSA/Ed25519/RSA/ML-DSA)
+          make servernegtest $MEMARG          # adversarial server (arg/parse/IO failures)
           make cert-notime-build $MEMARG      # clockless tier compiles
           make configs-build                  # every starter template (incl cert_p256min)
