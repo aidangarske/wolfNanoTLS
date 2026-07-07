@@ -46,4 +46,23 @@ WOLFNANO_API int wn_Accept_Psk(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv,
                                const char* identity, byte* scratch,
                                word32 scratchLen);
 
+#ifdef WOLFNANO_X509
+/* Complete a TLS 1.3 certificate server handshake: present certDer (a leaf cert,
+ * DER) and sign CertificateVerify under scheme with keyDer (private key, DER).
+ * scheme is a WN_SIG_* TLS 1.3 signature scheme matching the key. scratch is a
+ * caller buffer (>= 4096 bytes; larger for RSA/ML-DSA) for framing. */
+WOLFNANO_API int wn_Accept_Cert_ex(wn_Session* sess, WC_RNG* rng,
+                                   wn_IoSend ioSend, wn_IoRecv ioRecv,
+                                   void* ioCtx, const byte* certDer,
+                                   word32 certLen, const byte* keyDer,
+                                   word32 keyLen, word16 scheme, byte* scratch,
+                                   word32 scratchLen);
+
+/* Handshake-only form: runs wn_Accept_Cert_ex on a stack session and wipes it. */
+WOLFNANO_API int wn_Accept_Cert(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv,
+                                void* ioCtx, const byte* certDer, word32 certLen,
+                                const byte* keyDer, word32 keyLen, word16 scheme,
+                                byte* scratch, word32 scratchLen);
+#endif /* WOLFNANO_X509 */
+
 #endif /* WN_ACCEPT_H */

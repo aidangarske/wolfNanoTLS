@@ -79,6 +79,11 @@ CONN_CERT_SRC := $(FLOOR_SRC) $(WC)/sp_int.c \
   src/wn_keyshare.c src/wn_serverhello.c \
   src/wn_clienthello.c src/wn_connect.c src/wn_session.c \
   tests/wn_host_seed.c
+
+# Certificate server adder: the cert floor plus the server shell + cert signer.
+SERVER_CERT_SRC := $(CONN_CERT_SRC) src/wn_accept.c src/wn_handshake.c \
+  src/wn_servercert.c
+
 # Minimal single-curve P-256 cert build: no rsa.c, sha512.c, or ed25519.c deps.
 CONN_CERT_P256MIN_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c \
   $(WC)/hash.c $(WC)/random.c $(WC)/wolfmath.c $(WC)/logging.c $(WC)/coding.c \
@@ -212,7 +217,7 @@ ASM_CC    := $(CC_$(WOLFNANO_ASM))
 ASM_FLAGS := $(FLAGS_$(WOLFNANO_ASM))
 ASM_SRC   := $(SPSRC_$(WOLFNANO_ASM)) $(ASMSRC_$(WOLFNANO_ASM))
 
-.PHONY: host kstest keyupdatetest sessiontest mocktest mockhybridtest servertest errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest certmldsatest certnegtest certnegpintest certgentest hybridtest certtest x509diff x509verifytest x509negtest x509negvectest x509probetest x509covtest noalloc-crypto noalloc-handshake bench benchrun targets test-qemu test test-core test-x509 test-cert check example example-server example-cert example-cert-min example-cert-pqc cert-notime-build example-https example-https-lite example-pqc configs-build m33mu coverage stackcheck clean
+.PHONY: host kstest keyupdatetest sessiontest mocktest mockhybridtest servertest servercerttest example-server-cert errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest certmldsatest certnegtest certnegpintest certgentest hybridtest certtest x509diff x509verifytest x509negtest x509negvectest x509probetest x509covtest noalloc-crypto noalloc-handshake bench benchrun targets test-qemu test test-core test-x509 test-cert check example example-server example-cert example-cert-min example-cert-pqc cert-notime-build example-https example-https-lite example-pqc configs-build m33mu coverage stackcheck clean
 test: test-core test-x509 mlkemtest mldsatest hybridtest mockhybridtest wctestpqc ## build + run all local self-tests (certmldsatest runs separately; compiling X509 here would drag the interop-only cert path into the coverage build)
 test-core: host kstest keyupdatetest sessiontest mocktest errtest rfctest tstest rectest ksharetest hstest wctest msgtest chtest shtest negtest flighttest alerttest matrixtest ## protocol + crypto suites (no cert/X.509; those are test-x509 / test-cert)
 test-x509: certtest x509diff x509verifytest x509negtest x509negvectest x509covtest x509probetest ## native wn_x509 parser + cert-verify unit tests
@@ -292,6 +297,27 @@ servertest: ## build + run the TLS 1.3 PSK server vs the real client (WOLFNANO_S
 	   $(SERVER_HYBRID_SRC) tests/accept_mock_test.c -o $(BUILD)/accept_mock_hybrid_test
 	@echo "---- run (X25519MLKEM768) ----"
 	@./$(BUILD)/accept_mock_hybrid_test
+
+servercerttest: ## build + run the TLS 1.3 cert server vs the real cert client (WOLFNANO_SERVER + X509)
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER -DWOLFNANO_X509 \
+	   $(X509_BACKEND_FLAG) -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(SERVER_CERT_SRC) $(X509_BACKEND_SRC) tests/accept_cert_mock_test.c \
+	   -o $(BUILD)/accept_cert_mock_test
+	@echo "---- run (ECDSA P-256) ----"
+	@./$(BUILD)/accept_cert_mock_test tests/pki/server/ec-cert.der \
+	   tests/pki/server/ec-key-sec1.der 0403
+	@echo "---- run (Ed25519) ----"
+	@./$(BUILD)/accept_cert_mock_test tests/pki/server/ed-cert.der \
+	   tests/pki/server/ed-key.der 0807
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER -DWOLFNANO_X509 \
+	   $(X509_BACKEND_FLAG) -DWOLFNANO_HAVE_RSA_VERIFY -DWOLFNANO_RSA_FULL \
+	   -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(SERVER_CERT_SRC) $(WC)/rsa.c $(X509_BACKEND_SRC) \
+	   tests/accept_cert_mock_test.c -o $(BUILD)/accept_cert_mock_rsa_test
+	@echo "---- run (RSA-PSS 2048) ----"
+	@./$(BUILD)/accept_cert_mock_rsa_test tests/pki/server/rsa-cert.der \
+	   tests/pki/server/rsa-key-trad.der 0804
 
 mockhybridtest: ## build + run the X25519MLKEM768 hybrid mock-server handshake test
 	@mkdir -p $(BUILD)
@@ -640,6 +666,14 @@ interop: ## live TLS 1.3 PSK handshake vs OpenSSL and wolfSSL
 	@echo "== server PSK (X25519MLKEM768) vs OpenSSL =="; SERVER=$(BUILD)/example_server_hybrid KXGROUP=X25519MLKEM768 sh tests/interop_server_psk.sh
 	@echo "== server PSK (X25519MLKEM768) vs wolfSSL =="; SERVER=$(BUILD)/example_server_hybrid WNGROUP=hybrid sh tests/interop_server_wolfssl.sh
 	@echo "== server PSK (X25519MLKEM768) vs mbedTLS =="; SERVER=$(BUILD)/example_server_hybrid WNGROUP=hybrid sh tests/interop_server_mbedtls.sh
+	@$(MAKE) --no-print-directory example-server-cert
+	@echo "== cert server (ECDSA) vs OpenSSL =="; PEER=openssl sh tests/interop_server_cert.sh ecdsa
+	@echo "== cert server (ECDSA) vs wolfSSL =="; PEER=wolfssl sh tests/interop_server_cert.sh ecdsa
+	@echo "== cert server (ECDSA) vs mbedTLS =="; PEER=mbedtls sh tests/interop_server_cert.sh ecdsa
+	@echo "== cert server (Ed25519) vs OpenSSL =="; PEER=openssl sh tests/interop_server_cert.sh ed
+	@echo "== cert server (Ed25519) vs wolfSSL =="; PEER=wolfssl sh tests/interop_server_cert.sh ed
+	@echo "== cert server (RSA-PSS) vs OpenSSL =="; SERVER=$(BUILD)/example_server_cert_rsa PEER=openssl sh tests/interop_server_cert.sh rsa
+	@echo "== cert server (RSA-PSS) vs wolfSSL =="; SERVER=$(BUILD)/example_server_cert_rsa PEER=wolfssl sh tests/interop_server_cert.sh rsa
 
 # Build + run the all-algo bench for the active WOLFNANO_ASM arch.
 benchrun:
@@ -718,6 +752,19 @@ example-server: ## build the minimal PSK server example (examples/server.c)
 	   -DWOLFNANO_HAVE_MLKEM_HYBRID -DWOLFNANO_TARGET_PORTABLE_C \
 	   $(SERVER_HYBRID_SRC) examples/server.c -o $(BUILD)/example_server_hybrid
 	@echo "built $(BUILD)/example_server{,_p256,_hybrid}"
+
+example-server-cert: ## build the cert server example (ECDSA/Ed25519, plus an RSA-PSS build)
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER -DWOLFNANO_X509 \
+	   $(X509_BACKEND_FLAG) -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(SERVER_CERT_SRC) $(X509_BACKEND_SRC) examples/server_cert.c \
+	   -o $(BUILD)/example_server_cert
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER -DWOLFNANO_X509 \
+	   $(X509_BACKEND_FLAG) -DWOLFNANO_HAVE_RSA_VERIFY -DWOLFNANO_RSA_FULL \
+	   -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(SERVER_CERT_SRC) $(WC)/rsa.c $(X509_BACKEND_SRC) examples/server_cert.c \
+	   -o $(BUILD)/example_server_cert_rsa
+	@echo "built $(BUILD)/example_server_cert{,_rsa}"
 
 example-cert: ## build the X.509 server-cert client example (examples/client_cert.c)
 	@mkdir -p $(BUILD)

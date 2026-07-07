@@ -163,6 +163,23 @@ int wn_ClientHello_Build_ex(byte* out, word32* outLen, word32 outCap,
 
 #ifdef WOLFNANO_SERVER
 #define WN_EXT_PRE_SHARED_KEY 41
+#define WN_EXT_SIGNATURE_ALGS 13
+
+int wn_ClientHello_HasSigAlg(const wn_ClientHello* ch, word16 scheme)
+{
+    word16 i;
+    int found = 0;
+
+    if ((ch != NULL) && (ch->sigAlgs != NULL)) {
+        for (i = 0; (i + 1) < ch->sigAlgsLen; i += 2) {
+            if (((word16)(ch->sigAlgs[i] << 8) | ch->sigAlgs[i + 1]) == scheme) {
+                found = 1;
+            }
+        }
+    }
+
+    return found;
+}
 
 int wn_ClientHello_Parse(const byte* msg, word32 msgLen, wn_ClientHello* out)
 {
@@ -231,6 +248,11 @@ int wn_ClientHello_Parse(const byte* msg, word32 msgLen, wn_ClientHello* out)
                 }
             }
         }
+        else if (et == WN_EXT_SIGNATURE_ALGS) {
+            idsLen = wn_Read_U16(&r);           /* supported_signature_algorithms */
+            out->sigAlgs = wn_Read_Bytes(&r, idsLen);
+            out->sigAlgsLen = idsLen;
+        }
         else if (et == WN_EXT_PRE_SHARED_KEY) {
             idsLen = wn_Read_U16(&r);           /* identities vector */
             idsEnd = r.pos + idsLen;
@@ -254,10 +276,13 @@ int wn_ClientHello_Parse(const byte* msg, word32 msgLen, wn_ClientHello* out)
             ret = WOLFNANO_E_DECODE;
         }
     }
+    /* cipher + key_share are always required; PSK binder only when a PSK was
+     * offered. A cert-mode ClientHello carries no pre_shared_key, and the
+     * chosen auth driver (wn_Accept_Psk vs wn_Accept_Cert) enforces its mode. */
     if ((ret == WOLFNANO_SUCCESS) &&
         ((out->cipher == 0) || (out->haveKeyShare == 0) ||
-         (out->keyShareLen != WN_DEFAULT_PUB_SZ) || (out->havePsk == 0) ||
-         (out->binderLen != 32))) {
+         (out->keyShareLen != WN_DEFAULT_PUB_SZ) ||
+         (out->havePsk && (out->binderLen != 32)))) {
         ret = WOLFNANO_E_ILLEGAL_PARAM;
     }
 

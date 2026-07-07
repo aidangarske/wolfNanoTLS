@@ -74,6 +74,10 @@ run_renewcerts(){
     selfsign server/p384  wolfNanoTLS-test 14 server/p384 sha384
     echo "Updating server/rsa4096-cert"
     selfsign server/rsa4096 wolfNanoTLS-test 15 server/rsa4096
+    echo "Updating server DER private keys (wn_Accept_Cert)"
+    openssl ec   -in server/ec-key.pem  -outform DER -out server/ec-key-sec1.der
+    openssl pkey -in server/ed-key.pem  -outform DER -out server/ed-key.der
+    openssl rsa  -in server/rsa-key.pem -outform DER -out server/rsa-key-trad.der
     echo "---------------------------------------------------------------------"
 
     ############################################################

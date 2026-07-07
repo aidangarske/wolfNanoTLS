@@ -38,7 +38,7 @@ jobs:
       - uses: ./.github/actions/wolfssl-checkout
       - name: protocol + crypto suites
         if: matrix.suite == 'protocol'
-        run: make test-core mlkemtest mldsatest hybridtest mockhybridtest wctestpqc $MEMARG
+        run: make test-core mlkemtest mldsatest hybridtest mockhybridtest wctestpqc servertest $MEMARG
       - name: native wn_x509 parser + cert-verify unit tests
         if: matrix.suite == 'x509'
         run: make test-x509 $MEMARG

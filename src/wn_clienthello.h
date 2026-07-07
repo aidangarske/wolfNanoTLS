@@ -57,16 +57,22 @@ typedef struct wn_ClientHello {
     const byte* keyShare;       /* client (EC)DHE public for the selected group */
     const byte* pskIdentity;    /* first offered PSK identity */
     const byte* binder;         /* PSK binder for that identity */
+    const byte* sigAlgs;        /* signature_algorithms list (for cert auth) */
     word32 keyShareLen;
     word32 pskIdentityLen;
     word32 binderLen;
     word32 binderTruncLen;
+    word16 sigAlgsLen;
     word16 cipher;              /* selected cipher suite */
     word16 group;              /* selected key_share group */
     byte sessionIdLen;
     byte haveKeyShare;
     byte havePsk;
 } wn_ClientHello;
+
+/* True if the client's signature_algorithms list offers the given scheme. */
+WOLFNANO_LOCAL int wn_ClientHello_HasSigAlg(const wn_ClientHello* ch,
+                                            word16 scheme);
 
 /* Decode a ClientHello handshake message (type 1 + length + body). Selects the
  * cipher suite and key_share group wolfNanoTLS supports; fails closed. */

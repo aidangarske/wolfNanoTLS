@@ -158,7 +158,7 @@ int wn_ServerHello_Build(byte* out, word32* outLen, word32 outCap,
                          const byte* random32, const byte* sessionId,
                          byte sessionIdLen, word16 cipher, word16 group,
                          const byte* srvPub, word32 srvPubLen,
-                         word16 pskIdentity)
+                         word16 pskIdentity, int includePsk)
 {
     wn_Writer w;
     word32 body, ext;
@@ -185,9 +185,11 @@ int wn_ServerHello_Build(byte* out, word32* outLen, word32 outCap,
     wn_Write_U16(&w, group);
     wn_Write_U16(&w, (word16)srvPubLen);
     wn_Write_Bytes(&w, srvPub, srvPubLen);
-    wn_Write_U16(&w, WN_EXT_PRE_SHARED);
-    wn_Write_U16(&w, 2);
-    wn_Write_U16(&w, pskIdentity);
+    if (includePsk != 0) {
+        wn_Write_U16(&w, WN_EXT_PRE_SHARED);
+        wn_Write_U16(&w, 2);
+        wn_Write_U16(&w, pskIdentity);
+    }
     wn_Write_LenEnd(&w, ext, 2);
     wn_Write_LenEnd(&w, body, 3);
     if (w.err != 0) {
