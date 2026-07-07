@@ -84,6 +84,20 @@ wolfSSL's own macros (no wolfNano wrapper):
   handshake. The native `wn_x509` ECDSA cert path is fully no-malloc; the `asn.c`
   backend requires heap.
 
+## Server adder (`WOLFNANO_SERVER`)
+
+The TLS 1.3 server is a compile-time adder, off by default, built the same way as
+the client: a slim `wn_` shell (`wn_Accept_Psk` / `wn_Accept_Cert`) that lifts the
+server-side handshake from wolfSSL `tls13.c`, reaches crypto only through the
+`wc_*` seam, and reuses the client's role-agnostic modules (key share, key
+schedule, transcript, record, session). The direction-specific pieces are a
+ClientHello decoder, a ServerHello/Certificate encoder, a server-role key-share
+(ECDHE generate-and-combine, ML-KEM encapsulate), and a CertificateVerify signer
+(the mirror of the client's verify helpers: ECDSA, Ed25519, RSA-PSS, ML-DSA). It
+supports every group and cipher the client does and interops both ways with
+OpenSSL, wolfSSL, and mbedTLS. PSK + ECDSA/Ed25519 stay on the zero-allocation
+tier; RSA and ML-DSA signing use the heap tier, exactly as on the client.
+
 ## Behavioral subset
 
 wolfNanoTLS is "wolfSSL with features turned off." Interop stays identical to

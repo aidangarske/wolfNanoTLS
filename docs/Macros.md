@@ -40,6 +40,7 @@ Owned by wolfNanoTLS; no wolfSSL equivalent.
 | `WOLFNANO_MLDSA` | ML-DSA verify (no-malloc) | `WOLFSSL_HAVE_MLDSA`, verify-only |
 | `WOLFNANO_MLDSA_LEVEL` | ML-DSA security level 2/3/5 (default 2) | selects ML-DSA-44/65/87 |
 | `WOLFNANO_MLDSA_SIGN` | adds ML-DSA keygen/sign (needs memory) | drops verify-only |
+| `WOLFNANO_SERVER` | TLS 1.3 server (`wn_Accept_Psk` / `wn_Accept_Cert`), off by default; reuses the sub-adders above for groups and cert-sign algorithms | server shell + ClientHello decoder + ServerHello/Certificate encoders |
 | `WOLFNANO_SEND_ALERTS` | emit a fatal TLS alert on handshake failure (off by default) | RFC 8446 6.2 alert codes |
 
 When a feature is off, the build has no undefined references for it.
