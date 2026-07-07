@@ -98,11 +98,11 @@ supports every group and cipher the client does and interops both ways with
 OpenSSL, wolfSSL, and mbedTLS. PSK + ECDSA/Ed25519 stay on the zero-allocation
 tier; RSA and ML-DSA signing use the heap tier, exactly as on the client.
 
-The server reads the ClientHello and the client Finished as one record each (as
-every mainstream TLS 1.3 peer sends them); it does not reassemble a handshake
-message fragmented across multiple records. Group negotiation is by build, not
-HelloRetryRequest: a peer must offer a key_share for the group the server is
-built with (the interop matrix drives each peer to the matching group).
+The server reassembles a ClientHello that spans multiple records (RFC 8446 5.1);
+the client Finished is a single 36-byte message read as one record. Group
+negotiation is by build, not HelloRetryRequest: a peer must offer a key_share for
+the group the server is built with (the interop matrix drives each peer to the
+matching group).
 
 ## Behavioral subset
 

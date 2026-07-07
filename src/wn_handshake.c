@@ -68,6 +68,55 @@ int wn_SendCcs(wn_IoSend send, void* ctx)
     return wn_SendPlainRecord(send, ctx, WN_REC_CHANGE_CIPHER, &ccs, 1);
 }
 
+int wn_RecvHandshake(wn_IoRecv ioRecv, void* ioCtx, byte* acc, word32 accCap,
+                     byte* tmp, word32 tmpCap, word32* msgLen)
+{
+    word32 accLen = 0;
+    word32 recLen = 0;
+    word32 mLen = 0;
+    byte rtype = 0;
+    int ret = WOLFNANO_SUCCESS;
+    int complete = 0;
+
+    while ((ret == WOLFNANO_SUCCESS) && (complete == 0)) {
+        ret = wn_RecvRecord(ioRecv, ioCtx, tmp, tmpCap, &rtype, &recLen);
+        if ((ret == WOLFNANO_SUCCESS) && (rtype == WN_REC_CHANGE_CIPHER)) {
+            continue;                       /* skip the compat ChangeCipherSpec */
+        }
+        if ((ret == WOLFNANO_SUCCESS) &&
+            ((rtype != WN_REC_HANDSHAKE) || (recLen <= WN_RECORD_HEADER_SZ))) {
+            ret = WOLFNANO_E_UNEXPECTED_MSG;
+        }
+        if ((ret == WOLFNANO_SUCCESS) &&
+            ((recLen - WN_RECORD_HEADER_SZ) > (accCap - accLen))) {
+            ret = WOLFNANO_E_DECODE;         /* reassembly overruns the buffer */
+        }
+        if (ret == WOLFNANO_SUCCESS) {
+            XMEMCPY(acc + accLen, tmp + WN_RECORD_HEADER_SZ,
+                    recLen - WN_RECORD_HEADER_SZ);
+            accLen += recLen - WN_RECORD_HEADER_SZ;
+            if (accLen >= 4) {
+                mLen = ((word32)acc[1] << 16) | ((word32)acc[2] << 8) | acc[3];
+                if ((4 + mLen) > accCap) {
+                    ret = WOLFNANO_E_DECODE;
+                }
+                else if (accLen >= (4 + mLen)) {
+                    complete = 1;
+                }
+            }
+        }
+    }
+    /* the first flight carries exactly one message: reject any trailing bytes */
+    if ((ret == WOLFNANO_SUCCESS) && (accLen != (4 + mLen))) {
+        ret = WOLFNANO_E_DECODE;
+    }
+    if (ret == WOLFNANO_SUCCESS) {
+        *msgLen = accLen;
+    }
+
+    return ret;
+}
+
 int wn_DeriveHsKeys(byte* hs, byte* cHs, byte* sHs, byte* cKey, byte* cIv,
                     byte* sKey, byte* sIv, const byte* early, const byte* ecdhe,
                     word32 ecdheLen, const byte* emptyHash, const byte* th)

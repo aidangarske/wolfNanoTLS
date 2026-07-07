@@ -122,14 +122,32 @@ int main(void)
 {
     WC_RNG rng;
     wn_Session sc, ss;
+    mock_io mr;
     byte scratch[4096];
     byte rec[512];
     byte body[256];
     byte hs32[32], eh[32], z32[32], th32[32];
-    word32 rl;
+    word32 rl, mlen;
     int rc, k;
 
     wc_InitRng(&rng);
+
+    /* ----- wn_RecvHandshake reassembles a message split across two records ----- */
+    rec[0] = 22; rec[1] = 3; rec[2] = 3; rec[3] = 0; rec[4] = 6;   /* record 1 */
+    rec[5] = 1; rec[6] = 0; rec[7] = 0; rec[8] = 8;                /* hs: type 1, len 8 */
+    rec[9] = 0xAA; rec[10] = 0xAA;                                 /* payload[0..2] */
+    rec[11] = 22; rec[12] = 3; rec[13] = 3; rec[14] = 0; rec[15] = 6; /* record 2 */
+    for (k = 0; k < 6; k++) {
+        rec[16 + k] = 0xAA;                                       /* payload[2..8] */
+    }
+    XMEMSET(&mr, 0, sizeof(mr));
+    mr.in = rec;
+    mr.inLen = 22;
+    mlen = 0;
+    rc = wn_RecvHandshake(m_recv, &mr, body, sizeof(body), scratch,
+                          sizeof(scratch), &mlen);
+    check((rc == WOLFNANO_SUCCESS) && (mlen == 12) && (body[0] == 1),
+          "handshake message reassembled across two records");
 
     /* ----- wn_SessionEstablish: client and server key polarity are inverse ----- */
     for (k = 0; k < 32; k++) {

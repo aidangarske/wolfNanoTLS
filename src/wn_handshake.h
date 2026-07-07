@@ -42,6 +42,14 @@ WOLFNANO_LOCAL int wn_SendPlainRecord(wn_IoSend send, void* ctx, byte type,
 /* Send the TLS 1.3 middlebox-compatibility ChangeCipherSpec (RFC 8446 D.4). */
 WOLFNANO_LOCAL int wn_SendCcs(wn_IoSend send, void* ctx);
 
+/* Read plaintext handshake records (skipping compat ChangeCipherSpec) and
+ * reassemble exactly one complete handshake message into acc (RFC 8446 5.1: a
+ * message may span records). Records are read into the caller's tmp buffer;
+ * msgLen receives the reassembled length. */
+WOLFNANO_LOCAL int wn_RecvHandshake(wn_IoRecv ioRecv, void* ioCtx, byte* acc,
+                                    word32 accCap, byte* tmp, word32 tmpCap,
+                                    word32* msgLen);
+
 /* RFC 8446 7.1: handshake secret, c/s hs traffic, and both record key/iv pairs.
  * early differs per path (PSK vs zeros). Direction-neutral: the caller picks
  * which side (c or s) is its write vs read. */

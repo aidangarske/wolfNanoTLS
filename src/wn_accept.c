@@ -64,7 +64,7 @@ int wn_Accept_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     byte sid[32];
     byte mac[32], recvMac[32];
     byte flight[128];
-    word32 recLen, chLen, thLen, pubLen, ssLen, shLen, eeLen, flightLen, encLen;
+    word32 recLen, chLen, chHalf, thLen, pubLen, ssLen, shLen, eeLen, flightLen, encLen;
     word32 idLen;
     byte rtype = 0, ctype = 0;
     byte sidLen;
@@ -85,17 +85,14 @@ int wn_Accept_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     ret |= (wc_RNG_GenerateBlock(rng, random32, 32) != 0)
                ? WOLFNANO_E_CRYPTO : 0;
 
-    /* ----- receive + parse ClientHello ----- */
+    /* ----- receive + parse ClientHello (reassembled, RFC 8446 5.1) ----- */
     if (ret == WOLFNANO_SUCCESS) {
-        ret = wn_RecvRecord(ioRecv, ioCtx, scratch, scratchLen, &rtype, &recLen);
-    }
-    if ((ret == WOLFNANO_SUCCESS) &&
-        ((rtype != WN_REC_HANDSHAKE) || (recLen <= WN_RECORD_HEADER_SZ))) {
-        ret = WOLFNANO_E_UNEXPECTED_MSG;
+        chHalf = scratchLen / 2;
+        ret = wn_RecvHandshake(ioRecv, ioCtx, scratch, chHalf, scratch + chHalf,
+                               scratchLen - chHalf, &chLen);
     }
     if (ret == WOLFNANO_SUCCESS) {
-        chLen = recLen - WN_RECORD_HEADER_SZ;
-        ret = wn_ClientHello_Parse(scratch + WN_RECORD_HEADER_SZ, chLen, &ch);
+        ret = wn_ClientHello_Parse(scratch, chLen, &ch);
     }
     if ((ret == WOLFNANO_SUCCESS) &&
         ((ch.havePsk == 0) || (ch.pskIdentityLen != idLen) ||
@@ -110,8 +107,8 @@ int wn_Accept_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
                                      32, WC_SHA256);
     }
     if (ret == WOLFNANO_SUCCESS) {
-        ret = (wc_Sha256Hash(scratch + WN_RECORD_HEADER_SZ, ch.binderTruncLen,
-                             th) != 0) ? WOLFNANO_E_CRYPTO : 0;
+        ret = (wc_Sha256Hash(scratch, ch.binderTruncLen, th) != 0)
+                  ? WOLFNANO_E_CRYPTO : 0;
     }
     if (ret == WOLFNANO_SUCCESS) {
         ret = wn_Tls13_FinishedMac(mac, binderKey, th, 32, WC_SHA256);
@@ -123,7 +120,7 @@ int wn_Accept_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
 
     /* ----- transcript(CH), ECDHE, echo session id ----- */
     if (ret == WOLFNANO_SUCCESS) {
-        ret = wn_Transcript_Update(&tc, scratch + WN_RECORD_HEADER_SZ, chLen);
+        ret = wn_Transcript_Update(&tc, scratch, chLen);
     }
     if (ret == WOLFNANO_SUCCESS) {
         ret = wn_KeyShare_Init(&ks, ch.group);
@@ -312,17 +309,13 @@ int wn_Accept_Cert_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     ret |= (wc_RNG_GenerateBlock(rng, random32, 32) != 0)
                ? WOLFNANO_E_CRYPTO : 0;
 
-    /* ----- receive + parse ClientHello (no PSK) ----- */
+    /* ----- receive + parse ClientHello (no PSK; reassembled, RFC 8446 5.1) ----- */
     if (ret == WOLFNANO_SUCCESS) {
-        ret = wn_RecvRecord(ioRecv, ioCtx, scratch, scratchLen, &rtype, &recLen);
-    }
-    if ((ret == WOLFNANO_SUCCESS) &&
-        ((rtype != WN_REC_HANDSHAKE) || (recLen <= WN_RECORD_HEADER_SZ))) {
-        ret = WOLFNANO_E_UNEXPECTED_MSG;
+        ret = wn_RecvHandshake(ioRecv, ioCtx, plain, half, enc,
+                               scratchLen - half, &chLen);
     }
     if (ret == WOLFNANO_SUCCESS) {
-        chLen = recLen - WN_RECORD_HEADER_SZ;
-        ret = wn_ClientHello_Parse(scratch + WN_RECORD_HEADER_SZ, chLen, &ch);
+        ret = wn_ClientHello_Parse(plain, chLen, &ch);
     }
     if ((ret == WOLFNANO_SUCCESS) &&
         (wn_ClientHello_HasSigAlg(&ch, scheme) == 0)) {
@@ -331,7 +324,7 @@ int wn_Accept_Cert_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
 
     /* ----- transcript(CH), ECDHE, echo session id ----- */
     if (ret == WOLFNANO_SUCCESS) {
-        ret = wn_Transcript_Update(&tc, scratch + WN_RECORD_HEADER_SZ, chLen);
+        ret = wn_Transcript_Update(&tc, plain, chLen);
     }
     if (ret == WOLFNANO_SUCCESS) {
         ret = wn_KeyShare_Init(&ks, ch.group);
