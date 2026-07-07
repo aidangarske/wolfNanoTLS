@@ -4,6 +4,11 @@
 set -u
 TYPE=${1:-ecdsa}
 PORT=14436
+# Prefer a fully-featured wolfSSL build (curve25519/ecc/mlkem) if present; the
+# stock ref may be configured without server-side X25519 key exchange.
+if [ -z "${WOLFSSL_SERVER:-}" ] && [ -x "$HOME/wolfssl-psk/examples/server/server" ]; then
+    WOLFSSL_SERVER=$HOME/wolfssl-psk/examples/server/server
+fi
 SERVER=${WOLFSSL_SERVER:-$HOME/wolfssl/examples/server/server}
 WOLFSSL_DIR=$(dirname "$(dirname "$(dirname "$SERVER")")")
 if [ "$TYPE" = "chain" ]; then
@@ -21,7 +26,7 @@ if [ ! -x "$SERVER" ] || [ ! -f "$CERT" ]; then
     exit 0
 fi
 
-( cd "$WOLFSSL_DIR" && "$SERVER" -v 4 -c "$CERT" -k "$KEY" -d -i -p "$PORT" ) \
+( cd "$WOLFSSL_DIR" && exec "$SERVER" -v 4 -c "$CERT" -k "$KEY" -d -i -p "$PORT" ) \
     >/tmp/wn_cert_wssl.log 2>&1 &
 SPID=$!
 

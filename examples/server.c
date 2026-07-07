@@ -32,6 +32,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -55,6 +56,7 @@ int main(int argc, char** argv)
         0x01,0x23,0x45,0x67,0x89,0xab,0xcd,0xef
     };
     int port = (argc > 1) ? atoi(argv[1]) : 4433;
+    const char* identity = (argc > 2) ? argv[2] : "Client_identity";
     struct sockaddr_in sa;
     WC_RNG rng;
     wn_Session sess;
@@ -63,6 +65,7 @@ int main(int argc, char** argv)
     word32 got = 0;
     int lfd, cfd, rc, one = 1;
 
+    signal(SIGPIPE, SIG_IGN);
     lfd = socket(AF_INET, SOCK_STREAM, 0);
     if (lfd < 0) {
         printf("socket failed\n");
@@ -95,7 +98,7 @@ int main(int argc, char** argv)
     }
 
     rc = wn_Accept_Psk_ex(&sess, &rng, sock_send, sock_recv, &cfd, psk,
-                          (word32)sizeof(psk), "Client_identity", scratch,
+                          (word32)sizeof(psk), identity, scratch,
                           sizeof(scratch));
     if (rc != 0) {
         printf("handshake failed: %d\n", rc);
@@ -108,8 +111,9 @@ int main(int argc, char** argv)
 
     rc = wn_Recv(&sess, in, sizeof(in), &got);
     if (rc == 0) {
+        static const char reply[] = "I hear you fa shizzle!";
         printf("received %u bytes: %.*s\n", (unsigned)got, (int)got, in);
-        rc = wn_Send(&sess, in, got);          /* echo it back */
+        rc = wn_Send(&sess, (const byte*)reply, (word32)(sizeof(reply) - 1));
     }
     if (rc != 0) {
         printf("application data failed: %d\n", rc);

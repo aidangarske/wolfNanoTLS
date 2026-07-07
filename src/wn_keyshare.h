@@ -87,6 +87,16 @@ WOLFNANO_API int wn_KeyShare_Shared(wn_KeyShare* ks, const byte* peerPub,
                                     word32 peerPubLen, byte* out,
                                     word32* outLen);
 
+#ifdef WOLFNANO_SERVER
+/* Server role: from the client share, produce our outgoing share and the shared
+ * secret. ECDHE generates and combines; the ML-KEM hybrid encapsulates. */
+WOLFNANO_API int wn_KeyShare_ServerShare(wn_KeyShare* ks, WC_RNG* rng,
+                                         const byte* peerShare,
+                                         word32 peerShareLen, byte* srvShare,
+                                         word32* srvShareLen, byte* secret,
+                                         word32* secretLen);
+#endif
+
 /* Release the key share. */
 WOLFNANO_API int wn_KeyShare_Free(wn_KeyShare* ks);
 

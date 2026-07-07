@@ -217,6 +217,43 @@ int wn_KeyShare_Shared(wn_KeyShare* ks, const byte* peerPub, word32 peerPubLen,
     return ret;
 }
 
+#ifdef WOLFNANO_SERVER
+int wn_KeyShare_ServerShare(wn_KeyShare* ks, WC_RNG* rng, const byte* peerShare,
+                           word32 peerShareLen, byte* srvShare,
+                           word32* srvShareLen, byte* secret, word32* secretLen)
+{
+    int ret = WOLFNANO_SUCCESS;
+
+    if ((ks == NULL) || (rng == NULL) || (peerShare == NULL) ||
+        (srvShare == NULL) || (srvShareLen == NULL) || (secret == NULL) ||
+        (secretLen == NULL)) {
+        ret = WOLFNANO_E_INVALID_ARG;
+    }
+
+    if (ret == WOLFNANO_SUCCESS) {
+#if defined(WOLFNANO_HAVE_MLKEM_HYBRID)
+        if (ks->group == WN_GROUP_X25519MLKEM768) {
+            /* server encapsulates against the client share (RFC 9180 style) */
+            ret = wn_Hybrid_ServerRespond(peerShare, peerShareLen, rng, srvShare,
+                                          srvShareLen, secret, secretLen);
+        }
+        else {
+            ret = WOLFNANO_E_UNSUPPORTED;
+        }
+#else
+        /* pure ECDHE is symmetric: generate our share, then combine */
+        ret = wn_KeyShare_Generate(ks, rng, srvShare, srvShareLen);
+        if (ret == WOLFNANO_SUCCESS) {
+            ret = wn_KeyShare_Shared(ks, peerShare, peerShareLen, secret,
+                                     secretLen);
+        }
+#endif
+    }
+
+    return ret;
+}
+#endif /* WOLFNANO_SERVER */
+
 int wn_KeyShare_Free(wn_KeyShare* ks)
 {
     int ret = WOLFNANO_SUCCESS;

@@ -129,10 +129,8 @@ int wn_Accept_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
         }
     }
     if (ret == WOLFNANO_SUCCESS) {
-        ret = wn_KeyShare_Generate(&ks, rng, srvPub, &pubLen);
-    }
-    if (ret == WOLFNANO_SUCCESS) {
-        ret = wn_KeyShare_Shared(&ks, ch.keyShare, ch.keyShareLen, ecdhe, &ssLen);
+        ret = wn_KeyShare_ServerShare(&ks, rng, ch.keyShare, ch.keyShareLen,
+                                      srvPub, &pubLen, ecdhe, &ssLen);
     }
     if (ret == WOLFNANO_SUCCESS) {
         sidLen = ch.sessionIdLen;

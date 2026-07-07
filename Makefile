@@ -68,6 +68,10 @@ CONN_P256_SRC := $(FLOOR_SRC) $(WC)/sp_int.c \
   src/wn_keyshare.c src/wn_serverhello.c \
   src/wn_connect.c src/wn_session.c tests/wn_host_seed.c
 
+# P-256 server adder (ECDHE secp256r1): the P-256 floor plus the server shell.
+SERVER_P256_SRC := $(CONN_P256_SRC) src/wn_accept.c src/wn_handshake.c \
+  src/wn_clienthello.c
+
 # Cert handshake build (adds ECDHE non-PSK ClientHello + cert/CertVerify deps).
 CONN_CERT_SRC := $(FLOOR_SRC) $(WC)/sp_int.c \
   src/wn_msg.c src/wn_keyschedule.c \
@@ -142,6 +146,10 @@ MOCKHYB_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
   src/wn_msg.c src/wn_keyschedule.c src/wn_transcript.c src/wn_record.c \
   src/wn_keyshare.c src/wn_serverhello.c src/wn_hybrid.c src/wn_connect.c \
   src/wn_session.c tests/wn_host_seed.c
+
+# X25519MLKEM768 hybrid server adder: the hybrid floor plus the server shell.
+SERVER_HYBRID_SRC := $(MOCKHYB_SRC) src/wn_accept.c src/wn_handshake.c \
+  src/wn_clienthello.c
 
 # ---- WOLFNANO_ASM: per-arch speedup bundle (mirrors wolfSSL --enable-*asm) ----
 # Default 'none' = lightweight portable C (WOLFSSL_SP_MATH_ALL, no asm). Each
@@ -272,8 +280,18 @@ servertest: ## build + run the TLS 1.3 PSK server vs the real client (WOLFNANO_S
 	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER \
 	   -DWOLFNANO_TARGET_PORTABLE_C \
 	   $(SERVER_SRC) tests/accept_mock_test.c -o $(BUILD)/accept_mock_test
-	@echo "---- run ----"
+	@echo "---- run (X25519) ----"
 	@./$(BUILD)/accept_mock_test
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER \
+	   -DWOLFNANO_HAVE_ECDHE_P256 -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(SERVER_P256_SRC) tests/accept_mock_test.c -o $(BUILD)/accept_mock_p256_test
+	@echo "---- run (P-256) ----"
+	@./$(BUILD)/accept_mock_p256_test
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER \
+	   -DWOLFNANO_HAVE_MLKEM_HYBRID -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(SERVER_HYBRID_SRC) tests/accept_mock_test.c -o $(BUILD)/accept_mock_hybrid_test
+	@echo "---- run (X25519MLKEM768) ----"
+	@./$(BUILD)/accept_mock_hybrid_test
 
 mockhybridtest: ## build + run the X25519MLKEM768 hybrid mock-server handshake test
 	@mkdir -p $(BUILD)
@@ -612,6 +630,16 @@ interop: ## live TLS 1.3 PSK handshake vs OpenSSL and wolfSSL
 	@echo "== cert(RSA-PSS) vs wolfSSL =="; sh tests/interop_cert_wolfssl.sh rsa
 	@echo "== cert(Ed25519) vs wolfSSL =="; sh tests/interop_cert_wolfssl.sh ed
 	@echo "== cert(chain leaf<-inter<-root) vs wolfSSL =="; sh tests/interop_cert_wolfssl.sh chain
+	@$(MAKE) --no-print-directory example-server
+	@echo "== server PSK (X25519) vs OpenSSL =="; SERVER=$(BUILD)/example_server sh tests/interop_server_psk.sh
+	@echo "== server PSK (X25519) vs wolfSSL =="; SERVER=$(BUILD)/example_server WNGROUP=x25519 sh tests/interop_server_wolfssl.sh
+	@echo "== server PSK (X25519) vs mbedTLS =="; SERVER=$(BUILD)/example_server WNGROUP=x25519 sh tests/interop_server_mbedtls.sh
+	@echo "== server PSK (P-256) vs OpenSSL =="; SERVER=$(BUILD)/example_server_p256 KXGROUP=P-256 sh tests/interop_server_psk.sh
+	@echo "== server PSK (P-256) vs wolfSSL =="; SERVER=$(BUILD)/example_server_p256 WNGROUP=p256 sh tests/interop_server_wolfssl.sh
+	@echo "== server PSK (P-256) vs mbedTLS =="; SERVER=$(BUILD)/example_server_p256 WNGROUP=p256 sh tests/interop_server_mbedtls.sh
+	@echo "== server PSK (X25519MLKEM768) vs OpenSSL =="; SERVER=$(BUILD)/example_server_hybrid KXGROUP=X25519MLKEM768 sh tests/interop_server_psk.sh
+	@echo "== server PSK (X25519MLKEM768) vs wolfSSL =="; SERVER=$(BUILD)/example_server_hybrid WNGROUP=hybrid sh tests/interop_server_wolfssl.sh
+	@echo "== server PSK (X25519MLKEM768) vs mbedTLS =="; SERVER=$(BUILD)/example_server_hybrid WNGROUP=hybrid sh tests/interop_server_mbedtls.sh
 
 # Build + run the all-algo bench for the active WOLFNANO_ASM arch.
 benchrun:
@@ -683,7 +711,13 @@ example-server: ## build the minimal PSK server example (examples/server.c)
 	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER \
 	   -DWOLFNANO_TARGET_PORTABLE_C \
 	   $(SERVER_SRC) examples/server.c -o $(BUILD)/example_server
-	@echo "built $(BUILD)/example_server"
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER \
+	   -DWOLFNANO_HAVE_ECDHE_P256 -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(SERVER_P256_SRC) examples/server.c -o $(BUILD)/example_server_p256
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER \
+	   -DWOLFNANO_HAVE_MLKEM_HYBRID -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(SERVER_HYBRID_SRC) examples/server.c -o $(BUILD)/example_server_hybrid
+	@echo "built $(BUILD)/example_server{,_p256,_hybrid}"
 
 example-cert: ## build the X.509 server-cert client example (examples/client_cert.c)
 	@mkdir -p $(BUILD)
