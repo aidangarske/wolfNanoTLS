@@ -45,9 +45,19 @@
     #include <wolfcrypt/src/misc.c>   /* inline ForceZero / ConstantCompare */
 #endif
 
+#ifdef WOLFNANO_SERVER
+
 #define WN_HS_CLIENT_HELLO   1
 #define WN_HS_ENCRYPTED_EXT  8
 #define WN_HS_FINISHED       20
+
+/* Split-scratch reassembly needs room for two max ClientHello records; the
+ * hybrid key_share (~1.2 KB) needs a larger floor than the ECDHE groups. */
+#if WN_DEFAULT_PUB_SZ > 512
+    #define WN_ACCEPT_SCRATCH_MIN 4096
+#else
+    #define WN_ACCEPT_SCRATCH_MIN 2048
+#endif
 
 int wn_Accept_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
                      wn_IoRecv ioRecv, void* ioCtx, const byte* psk,
@@ -73,7 +83,7 @@ int wn_Accept_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
 
     if ((sess == NULL) || (rng == NULL) || (ioSend == NULL) || (ioRecv == NULL) ||
         (psk == NULL) || (pskLen == 0) || (identity == NULL) ||
-        (scratch == NULL) || (scratchLen < 2048)) {
+        (scratch == NULL) || (scratchLen < WN_ACCEPT_SCRATCH_MIN)) {
         return WOLFNANO_E_INVALID_ARG;
     }
 
@@ -501,3 +511,5 @@ int wn_Accept_Cert(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv, void* ioCtx,
     return ret;
 }
 #endif /* WOLFNANO_X509 */
+
+#endif /* WOLFNANO_SERVER */

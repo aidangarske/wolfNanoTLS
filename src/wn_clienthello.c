@@ -164,6 +164,7 @@ int wn_ClientHello_Build_ex(byte* out, word32* outLen, word32 outCap,
 #ifdef WOLFNANO_SERVER
 #define WN_EXT_PRE_SHARED_KEY 41
 #define WN_EXT_SIGNATURE_ALGS 13
+#define WN_EXT_SUPPORTED_GRPS 10
 #define WN_EXT_SUPPORTED_VERS 43
 #define WN_EXT_PSK_KEX_MODES  45
 
@@ -190,9 +191,10 @@ int wn_ClientHello_Parse(const byte* msg, word32 msgLen, wn_ClientHello* out)
     word16 vecLen, et, el, csLen, i, klen, idLen, idsLen, cs;
     word16 g;
     byte sidLen, compLen, comp, blen, nver, pmLen, j;
-    byte seenKs = 0, seenSig = 0, seenPsk = 0;
-    byte haveTls13 = 0, havePskDhe = 0;
-    word16 sv;
+    byte seenPsk = 0, dup, nSeen = 0;
+    byte haveTls13 = 0, havePskDhe = 0, haveGroups = 0, groupOffered = 0;
+    word16 sv, glen;
+    word16 seenExt[24];
     const byte* p;
     int ret = WOLFNANO_SUCCESS;
 
@@ -249,14 +251,17 @@ int wn_ClientHello_Parse(const byte* msg, word32 msgLen, wn_ClientHello* out)
         et = wn_Read_U16(&r);
         el = wn_Read_U16(&r);
         eEnd = r.pos + el;
-        if ((r.err != 0) || (eEnd > extEnd) || (seenPsk != 0)) {
-            /* body overruns the block, or an extension follows pre_shared_key
-             * (RFC 8446 4.2.11: it must be the last extension) */
+        dup = 0;                                /* RFC 8446 4.2: reject any dup type */
+        for (j = 0; j < nSeen; j++) {
+            if (seenExt[j] == et) { dup = 1; }
+        }
+        if ((r.err != 0) || (eEnd > extEnd) || (seenPsk != 0) || (dup != 0) ||
+            (nSeen >= (byte)(sizeof(seenExt) / sizeof(seenExt[0])))) {
+            /* body overruns the block, a duplicate/too-many extensions, or an
+             * extension follows pre_shared_key (RFC 8446 4.2.11: PSK is last) */
             ret = WOLFNANO_E_DECODE;
         }
         else if (et == WN_EXT_KEY_SHARE) {
-            if (seenKs != 0) { r.err = 1; }     /* RFC 8446: no duplicates */
-            seenKs = 1;
             ksVec = wn_Read_U16(&r);            /* client_shares vector */
             ksEnd = r.pos + ksVec;
             if (ksEnd > eEnd) { r.err = 1; }
@@ -273,11 +278,18 @@ int wn_ClientHello_Parse(const byte* msg, word32 msgLen, wn_ClientHello* out)
             }
         }
         else if (et == WN_EXT_SIGNATURE_ALGS) {
-            if (seenSig != 0) { r.err = 1; }
-            seenSig = 1;
             idsLen = wn_Read_U16(&r);           /* supported_signature_algorithms */
             out->sigAlgs = wn_Read_Bytes(&r, idsLen);
             out->sigAlgsLen = idsLen;
+        }
+        else if (et == WN_EXT_SUPPORTED_GRPS) {
+            glen = wn_Read_U16(&r);             /* named_group_list */
+            haveGroups = 1;
+            for (j = 0; (j + 1) < glen; j += 2) {
+                if (wn_Read_U16(&r) == WN_DEFAULT_GROUP) {
+                    groupOffered = 1;
+                }
+            }
         }
         else if (et == WN_EXT_SUPPORTED_VERS) {
             nver = wn_Read_U8(&r);              /* versions list length */
@@ -326,6 +338,9 @@ int wn_ClientHello_Parse(const byte* msg, word32 msgLen, wn_ClientHello* out)
         if ((ret == WOLFNANO_SUCCESS) && ((r.err != 0) || (r.pos != eEnd))) {
             ret = WOLFNANO_E_DECODE;
         }
+        if (ret == WOLFNANO_SUCCESS) {
+            seenExt[nSeen++] = et;             /* record type for dup detection */
+        }
     }
     /* cipher + key_share + a TLS 1.3 offer are always required (RFC 8446 4.2.1).
      * PSK binder + psk_dhe_ke only when a PSK was offered; a cert-mode ClientHello
@@ -333,8 +348,10 @@ int wn_ClientHello_Parse(const byte* msg, word32 msgLen, wn_ClientHello* out)
     if ((ret == WOLFNANO_SUCCESS) &&
         ((out->cipher == 0) || (out->haveKeyShare == 0) ||
          (out->keyShareLen != WN_DEFAULT_PUB_SZ) || (haveTls13 == 0) ||
+         (haveGroups == 0) || (groupOffered == 0) ||
          (out->havePsk && ((out->binderLen != 32) || (havePskDhe == 0))))) {
-        ret = WOLFNANO_E_ILLEGAL_PARAM;
+        ret = WOLFNANO_E_ILLEGAL_PARAM;   /* RFC 8446 9.2/4.2.7: key_share group
+                                           * must be in supported_groups */
     }
 
     return ret;
