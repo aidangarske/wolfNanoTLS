@@ -357,13 +357,15 @@ int wn_ClientHello_Parse(const byte* msg, word32 msgLen, wn_ClientHello* out)
             seenExt[nSeen++] = et;             /* record type for dup detection */
         }
     }
-    /* cipher + key_share + a TLS 1.3 offer are always required (RFC 8446 4.2.1).
-     * PSK binder + psk_dhe_ke only when a PSK was offered; a cert-mode ClientHello
-     * carries neither, and the auth driver enforces its own mode. */
+    /* cipher, a TLS 1.3 offer, and our group in supported_groups are always
+     * required (RFC 8446 4.2.1). A matching key_share is optional: when absent
+     * the server replies with HelloRetryRequest (RFC 8446 4.1.4). PSK binder +
+     * psk_dhe_ke only when a PSK was offered; a cert-mode ClientHello carries
+     * neither, and the auth driver enforces its own mode. */
     if ((ret == WOLFNANO_SUCCESS) &&
-        ((out->cipher == 0) || (out->haveKeyShare == 0) ||
-         (out->keyShareLen != WN_DEFAULT_PUB_SZ) || (haveTls13 == 0) ||
+        ((out->cipher == 0) || (haveTls13 == 0) ||
          (haveGroups == 0) || (groupOffered == 0) ||
+         (out->haveKeyShare && (out->keyShareLen != WN_DEFAULT_PUB_SZ)) ||
          (out->havePsk && ((out->binderLen != 32) || (havePskDhe == 0))))) {
         ret = WOLFNANO_E_ILLEGAL_PARAM;   /* RFC 8446 9.2/4.2.7: key_share group
                                            * must be in supported_groups */

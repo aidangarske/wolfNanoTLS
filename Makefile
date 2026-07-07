@@ -722,6 +722,8 @@ interop: ## live TLS 1.3 PSK handshake vs OpenSSL and wolfSSL
 	@echo "== cert server (RSA-PSS) vs OpenSSL =="; SERVER=$(BUILD)/example_server_cert_rsa PEER=openssl sh tests/interop_server_cert.sh rsa
 	@echo "== cert server (RSA-PSS) vs wolfSSL =="; SERVER=$(BUILD)/example_server_cert_rsa PEER=wolfssl sh tests/interop_server_cert.sh rsa
 	@echo "== cert server (ML-DSA-44) vs wolfSSL =="; SERVER=$(BUILD)/example_server_cert_mldsa PEER=wolfssl sh tests/interop_server_cert.sh mldsa
+	@echo "== HelloRetryRequest (PSK) vs OpenSSL =="; SERVER=$(BUILD)/example_server sh tests/interop_server_hrr.sh psk
+	@echo "== HelloRetryRequest (cert) vs OpenSSL =="; SERVER=$(BUILD)/example_server_cert sh tests/interop_server_hrr.sh cert
 
 # Build + run the all-algo bench for the active WOLFNANO_ASM arch.
 benchrun:

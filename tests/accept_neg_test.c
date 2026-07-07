@@ -178,7 +178,8 @@ int main(void)
     byte rec[512];
     byte body[256];
     byte hs32[32], eh[32], z32[32], th32[32];
-    word32 rl, mlen;
+    wn_ServerHello shp;
+    word32 rl, mlen, hrrLen;
     int rc, k;
 
     wc_InitRng(&rng);
@@ -248,6 +249,16 @@ int main(void)
               == WOLFNANO_E_INVALID_ARG, "ServerHello_Build NULL outLen");
     check(wn_EncExt_Build(scratch, NULL, sizeof(scratch))
               == WOLFNANO_E_INVALID_ARG, "EncExt_Build NULL outLen");
+
+    /* ----- HelloRetryRequest round-trips as a well-formed ServerHello ----- */
+    check(wn_HelloRetryRequest_Build(scratch, &hrrLen, sizeof(scratch), body, 8,
+              0x1301, 0x001d) == WOLFNANO_SUCCESS, "HelloRetryRequest_Build ok");
+    check((wn_ServerHello_Parse(scratch, hrrLen, &shp) == WOLFNANO_SUCCESS) &&
+              (shp.isHelloRetry == 1),
+          "HRR parses as a HelloRetryRequest (sentinel random)");
+    check(wn_HelloRetryRequest_Build(scratch, NULL, sizeof(scratch), body, 8,
+              0x1301, 0x001d) == WOLFNANO_E_INVALID_ARG,
+          "HelloRetryRequest_Build NULL outLen");
 
     /* ----- wn_SessionEstablish: client and server key polarity are inverse ----- */
     for (k = 0; k < 32; k++) {

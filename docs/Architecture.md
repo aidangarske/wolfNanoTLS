@@ -99,10 +99,13 @@ OpenSSL, wolfSSL, and mbedTLS. PSK + ECDSA/Ed25519 stay on the zero-allocation
 tier; RSA and ML-DSA signing use the heap tier, exactly as on the client.
 
 The server reassembles a ClientHello that spans multiple records (RFC 8446 5.1);
-the client Finished is a single 36-byte message read as one record. Group
-negotiation is by build, not HelloRetryRequest: a peer must offer a key_share for
-the group the server is built with (the interop matrix drives each peer to the
-matching group).
+the client Finished is a single 36-byte message read as one record. When a peer
+leads with a key_share for a group the server was not built with but offers the
+server's group in supported_groups, the server sends a HelloRetryRequest (RFC
+8446 4.1.4) and completes on ClientHello2, feeding the synthetic
+message_hash(ClientHello1) + HRR into the transcript (4.4.1). The server is still
+single-group per build; HRR is the negotiation path when a peer's lead group
+differs.
 
 ## Behavioral subset
 

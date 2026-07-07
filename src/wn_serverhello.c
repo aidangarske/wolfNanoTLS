@@ -203,6 +203,45 @@ int wn_ServerHello_Build(byte* out, word32* outLen, word32 outCap,
     return ret;
 }
 
+int wn_HelloRetryRequest_Build(byte* out, word32* outLen, word32 outCap,
+                               const byte* sessionId, byte sessionIdLen,
+                               word16 cipher, word16 group)
+{
+    wn_Writer w;
+    word32 body, ext;
+    int ret = WOLFNANO_SUCCESS;
+
+    if ((out == NULL) || (outLen == NULL)) {
+        return WOLFNANO_E_INVALID_ARG;
+    }
+    wn_Writer_Init(&w, out, outCap);
+    wn_Write_U8(&w, WN_HS_SERVER_HELLO);
+    body = wn_Write_LenStart(&w, 3);
+    wn_Write_U16(&w, 0x0303);
+    wn_Write_Bytes(&w, wn_hrr_random, sizeof(wn_hrr_random));
+    wn_Write_U8(&w, sessionIdLen);
+    wn_Write_Bytes(&w, sessionId, sessionIdLen);
+    wn_Write_U16(&w, cipher);
+    wn_Write_U8(&w, 0);                          /* legacy_compression_method */
+    ext = wn_Write_LenStart(&w, 2);
+    wn_Write_U16(&w, WN_EXT_SUPPORTED_VER);
+    wn_Write_U16(&w, 2);
+    wn_Write_U16(&w, 0x0304);
+    wn_Write_U16(&w, WN_EXT_KEY_SHARE);          /* HRR key_share = selected group */
+    wn_Write_U16(&w, 2);
+    wn_Write_U16(&w, group);
+    wn_Write_LenEnd(&w, ext, 2);
+    wn_Write_LenEnd(&w, body, 3);
+    if (w.err != 0) {
+        ret = WOLFNANO_E_CRYPTO;
+    }
+    else {
+        *outLen = w.len;
+    }
+
+    return ret;
+}
+
 int wn_EncExt_Build(byte* out, word32* outLen, word32 outCap)
 {
     wn_Writer w;

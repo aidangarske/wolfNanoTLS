@@ -59,6 +59,71 @@
     #define WN_ACCEPT_SCRATCH_MIN 2048
 #endif
 
+/* RFC 8446 4.1.4: when the client offered our group but no matching key_share,
+ * reply with HelloRetryRequest and read ClientHello2. Feeds the special
+ * message_hash(CH1) + HRR into the transcript (4.4.1); leaves scratch = CH2 and
+ * ch = the reparsed ClientHello2. No-op (returns success) if a key_share was
+ * already usable. */
+static int wn_Accept_MaybeHrr(wn_Transcript* tc, wn_IoSend ioSend,
+                              wn_IoRecv ioRecv, void* ioCtx, byte* scratch,
+                              word32 scratchLen, word32* chLen,
+                              wn_ClientHello* ch)
+{
+    byte synth[4 + 32];
+    byte hrr[128];
+    word32 hrrLen, ch2Len, chHalf;
+    int ret = WOLFNANO_SUCCESS;
+
+    if (ch->haveKeyShare != 0) {
+        return WOLFNANO_SUCCESS;
+    }
+    /* LCOV_EXCL_START: HRR needs a multi-group ClientHello (lead group != our
+     * group, our group offered in supported_groups); the single-group
+     * wn_Connect mock cannot produce one. Exercised end-to-end by the HRR
+     * interop legs (interop_server_hrr.sh, OpenSSL leading a non-matching
+     * key_share group) for both PSK and certificate servers. */
+    synth[0] = 0xFE;                    /* handshake type message_hash */
+    synth[1] = 0;
+    synth[2] = 0;
+    synth[3] = 32;
+    ret = (wc_Sha256Hash(scratch, *chLen, synth + 4) != 0)
+              ? WOLFNANO_E_CRYPTO : 0;
+    if (ret == WOLFNANO_SUCCESS) {
+        ret = wn_Transcript_Update(tc, synth, sizeof(synth));
+    }
+    if (ret == WOLFNANO_SUCCESS) {
+        ret = wn_HelloRetryRequest_Build(hrr, &hrrLen, sizeof(hrr),
+                                         ch->sessionId, ch->sessionIdLen,
+                                         ch->cipher, WN_DEFAULT_GROUP);
+    }
+    if (ret == WOLFNANO_SUCCESS) {
+        ret = wn_Transcript_Update(tc, hrr, hrrLen);
+    }
+    if (ret == WOLFNANO_SUCCESS) {
+        ret = wn_SendPlainRecord(ioSend, ioCtx, WN_REC_HANDSHAKE, hrr, hrrLen);
+    }
+    if (ret == WOLFNANO_SUCCESS) {
+        ret = wn_SendCcs(ioSend, ioCtx);
+    }
+    if (ret == WOLFNANO_SUCCESS) {
+        chHalf = scratchLen / 2;
+        ret = wn_RecvHandshake(ioRecv, ioCtx, scratch, chHalf, scratch + chHalf,
+                               scratchLen - chHalf, &ch2Len);
+    }
+    if (ret == WOLFNANO_SUCCESS) {
+        ret = wn_ClientHello_Parse(scratch, ch2Len, ch);
+    }
+    if ((ret == WOLFNANO_SUCCESS) && (ch->haveKeyShare == 0)) {
+        ret = WOLFNANO_E_ILLEGAL_PARAM;   /* client ignored the retry */
+    }
+    if (ret == WOLFNANO_SUCCESS) {
+        *chLen = ch2Len;
+    }
+
+    return ret;
+    /* LCOV_EXCL_STOP */
+}
+
 int wn_Accept_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
                      wn_IoRecv ioRecv, void* ioCtx, const byte* psk,
                      word32 pskLen, const char* identity, byte* scratch,
@@ -79,7 +144,7 @@ int wn_Accept_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     byte rtype = 0, ctype = 0;
     byte sidLen;
     int ret = WOLFNANO_SUCCESS;
-    int ksInit = 0, done = 0;
+    int ksInit = 0, done = 0, hrrDone = 0;
 
     if ((sess == NULL) || (rng == NULL) || (ioSend == NULL) || (ioRecv == NULL) ||
         (psk == NULL) || (pskLen == 0) || (identity == NULL) ||
@@ -104,21 +169,31 @@ int wn_Accept_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     if (ret == WOLFNANO_SUCCESS) {
         ret = wn_ClientHello_Parse(scratch, chLen, &ch);
     }
+    /* HelloRetryRequest when the client sent no usable key_share (RFC 8446
+     * 4.1.4); after this ch is ClientHello2 and the transcript holds the
+     * synthetic message_hash(CH1) + HRR. */
+    if (ret == WOLFNANO_SUCCESS) {
+        hrrDone = (ch.haveKeyShare == 0);
+        ret = wn_Accept_MaybeHrr(&tc, ioSend, ioRecv, ioCtx, scratch, scratchLen,
+                                 &chLen, &ch);
+    }
     if ((ret == WOLFNANO_SUCCESS) &&
         ((ch.havePsk == 0) || (ch.pskIdentityLen != idLen) ||
          (XMEMCMP(ch.pskIdentity, identity, idLen) != 0))) {
         ret = WOLFNANO_E_ILLEGAL_PARAM;     /* no PSK, or offered identity is not ours */
     }
 
-    /* ----- verify the PSK binder over the truncated ClientHello ----- */
+    /* ----- verify the PSK binder over the (HRR-aware) transcript ----- */
     if (ret == WOLFNANO_SUCCESS) {
         ret  = wn_Tls13_Extract(early, NULL, 0, psk, pskLen, WC_SHA256);
         ret |= wn_Tls13_DeriveSecret(binderKey, early, "ext binder", emptyHash,
                                      32, WC_SHA256);
     }
+    if (ret == WOLFNANO_SUCCESS) {   /* transcript up to the binders (RFC 8446 4.2.11.2) */
+        ret = wn_Transcript_Update(&tc, scratch, ch.binderTruncLen);
+    }
     if (ret == WOLFNANO_SUCCESS) {
-        ret = (wc_Sha256Hash(scratch, ch.binderTruncLen, th) != 0)
-                  ? WOLFNANO_E_CRYPTO : 0;
+        ret = wn_Transcript_GetHash(&tc, th, &thLen);
     }
     if (ret == WOLFNANO_SUCCESS) {
         ret = wn_Tls13_FinishedMac(mac, binderKey, th, 32, WC_SHA256);
@@ -127,11 +202,12 @@ int wn_Accept_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
         (ConstantCompare(mac, ch.binder, 32) != 0)) {
         ret = WOLFNANO_E_BAD_MAC;
     }
-
-    /* ----- transcript(CH), ECDHE, echo session id ----- */
-    if (ret == WOLFNANO_SUCCESS) {
-        ret = wn_Transcript_Update(&tc, scratch, chLen);
+    if (ret == WOLFNANO_SUCCESS) {   /* append the binders to finish CH in the transcript */
+        ret = wn_Transcript_Update(&tc, scratch + ch.binderTruncLen,
+                                   chLen - ch.binderTruncLen);
     }
+
+    /* ----- ECDHE, echo session id ----- */
     if (ret == WOLFNANO_SUCCESS) {
         ret = wn_KeyShare_Init(&ks, ch.group);
         if (ret == WOLFNANO_SUCCESS) {
@@ -161,7 +237,7 @@ int wn_Accept_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     if (ret == WOLFNANO_SUCCESS) {
         ret = wn_SendPlainRecord(ioSend, ioCtx, WN_REC_HANDSHAKE, scratch, shLen);
     }
-    if (ret == WOLFNANO_SUCCESS) {
+    if ((ret == WOLFNANO_SUCCESS) && (hrrDone == 0)) {  /* one compat CCS: after HRR if it fired */
         ret = wn_SendCcs(ioSend, ioCtx);
     }
 
@@ -305,7 +381,7 @@ int wn_Accept_Cert_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     byte rtype = 0, ctype = 0;
     byte sidLen;
     int ret = WOLFNANO_SUCCESS;
-    int ksInit = 0, done = 0;
+    int ksInit = 0, done = 0, hrrDone = 0;
 
     if ((sess == NULL) || (rng == NULL) || (ioSend == NULL) ||
         (ioRecv == NULL) || (certDer == NULL) || (keyDer == NULL) ||
@@ -330,6 +406,13 @@ int wn_Accept_Cert_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     }
     if (ret == WOLFNANO_SUCCESS) {
         ret = wn_ClientHello_Parse(plain, chLen, &ch);
+    }
+    /* HelloRetryRequest when no usable key_share (RFC 8446 4.1.4); after this
+     * plain holds ClientHello2 and the transcript holds message_hash(CH1)+HRR. */
+    if (ret == WOLFNANO_SUCCESS) {
+        hrrDone = (ch.haveKeyShare == 0);
+        ret = wn_Accept_MaybeHrr(&tc, ioSend, ioRecv, ioCtx, scratch, scratchLen,
+                                 &chLen, &ch);
     }
     if ((ret == WOLFNANO_SUCCESS) &&
         (wn_ClientHello_HasSigAlg(&ch, scheme) == 0)) {
@@ -369,7 +452,7 @@ int wn_Accept_Cert_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     if (ret == WOLFNANO_SUCCESS) {
         ret = wn_SendPlainRecord(ioSend, ioCtx, WN_REC_HANDSHAKE, scratch, shLen);
     }
-    if (ret == WOLFNANO_SUCCESS) {
+    if ((ret == WOLFNANO_SUCCESS) && (hrrDone == 0)) {  /* one compat CCS: after HRR if it fired */
         ret = wn_SendCcs(ioSend, ioCtx);
     }
 

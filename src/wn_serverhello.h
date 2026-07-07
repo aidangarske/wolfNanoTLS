@@ -56,6 +56,14 @@ WOLFNANO_LOCAL int wn_ServerHello_Build(byte* out, word32* outLen, word32 outCap
                                         const byte* srvPub, word32 srvPubLen,
                                         word16 pskIdentity, int includePsk);
 
+/* Build a HelloRetryRequest (RFC 8446 4.1.4): a ServerHello with the HRR
+ * sentinel random asking the client to resend with a key_share for group. */
+WOLFNANO_LOCAL int wn_HelloRetryRequest_Build(byte* out, word32* outLen,
+                                              word32 outCap,
+                                              const byte* sessionId,
+                                              byte sessionIdLen, word16 cipher,
+                                              word16 group);
+
 /* Encode an empty EncryptedExtensions (type 8 + length + empty vector). */
 WOLFNANO_LOCAL int wn_EncExt_Build(byte* out, word32* outLen, word32 outCap);
 #endif /* WOLFNANO_SERVER */
