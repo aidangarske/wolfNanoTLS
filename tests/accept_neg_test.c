@@ -161,6 +161,16 @@ int main(void)
     check(run_psk(rec, rl, 0, 1) != WOLFNANO_SUCCESS,
           "recv failure on ClientHello rejected");
 
+    /* ----- legacy_session_id length > 32 must be rejected before any copy ----- */
+    XMEMSET(body, 0, sizeof(body));
+    body[0] = 1;                             /* ClientHello */
+    body[4] = 0x03; body[5] = 0x03;          /* legacy_version (random follows) */
+    body[38] = 64;                           /* legacy_session_id length = 64 (>32) */
+    body[1] = 0; body[2] = 0; body[3] = 99;  /* handshake length = 4+2+32+1+64-4 */
+    rl = wrap_record(rec, body, 103);
+    check(run_psk(rec, rl, 0, 0) != WOLFNANO_SUCCESS,
+          "oversize legacy_session_id rejected (no stack overflow)");
+
     /* ----- ServerCert / CertVerify encoder argument checks ----- */
     check(wn_ServerCert_Build(NULL, &rl, sizeof(rec), rec, 1)
           == WOLFNANO_E_INVALID_ARG, "ServerCert_Build NULL out rejected");

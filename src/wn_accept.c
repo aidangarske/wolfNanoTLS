@@ -72,8 +72,8 @@ int wn_Accept_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     int ksInit = 0, done = 0;
 
     if ((sess == NULL) || (rng == NULL) || (ioSend == NULL) || (ioRecv == NULL) ||
-        (psk == NULL) || (identity == NULL) || (scratch == NULL) ||
-        (scratchLen < 2048)) {
+        (psk == NULL) || (pskLen == 0) || (identity == NULL) ||
+        (scratch == NULL) || (scratchLen < 2048)) {
         return WOLFNANO_E_INVALID_ARG;
     }
 
@@ -217,6 +217,11 @@ int wn_Accept_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
         if ((ret == WOLFNANO_SUCCESS) && (rtype != WN_REC_APPDATA)) {
             ret = WOLFNANO_E_UNEXPECTED_MSG;
         }
+        /* bound the plaintext to the destination before decrypting in place */
+        if ((ret == WOLFNANO_SUCCESS) &&
+            (recLen > sizeof(flight) + WN_RECORD_HEADER_SZ + WN_RECORD_TAG_SZ)) {
+            ret = WOLFNANO_E_UNEXPECTED_MSG;
+        }
         if (ret == WOLFNANO_SUCCESS) {
             ret = wn_Record_Unprotect(flight, &flightLen, &ctype, cKey, 16, cIv,
                                       0, scratch, recLen);
@@ -247,6 +252,9 @@ int wn_Accept_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     ForceZero(sKey, sizeof(sKey));
     ForceZero(sIv, sizeof(sIv));
     ForceZero(ecdhe, sizeof(ecdhe));
+    if (ret != WOLFNANO_SUCCESS) {   /* never leave a half-open established session */
+        ForceZero(sess, sizeof(*sess));
+    }
     return ret;
 }
 
@@ -445,6 +453,11 @@ int wn_Accept_Cert_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
         if ((ret == WOLFNANO_SUCCESS) && (rtype != WN_REC_APPDATA)) {
             ret = WOLFNANO_E_UNEXPECTED_MSG;
         }
+        /* bound the plaintext to the enc region before decrypting */
+        if ((ret == WOLFNANO_SUCCESS) &&
+            (recLen > half + WN_RECORD_HEADER_SZ + WN_RECORD_TAG_SZ)) {
+            ret = WOLFNANO_E_UNEXPECTED_MSG;
+        }
         if (ret == WOLFNANO_SUCCESS) {
             ret = wn_Record_Unprotect(enc, &flightLen, &ctype, cKey, 16, cIv,
                                       0, scratch, recLen);
@@ -474,6 +487,9 @@ int wn_Accept_Cert_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     ForceZero(sKey, sizeof(sKey));
     ForceZero(sIv, sizeof(sIv));
     ForceZero(ecdhe, sizeof(ecdhe));
+    if (ret != WOLFNANO_SUCCESS) {   /* never leave a half-open established session */
+        ForceZero(sess, sizeof(*sess));
+    }
     return ret;
 }
 
