@@ -27,6 +27,7 @@
 #include "wn_accept.h"
 #include "wn_servercert.h"
 #include "wn_handshake.h"
+#include "wn_keyshare.h"
 #include "wolfnano_crypto.h"
 #include <stdio.h>
 #include <string.h>
@@ -87,6 +88,52 @@ static int m_recv(void* ctx, byte* buf, word32 len)
 static const byte g_psk[16] = { 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15 };
 static const char g_id[] = "Client_identity";
 
+/* PSK of examples/client.c, whose captured ClientHello has a valid binder. */
+static const byte g_ex_psk[32] = {
+    0x01,0x23,0x45,0x67,0x89,0xab,0xcd,0xef, 0x01,0x23,0x45,0x67,0x89,0xab,0xcd,0xef,
+    0x01,0x23,0x45,0x67,0x89,0xab,0xcd,0xef, 0x01,0x23,0x45,0x67,0x89,0xab,0xcd,0xef
+};
+/* captured valid TLS 1.3 PSK ClientHello record (219 B) + client CCS (6 B) */
+static const byte g_valid_psk_ch[225] = {
+    0x16,0x03,0x03,0x00,0xd6,0x01,0x00,0x00,0xd2,0x03,0x03,0x24,
+    0x0e,0xf8,0xca,0xb0,0xcf,0x55,0x4a,0x8e,0x74,0x6e,0x24,0x50,
+    0x0a,0x8c,0x97,0x3a,0x5c,0x48,0xc7,0x38,0x77,0xd1,0x10,0xa8,
+    0x89,0xce,0x4d,0x9e,0xa0,0x20,0x49,0x20,0x83,0x5e,0xc3,0x21,
+    0xd6,0x2f,0xe9,0x62,0x2f,0xab,0x3b,0xb8,0x64,0x0e,0xd0,0x8b,
+    0x5d,0x19,0x9b,0x91,0xd4,0x74,0xa5,0x6f,0x46,0x17,0x51,0xaa,
+    0xe8,0x86,0x6f,0x36,0x00,0x02,0x13,0x01,0x01,0x00,0x00,0x87,
+    0x00,0x2b,0x00,0x03,0x02,0x03,0x04,0x00,0x0a,0x00,0x04,0x00,
+    0x02,0x00,0x1d,0x00,0x0d,0x00,0x06,0x00,0x04,0x08,0x07,0x04,
+    0x03,0x00,0x33,0x00,0x26,0x00,0x24,0x00,0x1d,0x00,0x20,0x82,
+    0xdd,0x58,0x00,0x14,0x18,0x73,0x15,0xe9,0xd1,0x13,0x69,0x5f,
+    0x99,0xd5,0x8a,0xec,0x01,0x61,0x9c,0xb5,0xd2,0x45,0xa0,0xb5,
+    0xda,0x5d,0xe0,0x25,0xb6,0xd9,0x03,0x00,0x2d,0x00,0x02,0x01,
+    0x01,0x00,0x29,0x00,0x3a,0x00,0x15,0x00,0x0f,0x43,0x6c,0x69,
+    0x65,0x6e,0x74,0x5f,0x69,0x64,0x65,0x6e,0x74,0x69,0x74,0x79,
+    0x00,0x00,0x00,0x00,0x00,0x21,0x20,0xb5,0xe3,0x21,0x54,0xc1,
+    0xf3,0xe0,0xd5,0xb5,0x01,0xb0,0x82,0x78,0x25,0xde,0xe7,0x21,
+    0x6b,0x65,0xe4,0x74,0x61,0x07,0xfb,0x4e,0x32,0x04,0x82,0x84,
+    0x11,0x2e,0xe4,0x14,0x03,0x03,0x00,0x01,0x01,
+};
+
+static int accept_psk_ch(const byte* rec, word32 len, const byte* psk,
+                         word32 pskLen, const char* id)
+{
+    mock_io m;
+    WC_RNG rng;
+    byte scr[4096];
+    int rc;
+
+    XMEMSET(&m, 0, sizeof(m));
+    m.in = rec;
+    m.inLen = len;
+    wc_InitRng(&rng);
+    rc = wn_Accept_Psk(&rng, m_send, m_recv, &m, psk, pskLen, id, scr,
+                       sizeof(scr));
+    wc_FreeRng(&rng);
+    return rc;
+}
+
 /* Wrap a handshake body in a TLS record header (type 22 handshake). */
 static word32 wrap_record(byte* out, const byte* body, word32 bodyLen)
 {
@@ -122,7 +169,10 @@ int main(void)
 {
     WC_RNG rng;
     wn_Session sc, ss;
+    wn_KeyShare ks;
     mock_io mr;
+    byte spub[128], ssec[64];
+    word32 splen, seclen;
     byte scratch[4096];
     byte rec[512];
     byte body[256];
@@ -197,6 +247,24 @@ int main(void)
     check(run_psk(rec, rl, 0, 1) != WOLFNANO_SUCCESS,
           "recv failure on ClientHello rejected");
 
+    /* ----- PSK identity + binder rejection over a captured valid CH ----- */
+    check(accept_psk_ch(g_valid_psk_ch, sizeof(g_valid_psk_ch), g_ex_psk,
+                        sizeof(g_ex_psk), "WrongIdentity")
+              == WOLFNANO_E_ILLEGAL_PARAM, "PSK wrong identity rejected");
+    XMEMCPY(body, g_valid_psk_ch, sizeof(g_valid_psk_ch));
+    body[218] ^= 0x01;                     /* corrupt the last PSK binder byte */
+    check(accept_psk_ch(body, sizeof(g_valid_psk_ch), g_ex_psk, sizeof(g_ex_psk),
+                        "Client_identity") == WOLFNANO_E_BAD_MAC,
+          "PSK corrupted binder rejected (BAD_MAC)");
+
+    /* ----- cert server rejects a signature scheme the client did not offer ----- */
+    XMEMSET(&mr, 0, sizeof(mr));
+    mr.in = g_valid_psk_ch;
+    mr.inLen = sizeof(g_valid_psk_ch);
+    check(wn_Accept_Cert_ex(&sc, &rng, m_send, m_recv, &mr, rec, 8, rec, 8,
+                            0xFFFF, scratch, sizeof(scratch))
+              == WOLFNANO_E_ILLEGAL_PARAM, "cert server rejects unoffered scheme");
+
     /* ----- legacy_session_id length > 32 must be rejected before any copy ----- */
     XMEMSET(body, 0, sizeof(body));
     body[0] = 1;                             /* ClientHello */
@@ -206,6 +274,17 @@ int main(void)
     rl = wrap_record(rec, body, 103);
     check(run_psk(rec, rl, 0, 0) != WOLFNANO_SUCCESS,
           "oversize legacy_session_id rejected (no stack overflow)");
+
+    /* ----- wn_KeyShare_ServerShare argument + malformed-peer rejection ----- */
+    rc = wn_KeyShare_Init(&ks, WN_DEFAULT_GROUP);
+    check(rc == WOLFNANO_SUCCESS, "keyshare init");
+    check(wn_KeyShare_ServerShare(&ks, &rng, NULL, 0, spub, &splen, ssec,
+                                  &seclen) == WOLFNANO_E_INVALID_ARG,
+          "ServerShare NULL peer share rejected");
+    check(wn_KeyShare_ServerShare(&ks, &rng, (const byte*)spub, 3, spub, &splen,
+                                  ssec, &seclen) != WOLFNANO_SUCCESS,
+          "ServerShare short peer share rejected");
+    (void)wn_KeyShare_Free(&ks);
 
     /* ----- ServerCert / CertVerify encoder argument checks ----- */
     check(wn_ServerCert_Build(NULL, &rl, sizeof(rec), rec, 1)
