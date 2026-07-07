@@ -47,8 +47,6 @@
 
 #ifdef WOLFNANO_SERVER
 
-#define WN_HS_CLIENT_HELLO   1
-#define WN_HS_ENCRYPTED_EXT  8
 #define WN_HS_FINISHED       20
 
 /* Split-scratch reassembly needs room for two max ClientHello records; the

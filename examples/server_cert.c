@@ -71,6 +71,8 @@ int main(int argc, char** argv)
 
     if (argc < 5) {
         printf("usage: %s <port> <cert.der> <key.der> <scheme-hex>\n", argv[0]);
+        printf("  scheme-hex: 0403 ecdsa-p256, 0503 ecdsa-p384, 0807 ed25519,\n");
+        printf("              0804/0805/0806 rsa-pss-sha256/384/512, 0904 ml-dsa\n");
         return 1;
     }
     port = atoi(argv[1]);
