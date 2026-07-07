@@ -194,7 +194,7 @@ int wn_ClientHello_Parse(const byte* msg, word32 msgLen, wn_ClientHello* out)
     byte seenPsk = 0, dup, nSeen = 0;
     byte haveTls13 = 0, havePskDhe = 0, haveGroups = 0, groupOffered = 0;
     word16 sv, glen;
-    word16 seenExt[24];
+    word16 seenExt[40];   /* dup-detection window; wider than any real CH */
     const byte* p;
     int ret = WOLFNANO_SUCCESS;
 
