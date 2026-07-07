@@ -187,8 +187,8 @@ int wn_ClientHello_HasSigAlg(const wn_ClientHello* ch, word16 scheme)
 int wn_ClientHello_Parse(const byte* msg, word32 msgLen, wn_ClientHello* out)
 {
     wn_Reader r;
-    word32 hsLen, extEnd, eEnd, ksEnd, idsEnd, bndEnd, ksVec;
-    word16 vecLen, et, el, csLen, i, klen, idLen, idsLen, cs;
+    word32 hsLen, extEnd = 0, eEnd, ksEnd, idsEnd, bndEnd, ksVec;
+    word16 vecLen, et, el, csLen = 0, i, klen, idLen, idsLen, cs;
     word16 g, nId, nBnd;
     byte sidLen, compLen, comp, blen, nver, pmLen, j;
     byte seenPsk = 0, dup, nSeen = 0;

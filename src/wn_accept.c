@@ -171,7 +171,8 @@ int wn_Accept_Psk_ex(wn_Session* sess, WC_RNG* rng, wn_IoSend ioSend,
     }
     if ((ret == WOLFNANO_SUCCESS) &&
         ((ch.havePsk == 0) || (ch.pskIdentityLen != idLen) ||
-         (XMEMCMP(ch.pskIdentity, identity, idLen) != 0))) {
+         (ConstantCompare(ch.pskIdentity, (const byte*)identity, (int)idLen)
+              != 0))) {
         ret = WOLFNANO_E_ILLEGAL_PARAM;     /* no PSK, or offered identity is not ours */
     }
 
