@@ -1,0 +1,75 @@
+/* mbedTLS 4.x TLS-side config: minimal TLS 1.3 PSK + ECDHE client, no X.509.
+ * Starts from bench/min/mbedtls4_config.h and additionally drops the whole
+ * certificate stack (X.509 / PK), keeping only the PSK-ephemeral key exchange
+ * mode. Mirrors the wolfNanoTLS PSK footprint scope (SHA-256 only). */
+
+#ifndef WN_FP_MB4_TLS_PSK_CONFIG_H
+#define WN_FP_MB4_TLS_PSK_CONFIG_H
+
+#include "mbedtls/mbedtls_config.h"
+
+/* host-only I/O / timing */
+#undef MBEDTLS_NET_C
+#undef MBEDTLS_TIMING_C
+
+/* TLS 1.3 client+server: drop TLS 1.2, server, DTLS */
+#undef MBEDTLS_SSL_PROTO_TLS1_2
+#undef MBEDTLS_SSL_PROTO_DTLS
+#undef MBEDTLS_SSL_DTLS_ANTI_REPLAY
+#undef MBEDTLS_SSL_DTLS_CONNECTION_ID
+#undef MBEDTLS_SSL_DTLS_HELLO_VERIFY
+#undef MBEDTLS_SSL_DTLS_CLIENT_PORT_REUSE
+#undef MBEDTLS_SSL_DTLS_SRTP
+
+/* TLS 1.2 key-exchange selectors (unused without TLS 1.2) */
+#undef MBEDTLS_KEY_EXCHANGE_PSK_ENABLED
+#undef MBEDTLS_KEY_EXCHANGE_DHE_PSK_ENABLED
+#undef MBEDTLS_KEY_EXCHANGE_ECDHE_PSK_ENABLED
+#undef MBEDTLS_KEY_EXCHANGE_RSA_PSK_ENABLED
+#undef MBEDTLS_KEY_EXCHANGE_ECDHE_PSK_ENABLED
+#undef MBEDTLS_KEY_EXCHANGE_ECDHE_RSA_ENABLED
+#undef MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA_ENABLED
+#undef MBEDTLS_KEY_EXCHANGE_ECDH_ECDSA_ENABLED
+#undef MBEDTLS_KEY_EXCHANGE_ECDH_RSA_ENABLED
+#undef MBEDTLS_KEY_EXCHANGE_ECJPAKE_ENABLED
+
+/* TLS 1.3: PSK + ECDHE (PSK-ephemeral) only. Drop cert-based ephemeral and
+ * pure-PSK-no-ECDHE. */
+#undef MBEDTLS_SSL_TLS1_3_KEY_EXCHANGE_MODE_EPHEMERAL_ENABLED
+#undef MBEDTLS_SSL_TLS1_3_KEY_EXCHANGE_MODE_PSK_ENABLED
+#undef MBEDTLS_SSL_SESSION_TICKETS
+#undef MBEDTLS_SSL_TLS1_3_DEFAULT_NEW_SESSION_TICKETS
+#undef MBEDTLS_SSL_EARLY_DATA
+
+/* optional TLS extensions / features */
+#undef MBEDTLS_SSL_ALPN
+#undef MBEDTLS_SSL_RENEGOTIATION
+#undef MBEDTLS_SSL_SERVER_NAME_INDICATION
+#undef MBEDTLS_SSL_CONTEXT_SERIALIZATION
+#undef MBEDTLS_SSL_ENCRYPT_THEN_MAC
+#undef MBEDTLS_SSL_EXTENDED_MASTER_SECRET
+#undef MBEDTLS_SSL_KEYING_MATERIAL_EXPORT
+#undef MBEDTLS_SSL_CACHE_C
+#undef MBEDTLS_SSL_TICKET_C
+
+/* no certificate stack for a pure-PSK client: drop all X.509 + PK */
+#undef MBEDTLS_X509_USE_C
+#undef MBEDTLS_X509_CRT_PARSE_C
+#undef MBEDTLS_X509_CRL_PARSE_C
+#undef MBEDTLS_X509_CSR_PARSE_C
+#undef MBEDTLS_X509_CREATE_C
+#undef MBEDTLS_X509_CRT_WRITE_C
+#undef MBEDTLS_X509_CSR_WRITE_C
+#undef MBEDTLS_X509_RSASSA_PSS_SUPPORT
+#undef MBEDTLS_PK_C
+#undef MBEDTLS_PK_PARSE_C
+#undef MBEDTLS_PK_WRITE_C
+
+/* misc host bits / diagnostics */
+#undef MBEDTLS_PKCS7_C
+#undef MBEDTLS_DEBUG_C
+#undef MBEDTLS_SSL_DEBUG_ALL
+#undef MBEDTLS_ERROR_C
+#undef MBEDTLS_VERSION_FEATURES
+
+#endif /* WN_FP_MB4_TLS_PSK_CONFIG_H */

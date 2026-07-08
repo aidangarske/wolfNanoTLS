@@ -1,9 +1,9 @@
-/* Whole-deployment footprint harness: a bare-metal TLS 1.3 server entry point
- * that drives the full wolfNanoTLS cert handshake (wn_Accept_Cert) with stub I/O
- * and seed. Links the floor crypto + the whole server shell; --gc-sections keeps
- * only the handshake's reachable code, so the binary's .text is the real
- * deployment footprint. Correctness is irrelevant; this measures size. */
+/* Combined role wolfNanoTLS: a device that is both TLS 1.3 client and server with
+ * X.509 (client verifies a chain, server signs CertificateVerify). Drives
+ * wn_Connect_Cert and wn_Accept_Cert so --gc-sections keeps both the verify and
+ * sign paths. Size only; stub I/O + seed. */
 
+#include "wn_connect.h"
 #include "wn_accept.h"
 #include <wolfssl/wolfcrypt/random.h>
 
@@ -48,6 +48,8 @@ int main(void)
     int ret;
 
     ret = wc_InitRng(&rng);
+    ret += wn_Connect_Cert(&rng, io_send, io_recv, NULL, cert, (word32)sizeof(cert),
+                           scratch, (word32)sizeof(scratch));
     ret += wn_Accept_Cert(&rng, io_send, io_recv, NULL, cert, (word32)sizeof(cert),
                           key, (word32)sizeof(key), WN_FP_SCHEME, scratch,
                           (word32)sizeof(scratch));

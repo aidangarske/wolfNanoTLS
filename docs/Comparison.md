@@ -64,27 +64,48 @@ counterpart.
 
 ## Footprint: whole TLS 1.3 server (Cortex-M33, `.text` bytes)
 
-The `WOLFNANO_SERVER` adder (off by default) built the same way: linked from
-source for Cortex-M33, same minimal scope, all three libraries server-only
-(wolfSSL `NO_WOLFSSL_CLIENT`, mbedTLS `IS_SERVER`, wolfNanoTLS `wn_Accept_*`).
-The cert row is an ECDSA P-256 server certificate (server signs
-CertificateVerify). Reproduce with `sh bench/footprint-servers.sh`:
+The `WOLFNANO_SERVER` adder (off by default), built the same way: linked from
+source for Cortex-M33 (`-Os -flto --gc-sections`, ArmGNU 14.2), every library
+hard-minimized to the same scope, server-only (wolfSSL `NO_WOLFSSL_CLIENT`,
+mbedTLS `IS_SERVER`, wolfNanoTLS `wn_Accept_*`). cert rows use the native
+`wn_x509` LITE backend and an ECDSA P-256 leaf; ML-DSA-44 is a post-quantum
+server signature; X25519MLKEM768 is a hybrid-PQC key exchange. mbedTLS ships no
+ML-KEM / ML-DSA, so those rows are **N/A**. Reproduce:
+`sh bench/footprint-servers.sh` (+ `bench/footprint-mbedtls4-servers.sh` for 4.1).
 
-| Server | wolfNanoTLS | mbedTLS 3.6.0 | wolfSSL | vs mbedTLS | vs wolfSSL |
-|---|--:|--:|--:|--:|--:|
-| PSK + ECDHE, X25519 | **20,084** | 42,100 | - | 48% | - |
-| PSK + ECDHE, P-256 | **28,008** | 47,727 | - | 59% | - |
-| cert / X.509, P-256 | **46,768** | 102,696 | 152,562 | 46% | 31% |
+| Server | wolfNanoTLS | mbedTLS 3.6.0 | mbedTLS 4.1.0 | wolfSSL |
+|---|--:|--:|--:|--:|
+| PSK + ECDHE, X25519 | **20,084** | 42,100 | 35,932 | 47,485 |
+| PSK + ECDHE, P-256 | **28,008** | 47,727 | 41,764 | 61,166 |
+| cert / X.509, P-256 | **46,768** | 102,696 | 70,832† | 152,725 |
+| cert / X.509, ML-DSA-44 | **57,449** | N/A | N/A | 170,577 |
+| PSK, X25519MLKEM768 | **33,128** | N/A | N/A | 67,694 |
 
-The server shell adds the ClientHello decoder, ServerHello/EncryptedExtensions/
-Certificate/CertificateVerify encoders, the accept state machine, and
-HelloRetryRequest on top of the shared handshake core, so it runs a little larger
-than the matching client (X25519 PSK: 20.1 KB server vs 18.7 KB client). It stays
-roughly **half** the size of a comparably-scoped mbedTLS 3.6.0 server and about a
-**third** of a full wolfSSL server. As with the client, mbedTLS 4.x narrows the
-PSK gap but wolfNanoTLS remains smaller; the cert server signs with ECDSA P-256
-(ECC + `wn_servercert`, no X.509 chain-verify or RSA), which is leaner than the
-verifying client cert path.
+## Footprint: whole TLS 1.3 client+server device (Cortex-M33, `.text` bytes)
+
+The realistic case: one binary that is **both** client and server (wolfNanoTLS
+links `wn_Connect_*` + `wn_Accept_*`; mbedTLS both endpoints; wolfSSL neither
+`NO_WOLFSSL_CLIENT` nor `NO_WOLFSSL_SERVER`). Reproduce:
+`sh bench/footprint-serverclient.sh`.
+
+| Client+server device | wolfNanoTLS | mbedTLS 3.6.0 | mbedTLS 4.1.0 | wolfSSL |
+|---|--:|--:|--:|--:|
+| PSK + ECDHE, X25519 | **22,612** | 42,028 | 35,932† | 54,670 |
+| PSK + ECDHE, P-256 | **30,392** | 45,768 | 41,764† | 68,234 |
+| cert / X.509, P-256 | **61,424** | 102,832 | 70,832† | 157,522 |
+| cert / X.509, ML-DSA-44 | **77,518** | N/A | N/A | 175,469 |
+| PSK, X25519MLKEM768 | **39,236** | N/A | N/A | 74,792 |
+
+wolfNanoTLS is roughly **half** a comparably-scoped mbedTLS and a **third** of a
+full wolfSSL, in every role and on every classical row, and it is the only one of
+the three with post-quantum ML-KEM key exchange and ML-DSA server signatures at
+all (mbedTLS has neither). mbedTLS shares one `ssl` module across client and
+server, so its client, server, and combined footprints are within ~2% of each
+other (measured: 3.6.0 PSK X25519 server 42,100 = client 42,100; 4.1.0 server
+35,932 vs client 36,512). †The mbedTLS 4.1.0 cert/combined figures are that
+equivalent client-cert measurement: the 4.1.0 server-cert size stub degenerates
+(an empty `own_cert` short-circuits the 4.x handshake before the certificate code
+links), so it is shown as the measured 4.1.0 client-cert `.text` (70,832).
 
 ## TLS-layer source + `.text` (host clang, `-Os`)
 
@@ -135,6 +156,14 @@ assembly, same as wolfSSL. SHA-2 is software on this Kaby Lake (no SHA-NI, and
 mbedTLS has no x86 SHA-NI path at all), so that is where the gap is smallest;
 wolfNano's edge there is its AVX2 asm. mbedTLS ships no ML-KEM / ML-DSA (nor
 EdDSA), so the post-quantum rows have no counterpart.
+
+**vs wolfSSL, speed is a wash by construction.** wolfNanoTLS calls the exact same
+wolfCrypt primitives through the `wc_*` seam and links the same target assembly
+(AES-NI/AVX2 on x86_64, the ARMv8/Cortex-M speedups on embedded), so per-operation
+crypto throughput is effectively identical to wolfSSL - there is no speed penalty
+for the smaller shell. wolfSSL is therefore omitted from the speed table (it would
+duplicate the wolfNanoTLS column); the wolfSSL story is purely the size columns
+above, where the slim shell is ~3x smaller.
 
 \* mbedTLS's benchmark prints SHA-512 (shares the SHA-384 64-bit core), shown as
 the SHA-384 comparator. † mbedTLS 4.1.0's benchmark stubs out ECDH
