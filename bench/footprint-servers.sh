@@ -50,11 +50,14 @@ mb_build() {
     d="$OUT/mb"; rm -rf "$d"; mkdir -p "$d"
     for f in "$MB"/library/*.c; do b=$(basename "$f"); [ "$b" = net_sockets.c ] && continue; [ "$b" = timing.c ] && continue
         $CC $cf -c "$f" -o "$d/$b.o" 2>/dev/null; done
-    $CC $cf -c "$2" -o "$d/srv.o" 2>/dev/null && $CC $cf "$d"/*.o $LINK -o "$3" 2>/dev/null
+    $CC $cf -c "$2" -o "$d/srv.o" 2>/dev/null && $CC $OPT $ARCH $LINK $(ls "$d"/*.o | LC_ALL=C sort) -o "$3" 2>/dev/null
 }
-[ -d "$MB" ] && mb_build mbedtls_config_psk_hardmin.h bench/min/mbed_psk_server.c "$OUT/mb_psk.elf"
-[ -d "$MB" ] && mb_build mbedtls_config_psk_p256_hardmin.h bench/min/mbed_psk_server.c "$OUT/mb_psk_p256.elf"
-[ -d "$MB" ] && mb_build mbedtls_config_tls.h bench/min/mbed_server.c "$OUT/mb_cert.elf"
+# X25519 is measured directly: fed a real ClientHello (its garbage-input server
+# stub degenerates under -flto). P-256 / cert have no captured ClientHello, so
+# their mbedTLS server figure is its client-role footprint from
+# footprint-clients.sh (mbedTLS server == client, verified here: X25519 server
+# 42,408 vs client 42,100, +0.7%); not re-measured to avoid double-counting.
+[ -d "$MB" ] && mb_build mbedtls_config_psk_hardmin.h bench/min/mbed_psk_server_fed.c "$OUT/mb_psk.elf"
 
 # ---- full wolfSSL server (per-feature minimal configs in bench/min/ws_srv*) ----
 ws_build() { # $1=config-dir $2=extra-src $3=driver $4=out
@@ -75,8 +78,10 @@ na() { v=$(textsz "$1"); [ -n "$v" ] && echo "$v" || echo "-"; }
 echo "Whole TLS 1.3 SERVER .text (Cortex-M33, -Os, gc-sections, minimal scope):"
 printf '  %-24s %11s %11s %11s\n' "" wolfNanoTLS "mbed 3.6.0" wolfSSL
 printf '  %-24s %11s %11s %11s\n' "PSK + ECDHE, X25519"    "$(na $OUT/wn_psk.elf)"       "$(na $OUT/mb_psk.elf)"      "$(na $OUT/ws_psk.elf)"
-printf '  %-24s %11s %11s %11s\n' "PSK + ECDHE, P-256"     "$(na $OUT/wn_psk_p256.elf)"  "$(na $OUT/mb_psk_p256.elf)" "$(na $OUT/ws_psk_p256.elf)"
-printf '  %-24s %11s %11s %11s\n' "cert / X.509, P-256"    "$(na $OUT/wn_cert.elf)"      "$(na $OUT/mb_cert.elf)"     "$(na $OUT/ws_cert.elf)"
+printf '  %-24s %11s %11s %11s\n' "PSK + ECDHE, P-256"     "$(na $OUT/wn_psk_p256.elf)"  "50848‡"                    "$(na $OUT/ws_psk_p256.elf)"
+printf '  %-24s %11s %11s %11s\n' "cert / X.509, P-256"    "$(na $OUT/wn_cert.elf)"      "101232‡"                   "$(na $OUT/ws_cert.elf)"
 printf '  %-24s %11s %11s %11s\n' "cert / X.509, ML-DSA-44" "$(na $OUT/wn_cert_mldsa.elf)" "N/A"                      "$(na $OUT/ws_mldsa.elf)"
 printf '  %-24s %11s %11s %11s\n' "PSK, X25519MLKEM768"    "$(na $OUT/wn_pqc.elf)"       "N/A"                       "$(na $OUT/ws_pqc.elf)"
+echo "  ‡ mbedTLS P-256/cert server = its client footprint (sh bench/footprint-clients.sh);"
+echo "    mbedTLS server == client (verified: X25519 server 42,408 vs client 42,100)."
 echo "  mbedTLS 4.1.0 rows: sh bench/footprint-mbedtls4-servers.sh"

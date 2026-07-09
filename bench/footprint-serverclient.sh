@@ -50,11 +50,11 @@ mb_build() {
     d="$OUT/mb"; rm -rf "$d"; mkdir -p "$d"
     for f in "$MB"/library/*.c; do b=$(basename "$f"); [ "$b" = net_sockets.c ] && continue; [ "$b" = timing.c ] && continue
         $CC $cf -c "$f" -o "$d/$b.o" 2>/dev/null; done
-    $CC $cf -c "$2" -o "$d/srv.o" 2>/dev/null && $CC $cf "$d"/*.o $LINK -o "$3" 2>/dev/null
+    $CC $cf -c "$2" -o "$d/srv.o" 2>/dev/null && $CC $cf $(ls "$d"/*.o | LC_ALL=C sort) $LINK -o "$3" 2>/dev/null
 }
 [ -d "$MB" ] && mb_build mbedtls_config_psk_hardmin.h bench/min/mbed_psk_clientserver.c "$OUT/mb_psk.elf"
 [ -d "$MB" ] && mb_build mbedtls_config_psk_p256_hardmin.h bench/min/mbed_psk_clientserver.c "$OUT/mb_psk_p256.elf"
-[ -d "$MB" ] && mb_build mbedtls_config_tls.h bench/min/mbed_clientserver.c "$OUT/mb_cert.elf"
+[ -d "$MB" ] && mb_build mbedtls_config_tls_cs.h bench/min/mbed_clientserver.c "$OUT/mb_cert.elf"
 
 # ---- full wolfSSL server (per-feature minimal configs in bench/min/ws_cs*) ----
 ws_build() { # $1=config-dir $2=extra-src $3=driver $4=out

@@ -79,13 +79,13 @@ mb_build() { # $1=config $2=client $3=out
     local d="$OUT/mb"; rm -rf "$d"; mkdir -p "$d"
     for f in "$MB"/library/*.c; do b=$(basename "$f"); [ "$b" = net_sockets.c ] && continue; [ "$b" = timing.c ] && continue
         $CC $cf -c "$f" -o "$d/$b.o" 2>/dev/null; done
-    $CC $cf -c "$2" -o "$d/client.o" 2>/dev/null && $CC $cf "$d"/*.o $LINK -o "$3" 2>/dev/null
+    $CC $cf -c "$2" -o "$d/client.o" 2>/dev/null && $CC $cf $(ls "$d"/*.o | LC_ALL=C sort) $LINK -o "$3" 2>/dev/null
 }
 [ -d "$MB" ] && mb_build mbedtls_config_psk_hardmin.h bench/min/mbed_psk_client.c "$OUT/mb_psk.elf"
 [ -d "$MB" ] && mb_build mbedtls_config_psk_p256_hardmin.h bench/min/mbed_psk_client.c "$OUT/mb_psk_p256.elf"
 [ -d "$MB" ] && mb_build mbedtls_config_tls.h bench/min/mbed_client.c "$OUT/mb_cert.elf"
 
-# ---- full wolfSSL (minimal config in bench/min/ws) ----
+# ---- full wolfSSL (per-feature minimal configs in bench/min/ws_cli*) ----
 WS_CF="$OPT $ARCH -DWOLFSSL_USER_SETTINGS -DWOLFNANO_TARGET_PORTABLE_C -Ibench/min/ws -Iwolfssl"
 $CC $WS_CF $WC/wc_port.c $WC/memory.c $WC/error.c $WC/hash.c $WC/random.c $WC/wolfmath.c \
    $WC/logging.c $WC/coding.c $WC/sha256.c $WC/sha512.c $WC/hmac.c $WC/kdf.c $WC/aes.c \
@@ -93,14 +93,27 @@ $CC $WS_CF $WC/wc_port.c $WC/memory.c $WC/error.c $WC/hash.c $WC/random.c $WC/wo
    $WC/ed25519.c $WC/ge_operations.c \
    $WS/ssl.c $WS/internal.c $WS/tls.c $WS/tls13.c $WS/keys.c $WS/wolfio.c \
    bench/min/ws/ws_cert_client.c $LINK -o "$OUT/ws_cert.elf" 2>/dev/null
+ws_build() { # $1=config-dir $2=extra-src $3=driver $4=out
+    $CC $OPT $ARCH -DWOLFSSL_USER_SETTINGS -DWOLFNANO_TARGET_PORTABLE_C -I"$1" -Iwolfssl \
+      $WC/wc_port.c $WC/memory.c $WC/error.c $WC/hash.c $WC/random.c $WC/wolfmath.c \
+      $WC/logging.c $WC/coding.c $WC/sha256.c $WC/sha512.c $WC/hmac.c $WC/kdf.c $WC/aes.c \
+      $WC/curve25519.c $WC/fe_operations.c $WC/sp_int.c $2 \
+      $WS/ssl.c $WS/internal.c $WS/tls.c $WS/tls13.c $WS/keys.c $WS/wolfio.c \
+      "$3" $LINK -o "$4" 2>/dev/null
+}
+ws_build bench/min/ws_cli_psk      "$WC/ecc.c $WC/asn.c" bench/min/ws/ws_psk_client.c  "$OUT/ws_psk.elf"
+ws_build bench/min/ws_cli_psk_p256 "$WC/ecc.c $WC/asn.c" bench/min/ws/ws_psk_client.c  "$OUT/ws_psk_p256.elf"
+ws_build bench/min/ws_cli_pqc  "$WC/ecc.c $WC/asn.c $WC/sha3.c $WC/wc_mlkem.c $WC/wc_mlkem_poly.c" bench/min/ws/ws_psk_client.c "$OUT/ws_pqc.elf"
+ws_build bench/min/ws_cli_mldsa "$WC/ecc.c $WC/asn.c $WC/rsa.c $WC/ed25519.c $WC/ge_operations.c $WC/sha3.c $WC/wc_mldsa.c" bench/min/ws/ws_cert_client.c "$OUT/ws_mldsa.elf"
 
+na() { v=$(textsz "$1"); [ -n "$v" ] && echo "$v" || echo "-"; }
 echo "Whole TLS 1.3 client .text (Cortex-M33, -Os, gc-sections, minimal scope):"
 printf '  %-22s %10s %10s %10s\n' "" wolfNanoTLS MbedTLS wolfSSL
-printf '  %-22s %10s %10s %10s\n' "PSK X25519 (no X509)" "$(textsz $OUT/wn_psk.elf)" "$(textsz $OUT/mb_psk.elf)" "-"
-printf '  %-22s %10s %10s %10s\n' "PSK P-256 (no X509)" "$(textsz $OUT/wn_psk_p256.elf)" "$(textsz $OUT/mb_psk_p256.elf)" "-"
-printf '  %-22s %10s %10s %10s\n' "cert / X509 (P-256)" "$(textsz $OUT/wn_cert_lite.elf)" "$(textsz $OUT/mb_cert.elf)" "$(textsz $OUT/ws_cert.elf)"
-printf '  %-22s %10s %10s %10s\n' "PSK X25519MLKEM768" "$(textsz $OUT/wn_psk_pqc.elf)" "-" "-"
-printf '  %-22s %10s %10s %10s\n' "cert / X509 (ML-DSA-44)" "$(textsz $OUT/wn_cert_mldsa_lite.elf)" "-" "-"
+printf '  %-22s %10s %10s %10s\n' "PSK X25519 (no X509)" "$(na $OUT/wn_psk.elf)" "$(na $OUT/mb_psk.elf)" "$(na $OUT/ws_psk.elf)"
+printf '  %-22s %10s %10s %10s\n' "PSK P-256 (no X509)" "$(na $OUT/wn_psk_p256.elf)" "$(na $OUT/mb_psk_p256.elf)" "$(na $OUT/ws_psk_p256.elf)"
+printf '  %-22s %10s %10s %10s\n' "cert / X509 (P-256)" "$(na $OUT/wn_cert_lite.elf)" "$(na $OUT/mb_cert.elf)" "$(na $OUT/ws_cert.elf)"
+printf '  %-22s %10s %10s %10s\n' "PSK X25519MLKEM768" "$(na $OUT/wn_psk_pqc.elf)" "N/A" "$(na $OUT/ws_pqc.elf)"
+printf '  %-22s %10s %10s %10s\n' "cert / X509 (ML-DSA-44)" "$(na $OUT/wn_cert_mldsa_lite.elf)" "N/A" "$(na $OUT/ws_mldsa.elf)"
 echo "  (cert rows show WOLFNANO_X509_LITE; default asn.c backend is larger, see below)"
 echo ""
 echo "wolfNanoTLS X.509 backend .text (wolfSSL asn.c [default] vs native wn_x509 [X509_LITE]):"

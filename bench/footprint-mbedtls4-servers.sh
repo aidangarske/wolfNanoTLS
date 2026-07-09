@@ -48,7 +48,7 @@ build() { # $1=config $2=crypto_config $3=driver $4=out
     done
     $CC $ARCH $OPT $DEF $INC -c "$GEN/psa_crypto_driver_wrappers_no_static.c" -o "$d/drv.o" 2>/dev/null
     $CC $ARCH $OPT $DEF $INC -c "$BENCH/$3" -o "$d/srv.o" 2>/dev/null
-    $CC $ARCH $OPT $LINK "$d"/*.o -o "$d.elf" 2>/dev/null
+    $CC $ARCH $OPT $LINK $(ls "$d"/*.o | LC_ALL=C sort) -o "$d.elf" 2>/dev/null
     "$SIZE" "$d.elf" 2>/dev/null | awk 'NR==2{print $1}'
 }
 
