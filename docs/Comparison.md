@@ -15,11 +15,13 @@ releases **hard-minimized to the identical scope**. mbedTLS 4.x is markedly
 leaner than 3.6, so it is the tougher comparison; wolfNanoTLS is smaller than
 either:
 
-| Client | wolfNanoTLS | mbedTLS 3.6.0 | mbedTLS 4.1.0 | vs 4.1.0 | vs 3.6.0 |
-|---|--:|--:|--:|--:|--:|
-| PSK + ECDHE, X25519 | **18,680** | 42,100 | 36,512 | 49% | 56% |
-| PSK + ECDHE, P-256 | **26,604** | 50,848 | 42,284 | 37% | 48% |
-| cert / X.509, P-256 | **54,280** | 101,232 | 70,832 | 23% | 46% |
+Percentages are how much **smaller** wolfNanoTLS is than that column.
+
+| Client | wolfNanoTLS | mbedTLS 3.6.0 | mbedTLS 4.1.0 | wolfSSL |
+|---|--:|--:|--:|--:|
+| PSK + ECDHE, X25519 | **18,680** | 42,100 (56%) | 36,512 (49%) | 48,495 (61%) |
+| PSK + ECDHE, P-256 | **26,604** | 50,848 (48%) | 42,284 (37%) | 62,182 (57%) |
+| cert / X.509, P-256 | **54,280** | 101,232 (46%) | 70,832 (23%) | 151,829 (64%) |
 
 The cert row uses wolfNanoTLS's native `wn_x509` parser (`WOLFNANO_X509_LITE`,
 53.0 KB); the default `asn.c` backend is 63,877 B (62.4 KB), still ~10% under
@@ -55,12 +57,100 @@ The honest framing:
   <30 bytes).
 - **Raw crypto primitives are ~parity** (mbedTLS's compact bignum/ECP is its
   design strength); wolfNanoTLS's win is the TLS layer plus whole-stack assembly.
-- Full wolfSSL with X.509 is ~147 KB, which is the reason a slim shell exists.
+- Full wolfSSL with X.509 is ~150 KB, which is the reason a slim shell exists.
 
-At ~17 KB the X25519 PSK client fits where even a hard-minimized mbedTLS 4.1.0
+At ~18 KB the X25519 PSK client fits where even a hard-minimized mbedTLS 4.1.0
 (36 KB) cannot, and a stock mbedTLS is out of the question. mbedTLS and stock
 wolfSSL also ship **no ML-KEM / ML-DSA**, so wolfNanoTLS's PQC client rows have no
 counterpart.
+
+## Footprint: whole TLS 1.3 server (Cortex-M33, `.text` bytes)
+
+The `WOLFNANO_SERVER` adder (off by default), built the same way (`-Os -flto
+--gc-sections`, ArmGNU 14.2), every library hard-minimized to the same scope.
+wolfNanoTLS links only `wn_Accept_*` (no `wn_connect`); wolfSSL is
+`NO_WOLFSSL_CLIENT`; mbedTLS keeps only `ssl_tls13_server`. cert rows use the
+native `wn_x509` LITE backend; ML-DSA-44 is a post-quantum server signature;
+X25519MLKEM768 is a hybrid-PQC key exchange. mbedTLS ships no ML-KEM / ML-DSA, so
+those rows are **N/A**.
+
+Every server is a **direct measurement**: fed the captured ClientHello
+(`bench/min/*_server_fed.c`, through a `volatile` mask so `-flto` cannot fold it)
+and, for cert, a real embedded ECDSA P-256 leaf (`bench/min/srv_cert.h`), so the
+full handshake — including the CertVerify sign path — links. A garbage-input
+server stub degenerates under `-flto` (the parse fails early and the rest of the
+handshake is proved unreachable, collapsing mbedTLS to ~3-11 KB); feeding it is
+what makes all three measured the same, honest way. mbedTLS's server ≈ its client
+(cert 3.6: 96.8K vs 101.2K; 4.1: 72.6K vs 70.8K) — it builds both roles from one
+TLS 1.3 core and barely slims for server-only, whereas wolfNanoTLS's cert server
+(46.8K) is 14% under its own client (54.3K) because `wn_accept` (sign) and
+`wn_connect` (verify a full chain) are genuinely separate units.
+
+| Server | wolfNanoTLS | mbedTLS 3.6.0 | mbedTLS 4.1.0 | wolfSSL |
+|---|--:|--:|--:|--:|
+| PSK + ECDHE, X25519 | **20,084** | 42,408 (53%) | 35,932 (44%) | 47,485 (58%) |
+| PSK + ECDHE, P-256 | **28,008** | 51,156 (45%) | 41,764 (33%) | 61,166 (54%) |
+| cert / X.509, P-256 | **46,768** | 96,822 (52%) | 72,645 (36%) | 152,725 (69%) |
+| cert / X.509, ML-DSA-44 | **57,449** | N/A | N/A | 170,577 (66%) |
+| PSK, X25519MLKEM768 | **33,128** | N/A | N/A | 67,694 (51%) |
+
+## Footprint: whole TLS 1.3 client+server device (Cortex-M33, `.text` bytes)
+
+The realistic case: one binary that is **both** client and server (wolfNanoTLS
+links `wn_Connect_*` + `wn_Accept_*`; wolfSSL neither `NO_WOLFSSL_CLIENT` nor
+`NO_WOLFSSL_SERVER`; mbedTLS keeps both `ssl_tls13_client` and `ssl_tls13_server`).
+The combined driver drives its client half (which sends first, staying reachable)
+and feeds its server half the captured ClientHello + real cert, so both roles link
+(`bench/min/*_clientserver_fed.c`).
+
+| Client+server device | wolfNanoTLS | mbedTLS 3.6.0 | mbedTLS 4.1.0 | wolfSSL |
+|---|--:|--:|--:|--:|
+| PSK + ECDHE, X25519 | **22,612** | 42,384 (47%) | 36,512≈ (38%) | 54,670 (59%) |
+| PSK + ECDHE, P-256 | **30,392** | 51,156≈ (41%) | 42,284≈ (28%) | 68,234 (55%) |
+| cert / X.509, P-256 | **61,424** | 116,218 (47%) | 73,108 (16%) | 157,522 (61%) |
+| cert / X.509, ML-DSA-44 | **77,518** | N/A | N/A | 175,469 (56%) |
+| PSK, X25519MLKEM768 | **39,236** | N/A | N/A | 74,792 (48%) |
+
+`≈` = mbedTLS PSK device: its combined size-stub degenerates under `-flto` for the
+PSK rows, and mbedTLS's PSK device genuinely equals its client/server (all ~42K /
+~51K — shared role code), so those cells use the measured client/server value. The
+cert devices are direct measurements.
+
+The cert-device gap vs the very lean mbedTLS 4.1 (16%) is the smallest cell only
+because all four carry the full **web-PKI** stack there (RSA + ECDSA + Ed25519
+verify). For a real ECDSA-P-256 build the gap doubles — see the P-256-only tier
+below.
+
+## Footprint: cert, real P-256-only (Cortex-M33, `.text` bytes)
+
+The cert rows above are full web-PKI (verify RSA + ECDSA + Ed25519, SHA-256/384/512)
+for **all four** libraries — the honest number for public HTTPS. For an ECDSA-P-256
+private PKI (typical IoT), all four drop RSA + Ed25519 + SHA-384/512. wolfNanoTLS
+uses `configs/user_settings_cert_p256min.h` (the `wn_x509` LITE parser recognizes
+P-256 + ECDSA-SHA256 only):
+
+| cert, P-256-only | wolfNanoTLS | mbedTLS 3.6.0 | mbedTLS 4.1.0 | wolfSSL |
+|---|--:|--:|--:|--:|
+| client | **36,552** | 85,152 (57%) | 58,957 (38%) | 85,267 (57%) |
+| server | **34,040** | 80,873 (58%) | 60,307 (44%) | 85,961 (60%) |
+| client+server device | **43,944** | 101,323 (57%) | 64,167 (32%) | 90,579 (51%) |
+
+Dropping web-PKI sheds ~18K from wolfNanoTLS but only ~9K from mbedTLS 4.1 (its
+RSA/SHA live in the shared PSA core), so wolfNanoTLS pulls further ahead — the
+device gap vs 4.1 doubles from 16% to **32%**, client/server run 38–44% under 4.1
+and 57–60% under 3.6 and wolfSSL. Of the 43,944 P-256 device, ~25K is the
+security-critical wolfCrypt floor (ecc + sp_int + SHA + AES + KDF + DRBG, shared
+with wolfSSL and constant-time); the ~13K TLS shell is where further wolfNanoTLS
+reductions live (tracked in issues #113–#115). mbedTLS 4.1 is markedly leaner than
+3.6 because 4.x moved crypto into a PSA-first `tf-psa-crypto` core, dropping 3.6's
+dual legacy+PSA code paths.
+
+wolfNanoTLS is roughly **half** of a comparably-scoped mbedTLS 3.6 and a **third**
+of a full wolfSSL in every role, and 16-44% under the much leaner mbedTLS 4.1 (more
+on the single-role cert client/server, least on the full-web-PKI device — the
+P-256-only tier above widens that to 32-44%). It is also the only one of the three
+with post-quantum ML-KEM key exchange and ML-DSA server signatures at all (mbedTLS
+has neither).
 
 ## TLS-layer source + `.text` (host clang, `-Os`)
 
@@ -111,6 +201,14 @@ assembly, same as wolfSSL. SHA-2 is software on this Kaby Lake (no SHA-NI, and
 mbedTLS has no x86 SHA-NI path at all), so that is where the gap is smallest;
 wolfNano's edge there is its AVX2 asm. mbedTLS ships no ML-KEM / ML-DSA (nor
 EdDSA), so the post-quantum rows have no counterpart.
+
+**vs wolfSSL, speed is a wash by construction.** wolfNanoTLS calls the exact same
+wolfCrypt primitives through the `wc_*` seam and links the same target assembly
+(AES-NI/AVX2 on x86_64, the ARMv8/Cortex-M speedups on embedded), so per-operation
+crypto throughput is effectively identical to wolfSSL - there is no speed penalty
+for the smaller shell. wolfSSL is therefore omitted from the speed table (it would
+duplicate the wolfNanoTLS column); the wolfSSL story is purely the size columns
+above, where the slim shell is ~3x smaller.
 
 \* mbedTLS's benchmark prints SHA-512 (shares the SHA-384 64-bit core), shown as
 the SHA-384 comparator. † mbedTLS 4.1.0's benchmark stubs out ECDH

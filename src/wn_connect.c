@@ -604,12 +604,15 @@ int wn_Connect_Psk(WC_RNG* rng, wn_IoSend ioSend, wn_IoRecv ioRecv, void* ioCtx,
  * leafSpki]; records decrypt in place in the I/O region. WN_CERT_SCRATCH_MIN is
  * the minimum scratchLen. */
 #if defined(WOLFSSL_HAVE_MLDSA) && (WOLFNANO_MLDSA_LEVEL == 5)
-    /* ML-DSA-87 leaf SPKI is ~2620 B (DER); its flight needs the most room. */
-    #define WN_HS_ACC_SZ       10240
+    /* ML-DSA-87: cert ~7.6 KB + CertVerify ~4.6 KB coalesce into one flight. */
+    #define WN_HS_ACC_SZ       13312
     #define WN_LEAF_SPKI_SZ    3072
+#elif defined(WOLFSSL_HAVE_MLDSA) && (WOLFNANO_MLDSA_LEVEL == 3)
+    /* ML-DSA-65: cert ~5.6 KB + CertVerify ~3.3 KB coalesce into one flight. */
+    #define WN_HS_ACC_SZ       10240
+    #define WN_LEAF_SPKI_SZ    2048
 #elif defined(WOLFSSL_HAVE_MLDSA)
-    /* ML-DSA-44/65 leaf SPKI is up to 1974 B (DER); its Certificate + up to
-     * ~3309 B CertificateVerify flight needs a larger accumulator. */
+    /* ML-DSA-44: cert ~4.1 KB + CertVerify ~2.4 KB. */
     #define WN_HS_ACC_SZ       8192
     #define WN_LEAF_SPKI_SZ    2048
 #else

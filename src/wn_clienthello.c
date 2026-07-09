@@ -160,3 +160,217 @@ int wn_ClientHello_Build_ex(byte* out, word32* outLen, word32 outCap,
 
     return ret;
 }
+
+#ifdef WOLFNANO_SERVER
+#define WN_EXT_PRE_SHARED_KEY 41
+#define WN_EXT_SIGNATURE_ALGS 13
+#define WN_EXT_SUPPORTED_GRPS 10
+#define WN_EXT_SUPPORTED_VERS 43
+#define WN_EXT_PSK_KEX_MODES  45
+
+int wn_ClientHello_HasSigAlg(const wn_ClientHello* ch, word16 scheme)
+{
+    word16 i;
+    int found = 0;
+
+    if ((ch != NULL) && (ch->sigAlgs != NULL)) {
+        for (i = 0; (i + 1) < ch->sigAlgsLen; i += 2) {
+            if (((word16)(ch->sigAlgs[i] << 8) | ch->sigAlgs[i + 1]) == scheme) {
+                found = 1;
+            }
+        }
+    }
+
+    return found;
+}
+
+int wn_ClientHello_Parse(const byte* msg, word32 msgLen, wn_ClientHello* out)
+{
+    wn_Reader r;
+    word32 hsLen, extEnd = 0, eEnd, ksEnd, idsEnd, bndEnd, ksVec;
+    word16 vecLen, et, el, csLen = 0, i, klen, idLen, idsLen, cs;
+    word16 g, nId, nBnd;
+    byte sidLen, compLen, comp, blen, nver, pmLen, j;
+    byte seenPsk = 0, dup, nSeen = 0;
+    byte haveTls13 = 0, havePskDhe = 0, haveGroups = 0, groupOffered = 0;
+    word16 sv, glen;
+    word16 seenExt[40];   /* dup-detection window; wider than any real CH */
+    const byte* p;
+    int ret = WOLFNANO_SUCCESS;
+
+    if ((msg == NULL) || (out == NULL)) {
+        return WOLFNANO_E_INVALID_ARG;
+    }
+    XMEMSET(out, 0, sizeof(*out));
+
+    wn_Reader_Init(&r, msg, msgLen);
+    if (wn_Read_U8(&r) != WN_HS_CLIENT_HELLO) {
+        ret = WOLFNANO_E_UNEXPECTED_MSG;
+    }
+    hsLen = wn_Read_U24(&r);
+    if ((ret == WOLFNANO_SUCCESS) && (r.pos + hsLen != msgLen)) {
+        ret = WOLFNANO_E_DECODE;
+    }
+    if (ret == WOLFNANO_SUCCESS) {
+        if (wn_Read_U16(&r) != 0x0303) {        /* RFC 8446 4.1.2: frozen at 1.2 */
+            ret = WOLFNANO_E_DECODE;
+        }
+        (void)wn_Read_Bytes(&r, 32);            /* random */
+        sidLen = wn_Read_U8(&r);
+        if (sidLen > 32) {         /* RFC 8446 4.1.2: legacy_session_id is 0..32 */
+            ret = WOLFNANO_E_DECODE;
+        }
+        out->sessionId = wn_Read_Bytes(&r, sidLen);
+        out->sessionIdLen = sidLen;
+        csLen = wn_Read_U16(&r);
+        if ((ret == WOLFNANO_SUCCESS) && ((csLen & 1) != 0)) {
+            ret = WOLFNANO_E_DECODE;
+        }
+    }
+    for (i = 0; (ret == WOLFNANO_SUCCESS) && (i < csLen); i += 2) {
+        cs = wn_Read_U16(&r);
+        if (cs == WN_CIPHER_AES_128_GCM_SHA256) {
+            out->cipher = cs;                   /* first supported suite offered */
+        }
+    }
+    if (ret == WOLFNANO_SUCCESS) {
+        compLen = wn_Read_U8(&r);
+        comp = wn_Read_U8(&r);                  /* legacy_compression_methods */
+        if ((compLen != 1) || (comp != 0)) {    /* RFC 8446 4.1.2: must be [null] */
+            ret = WOLFNANO_E_DECODE;
+        }
+    }
+    if (ret == WOLFNANO_SUCCESS) {
+        vecLen = wn_Read_U16(&r);
+        extEnd = r.pos + vecLen;
+        if ((r.err != 0) || (extEnd != msgLen)) {
+            ret = WOLFNANO_E_DECODE;
+        }
+    }
+    while ((ret == WOLFNANO_SUCCESS) && (r.pos < extEnd) && (r.err == 0)) {
+        et = wn_Read_U16(&r);
+        el = wn_Read_U16(&r);
+        eEnd = r.pos + el;
+        dup = 0;                                /* RFC 8446 4.2: reject any dup type */
+        for (j = 0; j < nSeen; j++) {
+            if (seenExt[j] == et) { dup = 1; }
+        }
+        if ((r.err != 0) || (eEnd > extEnd) || (seenPsk != 0) || (dup != 0) ||
+            (nSeen >= (byte)(sizeof(seenExt) / sizeof(seenExt[0])))) {
+            /* body overruns the block, a duplicate/too-many extensions, or an
+             * extension follows pre_shared_key (RFC 8446 4.2.11: PSK is last) */
+            ret = WOLFNANO_E_DECODE;
+        }
+        else if (et == WN_EXT_KEY_SHARE) {
+            ksVec = wn_Read_U16(&r);            /* client_shares vector */
+            ksEnd = r.pos + ksVec;
+            if (ksEnd > eEnd) { r.err = 1; }
+            while ((r.pos < ksEnd) && (r.err == 0)) {
+                g = wn_Read_U16(&r);
+                klen = wn_Read_U16(&r);
+                p = wn_Read_Bytes(&r, klen);
+                if ((g == WN_DEFAULT_GROUP) && (p != NULL)) {
+                    out->keyShare = p;
+                    out->keyShareLen = klen;
+                    out->group = g;
+                    out->haveKeyShare = 1;
+                }
+            }
+        }
+        else if (et == WN_EXT_SIGNATURE_ALGS) {
+            idsLen = wn_Read_U16(&r);           /* supported_signature_algorithms */
+            out->sigAlgs = wn_Read_Bytes(&r, idsLen);
+            out->sigAlgsLen = idsLen;
+        }
+        else if (et == WN_EXT_SUPPORTED_GRPS) {
+            glen = wn_Read_U16(&r);             /* named_group_list length */
+            haveGroups = 1;
+            ksEnd = r.pos + glen;               /* word32 bound; no byte overflow */
+            while ((r.err == 0) && ((r.pos + 2) <= ksEnd)) {
+                if (wn_Read_U16(&r) == WN_DEFAULT_GROUP) {
+                    groupOffered = 1;
+                }
+            }
+        }
+        else if (et == WN_EXT_SUPPORTED_VERS) {
+            nver = wn_Read_U8(&r);              /* versions list length */
+            for (j = 0; (j + 1) < nver; j += 2) {
+                sv = wn_Read_U16(&r);
+                if (sv == 0x0304) {             /* client offers TLS 1.3 */
+                    haveTls13 = 1;
+                }
+            }
+        }
+        else if (et == WN_EXT_PSK_KEX_MODES) {
+            pmLen = wn_Read_U8(&r);             /* ke_modes list length */
+            for (j = 0; j < pmLen; j++) {
+                if (wn_Read_U8(&r) == 1) {      /* psk_dhe_ke */
+                    havePskDhe = 1;
+                }
+            }
+        }
+        else if (et == WN_EXT_PRE_SHARED_KEY) {
+            seenPsk = 1;
+            idsLen = wn_Read_U16(&r);           /* identities vector length */
+            idsEnd = r.pos + idsLen;
+            if (idsEnd > eEnd) { r.err = 1; }
+            /* each PskIdentity = identity<1..> + obfuscated_ticket_age (4) */
+            nId = 0;
+            while ((r.pos < idsEnd) && (r.err == 0)) {
+                idLen = wn_Read_U16(&r);
+                p = wn_Read_Bytes(&r, idLen);
+                (void)wn_Read_Bytes(&r, 4);     /* obfuscated_ticket_age */
+                if (idLen == 0) { r.err = 1; }
+                if (nId == 0) {                 /* keep the first identity */
+                    out->pskIdentity = p;
+                    out->pskIdentityLen = idLen;
+                }
+                nId++;
+            }
+            if (r.pos != idsEnd) { r.err = 1; } /* identities must end exactly */
+            out->binderTruncLen = r.pos;        /* binder MAC boundary (RFC 4.2.11.2) */
+            idsLen = wn_Read_U16(&r);           /* binders vector length */
+            bndEnd = r.pos + idsLen;
+            if (bndEnd != eEnd) { r.err = 1; }  /* binders fill the extension */
+            nBnd = 0;
+            while ((r.pos < bndEnd) && (r.err == 0)) {
+                blen = wn_Read_U8(&r);
+                p = wn_Read_Bytes(&r, blen);
+                if (nBnd == 0) {                /* keep the first binder */
+                    out->binder = p;
+                    out->binderLen = blen;
+                }
+                nBnd++;
+            }
+            /* one binder per identity (RFC 8446 4.2.11) */
+            if ((r.pos != bndEnd) || (nId == 0) || (nId != nBnd)) { r.err = 1; }
+            out->havePsk = 1;
+        }
+        else {
+            (void)wn_Read_Bytes(&r, el);
+        }
+        /* each extension must consume exactly its declared length */
+        if ((ret == WOLFNANO_SUCCESS) && ((r.err != 0) || (r.pos != eEnd))) {
+            ret = WOLFNANO_E_DECODE;
+        }
+        if (ret == WOLFNANO_SUCCESS) {
+            seenExt[nSeen++] = et;             /* record type for dup detection */
+        }
+    }
+    /* cipher, a TLS 1.3 offer, and our group in supported_groups are always
+     * required (RFC 8446 4.2.1). A matching key_share is optional: when absent
+     * the server replies with HelloRetryRequest (RFC 8446 4.1.4). PSK binder +
+     * psk_dhe_ke only when a PSK was offered; a cert-mode ClientHello carries
+     * neither, and the auth driver enforces its own mode. */
+    if ((ret == WOLFNANO_SUCCESS) &&
+        ((out->cipher == 0) || (haveTls13 == 0) ||
+         (haveGroups == 0) || (groupOffered == 0) ||
+         (out->haveKeyShare && (out->keyShareLen != WN_DEFAULT_PUB_SZ)) ||
+         (out->havePsk && ((out->binderLen != 32) || (havePskDhe == 0))))) {
+        ret = WOLFNANO_E_ILLEGAL_PARAM;   /* RFC 8446 9.2/4.2.7: key_share group
+                                           * must be in supported_groups */
+    }
+
+    return ret;
+}
+#endif /* WOLFNANO_SERVER */

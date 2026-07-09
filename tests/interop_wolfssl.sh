@@ -6,6 +6,10 @@
 set -u
 PORT=14434
 PSK=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+# Prefer a PSK-enabled wolfSSL build if present (the stock ref may be NO_PSK).
+if [ -z "${WOLFSSL_SERVER:-}" ] && [ -x "$HOME/wolfssl-psk/examples/server/server" ]; then
+    WOLFSSL_SERVER=$HOME/wolfssl-psk/examples/server/server
+fi
 SERVER=${WOLFSSL_SERVER:-$HOME/wolfssl/examples/server/server}
 WOLFSSL_DIR=$(dirname "$(dirname "$(dirname "$SERVER")")")
 
@@ -14,7 +18,7 @@ if [ ! -x "$SERVER" ]; then
     exit 0
 fi
 
-( cd "$WOLFSSL_DIR" && "$SERVER" -v 4 -s -i -p "$PORT" ) >/tmp/wn_wolfssl_srv.log 2>&1 &
+( cd "$WOLFSSL_DIR" && exec "$SERVER" -v 4 -s -i -p "$PORT" ) >/tmp/wn_wolfssl_srv.log 2>&1 &
 SPID=$!
 
 sleep 1

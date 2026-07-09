@@ -48,4 +48,36 @@ WOLFNANO_API int wn_ClientHello_Build_ex(byte* out, word32* outLen,
                                          word32 sessionIdLen, const byte* pub,
                                          word32 pubLen, const char* serverName);
 
+#ifdef WOLFNANO_SERVER
+/* Parsed ClientHello for the server (RFC 8446 4.1.2). Pointers reference the
+ * caller's input message. binderTruncLen is the message offset where the PSK
+ * binders section begins (the transcript boundary the binder is computed over). */
+typedef struct wn_ClientHello {
+    const byte* sessionId;      /* legacy_session_id (echo in ServerHello) */
+    const byte* keyShare;       /* client (EC)DHE public for the selected group */
+    const byte* pskIdentity;    /* first offered PSK identity */
+    const byte* binder;         /* PSK binder for that identity */
+    const byte* sigAlgs;        /* signature_algorithms list (for cert auth) */
+    word32 keyShareLen;
+    word32 pskIdentityLen;
+    word32 binderLen;
+    word32 binderTruncLen;
+    word16 sigAlgsLen;
+    word16 cipher;              /* selected cipher suite */
+    word16 group;              /* selected key_share group */
+    byte sessionIdLen;
+    byte haveKeyShare;
+    byte havePsk;
+} wn_ClientHello;
+
+/* True if the client's signature_algorithms list offers the given scheme. */
+WOLFNANO_LOCAL int wn_ClientHello_HasSigAlg(const wn_ClientHello* ch,
+                                            word16 scheme);
+
+/* Decode a ClientHello handshake message (type 1 + length + body). Selects the
+ * cipher suite and key_share group wolfNanoTLS supports; fails closed. */
+WOLFNANO_LOCAL int wn_ClientHello_Parse(const byte* msg, word32 msgLen,
+                                        wn_ClientHello* out);
+#endif /* WOLFNANO_SERVER */
+
 #endif /* WN_CLIENTHELLO_H */

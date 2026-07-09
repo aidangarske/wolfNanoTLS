@@ -20,35 +20,33 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           peers: "true"
-      - name: build wolfSSL example server
+      - name: build wolfSSL (all features, client + server for both directions)
         run: |
           set -eux
-          git clone --depth 1 https://github.com/wolfSSL/wolfssl "$RUNNER_TEMP/wolfssl-full"
-          cd "$RUNNER_TEMP/wolfssl-full"
-          ./autogen.sh
-          ./configure --enable-tls13 --enable-psk --enable-curve25519 --enable-ed25519
-          make -j"$(nproc)" examples/server/server
-      - name: build wolfSSL PQC server (separate, --enable-mlkem)
-        run: |
-          set -eux
-          git clone --depth 1 https://github.com/wolfSSL/wolfssl "$RUNNER_TEMP/wolfssl-pqc"
-          cd "$RUNNER_TEMP/wolfssl-pqc"
+          git clone --depth 1 https://github.com/wolfSSL/wolfssl "$RUNNER_TEMP/wolfssl"
+          cd "$RUNNER_TEMP/wolfssl"
           ./autogen.sh
           ./configure --enable-tls13 --enable-psk --enable-curve25519 \
-            --enable-mlkem --enable-experimental
-          make -j"$(nproc)" examples/server/server
-      - name: build mbedTLS ssl_server2 (best-effort)
+            --enable-ecc --enable-ed25519 --enable-dilithium --enable-mlkem \
+            --enable-experimental CFLAGS=-DWOLFSSL_STATIC_PSK
+          make -j"$(nproc)" examples/server/server examples/client/client
+      - name: build mbedTLS ssl_server2 + ssl_client2 (best-effort)
         run: |
           set -eux
           git clone --depth 1 --branch mbedtls-3.6.2 \
             https://github.com/Mbed-TLS/mbedtls "$RUNNER_TEMP/mbedtls" || exit 0
           cmake -S "$RUNNER_TEMP/mbedtls" -B "$RUNNER_TEMP/mbedtls/b" \
             -DENABLE_TESTING=Off >/dev/null 2>&1 || exit 0
-          make -C "$RUNNER_TEMP/mbedtls/b" -j"$(nproc)" ssl_server2 >/dev/null 2>&1 || exit 0
-      - name: make interop (vs OpenSSL + wolfSSL + mbedTLS)
+          make -C "$RUNNER_TEMP/mbedtls/b" -j"$(nproc)" ssl_server2 ssl_client2 \
+            >/dev/null 2>&1 || exit 0
+      - name: make interop (our client + server vs OpenSSL + wolfSSL + mbedTLS)
         run: |
-          export WOLFSSL_SERVER="$RUNNER_TEMP/wolfssl-full/examples/server/server"
-          export WOLFSSL_PQC_SERVER="$RUNNER_TEMP/wolfssl-pqc/examples/server/server"
-          MB="$RUNNER_TEMP/mbedtls/b/programs/ssl/ssl_server2"
-          [ -x "$MB" ] && export MBEDTLS_SERVER="$MB"
+          WS="$RUNNER_TEMP/wolfssl"
+          export WOLFSSL_DIR="$WS"
+          export WOLFSSL_SERVER="$WS/examples/server/server"
+          export WOLFSSL_PQC_SERVER="$WS/examples/server/server"
+          MBS="$RUNNER_TEMP/mbedtls/b/programs/ssl/ssl_server2"
+          MBC="$RUNNER_TEMP/mbedtls/b/programs/ssl/ssl_client2"
+          [ -x "$MBS" ] && export MBEDTLS_SERVER="$MBS"
+          [ -x "$MBC" ] && export MBEDTLS_CLIENT="$MBC"
           make interop

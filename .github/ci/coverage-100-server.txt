@@ -1,0 +1,11 @@
+# Files that must be 100% line-covered in the WOLFNANO_SERVER build.
+# These compile only under WOLFNANO_SERVER and are exercised by the dedicated
+# `make servercov` pass, which builds the server shell ONCE with a single
+# consistent flag set (SERVER + X509 + RSA_FULL) and runs the PSK, all-algo
+# cert, and adversarial drivers against those shared objects. A single build
+# is required: the ordinary server suites compile these files with differing
+# flags (PSK-only vs X509 vs group variants), whose gcov line tables cannot be
+# merged. Genuinely-unreachable defensive lines are marked /* LCOV_EXCL_LINE */.
+src/wn_accept.c
+src/wn_handshake.c
+src/wn_servercert.c

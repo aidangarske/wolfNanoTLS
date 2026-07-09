@@ -45,4 +45,27 @@ typedef struct wn_ServerHello {
 WOLFNANO_API int wn_ServerHello_Parse(const byte* msg, word32 msgLen,
                                       wn_ServerHello* out);
 
+#ifdef WOLFNANO_SERVER
+/* Encode a ServerHello (type 2 + length + body) into out: negotiated cipher,
+ * echoed session id, server key_share, and, when includePsk is nonzero, the
+ * selected pre_shared_key identity index (omitted for certificate auth). */
+WOLFNANO_LOCAL int wn_ServerHello_Build(byte* out, word32* outLen, word32 outCap,
+                                        const byte* random32,
+                                        const byte* sessionId, byte sessionIdLen,
+                                        word16 cipher, word16 group,
+                                        const byte* srvPub, word32 srvPubLen,
+                                        word16 pskIdentity, int includePsk);
+
+/* Build a HelloRetryRequest (RFC 8446 4.1.4): a ServerHello with the HRR
+ * sentinel random asking the client to resend with a key_share for group. */
+WOLFNANO_LOCAL int wn_HelloRetryRequest_Build(byte* out, word32* outLen,
+                                              word32 outCap,
+                                              const byte* sessionId,
+                                              byte sessionIdLen, word16 cipher,
+                                              word16 group);
+
+/* Encode an empty EncryptedExtensions (type 8 + length + empty vector). */
+WOLFNANO_LOCAL int wn_EncExt_Build(byte* out, word32* outLen, word32 outCap);
+#endif /* WOLFNANO_SERVER */
+
 #endif /* WN_SERVERHELLO_H */

@@ -42,6 +42,7 @@ jobs:
         run: |
           set -eu
           make example example-cert example-cert-lite example-cert-min example-https example-https-lite example-x509probe
+          make example-server example-server-cert   # server adder (WOLFNANO_SERVER)
           if [ -f wolfssl/wolfcrypt/src/wc_mlkem.c ]; then
             make example-pqc example-cert-pqc
           else

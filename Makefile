@@ -57,12 +57,20 @@ CONN_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
   src/wn_keyshare.c src/wn_serverhello.c \
   src/wn_connect.c src/wn_session.c tests/wn_host_seed.c
 
+# TLS 1.3 server adder (WOLFNANO_SERVER): the client shell plus the server state
+# machine, the ClientHello decoder, and the shared handshake helpers.
+SERVER_SRC := $(CONN_SRC) src/wn_accept.c src/wn_handshake.c src/wn_clienthello.c
+
 # P-256 PSK handshake build (ECDHE secp256r1; FLOOR_SRC links ecc/asn/sp).
 CONN_P256_SRC := $(FLOOR_SRC) $(WC)/sp_int.c \
   src/wn_msg.c src/wn_keyschedule.c \
   src/wn_transcript.c src/wn_record.c \
   src/wn_keyshare.c src/wn_serverhello.c \
   src/wn_connect.c src/wn_session.c tests/wn_host_seed.c
+
+# P-256 server adder (ECDHE secp256r1): the P-256 floor plus the server shell.
+SERVER_P256_SRC := $(CONN_P256_SRC) src/wn_accept.c src/wn_handshake.c \
+  src/wn_clienthello.c
 
 # Cert handshake build (adds ECDHE non-PSK ClientHello + cert/CertVerify deps).
 CONN_CERT_SRC := $(FLOOR_SRC) $(WC)/sp_int.c \
@@ -71,6 +79,11 @@ CONN_CERT_SRC := $(FLOOR_SRC) $(WC)/sp_int.c \
   src/wn_keyshare.c src/wn_serverhello.c \
   src/wn_clienthello.c src/wn_connect.c src/wn_session.c \
   tests/wn_host_seed.c
+
+# Certificate server adder: the cert floor plus the server shell + cert signer.
+SERVER_CERT_SRC := $(CONN_CERT_SRC) src/wn_accept.c src/wn_handshake.c \
+  src/wn_servercert.c
+
 # Minimal single-curve P-256 cert build: no rsa.c, sha512.c, or ed25519.c deps.
 CONN_CERT_P256MIN_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c \
   $(WC)/hash.c $(WC)/random.c $(WC)/wolfmath.c $(WC)/logging.c $(WC)/coding.c \
@@ -139,6 +152,10 @@ MOCKHYB_SRC := $(WC)/wc_port.c $(WC)/memory.c $(WC)/error.c $(WC)/hash.c \
   src/wn_keyshare.c src/wn_serverhello.c src/wn_hybrid.c src/wn_connect.c \
   src/wn_session.c tests/wn_host_seed.c
 
+# X25519MLKEM768 hybrid server adder: the hybrid floor plus the server shell.
+SERVER_HYBRID_SRC := $(MOCKHYB_SRC) src/wn_accept.c src/wn_handshake.c \
+  src/wn_clienthello.c
+
 # ---- WOLFNANO_ASM: per-arch speedup bundle (mirrors wolfSSL --enable-*asm) ----
 # Default 'none' = lightweight portable C (WOLFSSL_SP_MATH_ALL, no asm). Each
 # accelerated arch selects its toolchain, flags, specialized SP file + asm files.
@@ -200,15 +217,16 @@ ASM_CC    := $(CC_$(WOLFNANO_ASM))
 ASM_FLAGS := $(FLAGS_$(WOLFNANO_ASM))
 ASM_SRC   := $(SPSRC_$(WOLFNANO_ASM)) $(ASMSRC_$(WOLFNANO_ASM))
 
-.PHONY: host kstest keyupdatetest sessiontest mocktest mockhybridtest errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest certmldsatest certnegtest certnegpintest certgentest hybridtest certtest x509diff x509verifytest x509negtest x509negvectest x509probetest x509covtest noalloc-crypto noalloc-handshake bench benchrun targets test-qemu test test-core test-x509 test-cert check example example-cert example-cert-min example-cert-pqc cert-notime-build example-https example-https-lite example-pqc configs-build m33mu coverage stackcheck clean
+.PHONY: host kstest keyupdatetest sessiontest mocktest mockhybridtest servertest servercerttest servernegtest servercertnomalloc example-server-cert errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest certmldsatest certnegtest certnegpintest certgentest hybridtest certtest x509diff x509verifytest x509negtest x509negvectest x509probetest x509covtest noalloc-crypto noalloc-handshake bench benchrun targets test-qemu test test-core test-x509 test-cert check example example-server example-cert example-cert-min example-cert-pqc cert-notime-build example-https example-https-lite example-pqc configs-build m33mu coverage stackcheck servercov clean
 test: test-core test-x509 mlkemtest mldsatest hybridtest mockhybridtest wctestpqc ## build + run all local self-tests (certmldsatest runs separately; compiling X509 here would drag the interop-only cert path into the coverage build)
-test-core: host kstest keyupdatetest sessiontest mocktest errtest rfctest tstest rectest ksharetest hstest wctest msgtest chtest shtest negtest flighttest alerttest matrixtest ## protocol + crypto suites (no cert/X.509; those are test-x509 / test-cert)
+test-core: host kstest keyupdatetest sessiontest mocktest errtest rfctest tstest rectest ksharetest hstest wctest msgtest chtest shtest negtest flighttest alerttest matrixtest ## protocol + crypto suites (no cert/X.509/server; those are test-x509 / test-cert)
 test-x509: certtest x509diff x509verifytest x509negtest x509negvectest x509covtest x509probetest ## native wn_x509 parser + cert-verify unit tests
-test-cert: certnegtest certnegpintest certgentest ## X.509 cert-path chain-constraint tests (backend selected by X509_LITE)
+test-cert: certnegtest certnegpintest certgentest servercerttest servernegtest ## X.509 cert-path chain-constraint tests (backend selected by X509_LITE)
 
 SUITES := host kstest keyupdatetest sessiontest mocktest mockhybridtest errtest rfctest tstest rectest ksharetest hstest wctest wctestpqc \
   msgtest chtest shtest negtest flighttest alerttest matrixtest mlkemtest mldsatest certmldsatest certnegtest certnegpintest certgentest hybridtest certtest \
-  x509diff x509verifytest x509negtest x509negvectest x509covtest
+  x509diff x509verifytest x509negtest x509negvectest x509covtest \
+  servertest servercerttest servernegtest
 
 check: ## run every suite, continue past failures, print one colored PASS/FAIL tally
 	@mkdir -p $(BUILD)
@@ -262,6 +280,86 @@ mocktest: ## build + run the in-process mock-server handshake test (PORTABLE_C)
 	   $(CONN_SRC) tests/connect_mock_test.c -o $(BUILD)/connect_mock_test
 	@echo "---- run ----"
 	@./$(BUILD)/connect_mock_test
+
+servertest: ## build + run the TLS 1.3 PSK server vs the real client (WOLFNANO_SERVER)
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER \
+	   -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(SERVER_SRC) tests/accept_mock_test.c -o $(BUILD)/accept_mock_test
+	@echo "---- run (X25519) ----"
+	@./$(BUILD)/accept_mock_test
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER \
+	   -DWOLFNANO_HAVE_ECDHE_P256 -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(SERVER_P256_SRC) tests/accept_mock_test.c -o $(BUILD)/accept_mock_p256_test
+	@echo "---- run (P-256) ----"
+	@./$(BUILD)/accept_mock_p256_test
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER \
+	   -DWOLFNANO_HAVE_MLKEM_HYBRID -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(SERVER_HYBRID_SRC) tests/accept_mock_test.c -o $(BUILD)/accept_mock_hybrid_test
+	@echo "---- run (X25519MLKEM768) ----"
+	@./$(BUILD)/accept_mock_hybrid_test
+
+servercertnomalloc: ## ECDSA/Ed25519 cert server on the zero-allocation tier (native X.509 + WOLFSSL_NO_MALLOC)
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS_BASE) $(SHELL_INC) -DWOLFNANO_SERVER -DWOLFNANO_X509 \
+	   -DWOLFNANO_X509_LITE -DWOLFSSL_NO_MALLOC -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(SERVER_CERT_SRC) src/wn_x509.c tests/accept_cert_mock_test.c \
+	   -o $(BUILD)/accept_cert_nomalloc_test
+	@echo "---- run (ECDSA P-256, no-malloc) ----"
+	@./$(BUILD)/accept_cert_nomalloc_test tests/pki/server/ec-cert.der \
+	   tests/pki/server/ec-key-sec1.der 0403
+	@echo "---- run (Ed25519, no-malloc) ----"
+	@./$(BUILD)/accept_cert_nomalloc_test tests/pki/server/ed-cert.der \
+	   tests/pki/server/ed-key.der 0807
+
+servernegtest: ## adversarial server test: arg checks, malformed ClientHello, IO failures
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER -DWOLFNANO_X509 \
+	   $(X509_BACKEND_FLAG) -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(SERVER_CERT_SRC) $(X509_BACKEND_SRC) tests/accept_neg_test.c \
+	   -o $(BUILD)/accept_neg_test
+	@echo "---- run ----"
+	@./$(BUILD)/accept_neg_test
+
+servercerttest: ## build + run the TLS 1.3 cert server vs the real cert client (WOLFNANO_SERVER + X509)
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER -DWOLFNANO_X509 \
+	   $(X509_BACKEND_FLAG) -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(SERVER_CERT_SRC) $(X509_BACKEND_SRC) tests/accept_cert_mock_test.c \
+	   -o $(BUILD)/accept_cert_mock_test
+	@echo "---- run (ECDSA P-256) ----"
+	@./$(BUILD)/accept_cert_mock_test tests/pki/server/ec-cert.der \
+	   tests/pki/server/ec-key-sec1.der 0403
+	@echo "---- run (ECDSA P-384) ----"
+	@./$(BUILD)/accept_cert_mock_test tests/pki/server/p384-cert.der \
+	   tests/pki/server/p384-key-sec1.der 0503
+	@echo "---- run (Ed25519) ----"
+	@./$(BUILD)/accept_cert_mock_test tests/pki/server/ed-cert.der \
+	   tests/pki/server/ed-key.der 0807
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER -DWOLFNANO_X509 \
+	   $(X509_BACKEND_FLAG) -DWOLFNANO_HAVE_RSA_VERIFY -DWOLFNANO_RSA_FULL \
+	   -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(SERVER_CERT_SRC) $(WC)/rsa.c $(X509_BACKEND_SRC) \
+	   tests/accept_cert_mock_test.c -o $(BUILD)/accept_cert_mock_rsa_test
+	@echo "---- run (RSA-PSS SHA-256/384/512) ----"
+	@./$(BUILD)/accept_cert_mock_rsa_test tests/pki/server/rsa-cert.der \
+	   tests/pki/server/rsa-key-trad.der 0804
+	@./$(BUILD)/accept_cert_mock_rsa_test tests/pki/server/rsa-cert.der \
+	   tests/pki/server/rsa-key-trad.der 0805
+	@./$(BUILD)/accept_cert_mock_rsa_test tests/pki/server/rsa-cert.der \
+	   tests/pki/server/rsa-key-trad.der 0806
+	@for lvl in 2 3 5; do \
+	   sch=$$( [ $$lvl = 2 ] && echo 0904 || { [ $$lvl = 3 ] && echo 0905 || echo 0906; } ); \
+	   cert=$$( [ $$lvl = 2 ] && echo mldsa44 || { [ $$lvl = 3 ] && echo mldsa65 || echo mldsa87; } ); \
+	   $(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER -DWOLFNANO_X509 \
+	      $(X509_BACKEND_FLAG) -DWOLFNANO_MLDSA -DWOLFNANO_MLDSA_SIGN \
+	      -DWOLFNANO_MLDSA_LEVEL=$$lvl -DWOLFNANO_TARGET_PORTABLE_C \
+	      $(SERVER_CERT_SRC) $(WC)/wc_mldsa.c $(WC)/sha3.c $(X509_BACKEND_SRC) \
+	      tests/accept_cert_mock_test.c -o $(BUILD)/accept_cert_mock_mldsa_test; \
+	   echo "---- run (ML-DSA level $$lvl) ----"; \
+	   ./$(BUILD)/accept_cert_mock_mldsa_test tests/pki/server/$$cert-cert.der \
+	      tests/pki/server/$$cert-key.der $$sch; \
+	 done
 
 mockhybridtest: ## build + run the X25519MLKEM768 hybrid mock-server handshake test
 	@mkdir -p $(BUILD)
@@ -409,10 +507,14 @@ matrixtest: ## build + run the data-driven negotiation matrix (PORTABLE_C)
 FUZZ_TIME ?= 60
 FUZZ_CC ?= clang
 fuzz: ## coverage-guided fuzz of the wire parsers (clang libFuzzer + ASan)
-	@mkdir -p $(BUILD)/corp_sh $(BUILD)/corp_msg $(BUILD)/corp_rec $(BUILD)/corp_x509
+	@mkdir -p $(BUILD)/corp_sh $(BUILD)/corp_ch $(BUILD)/corp_msg $(BUILD)/corp_rec $(BUILD)/corp_x509
 	$(FUZZ_CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C \
 	   -fsanitize=fuzzer,address,undefined -g \
 	   src/wn_x509.c tests/fuzz_x509.c -o $(BUILD)/fuzz_x509
+	$(FUZZ_CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER \
+	   -DWOLFNANO_TARGET_PORTABLE_C -fsanitize=fuzzer,address -g \
+	   src/wn_msg.c src/wn_clienthello.c tests/fuzz_clienthello.c \
+	   -o $(BUILD)/fuzz_clienthello
 	$(FUZZ_CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C \
 	   -fsanitize=fuzzer,address -g \
 	   src/wn_msg.c src/wn_serverhello.c tests/fuzz_serverhello.c \
@@ -428,6 +530,7 @@ fuzz: ## coverage-guided fuzz of the wire parsers (clang libFuzzer + ASan)
 	@echo "---- run ($(FUZZ_TIME)s each) ----"
 	@./$(BUILD)/fuzz_x509       -max_total_time=$(FUZZ_TIME) -timeout=10 $(BUILD)/corp_x509
 	@./$(BUILD)/fuzz_serverhello -max_total_time=$(FUZZ_TIME) -timeout=10 $(BUILD)/corp_sh
+	@./$(BUILD)/fuzz_clienthello -max_total_time=$(FUZZ_TIME) -timeout=10 $(BUILD)/corp_ch
 	@./$(BUILD)/fuzz_msg        -max_total_time=$(FUZZ_TIME) -timeout=10 $(BUILD)/corp_msg
 	@./$(BUILD)/fuzz_record     -max_total_time=$(FUZZ_TIME) -timeout=10 $(BUILD)/corp_rec
 
@@ -600,6 +703,27 @@ interop: ## live TLS 1.3 PSK handshake vs OpenSSL and wolfSSL
 	@echo "== cert(RSA-PSS) vs wolfSSL =="; sh tests/interop_cert_wolfssl.sh rsa
 	@echo "== cert(Ed25519) vs wolfSSL =="; sh tests/interop_cert_wolfssl.sh ed
 	@echo "== cert(chain leaf<-inter<-root) vs wolfSSL =="; sh tests/interop_cert_wolfssl.sh chain
+	@$(MAKE) --no-print-directory example-server
+	@echo "== server PSK (X25519) vs OpenSSL =="; SERVER=$(BUILD)/example_server sh tests/interop_server_psk.sh
+	@echo "== server PSK (X25519) vs wolfSSL =="; SERVER=$(BUILD)/example_server WNGROUP=x25519 sh tests/interop_server_wolfssl.sh
+	@echo "== server PSK (X25519) vs mbedTLS =="; SERVER=$(BUILD)/example_server WNGROUP=x25519 sh tests/interop_server_mbedtls.sh
+	@echo "== server PSK (P-256) vs OpenSSL =="; SERVER=$(BUILD)/example_server_p256 KXGROUP=P-256 sh tests/interop_server_psk.sh
+	@echo "== server PSK (P-256) vs wolfSSL =="; SERVER=$(BUILD)/example_server_p256 WNGROUP=p256 sh tests/interop_server_wolfssl.sh
+	@echo "== server PSK (P-256) vs mbedTLS =="; SERVER=$(BUILD)/example_server_p256 WNGROUP=p256 sh tests/interop_server_mbedtls.sh
+	@echo "== server PSK (X25519MLKEM768) vs OpenSSL =="; SERVER=$(BUILD)/example_server_hybrid KXGROUP=X25519MLKEM768 sh tests/interop_server_psk.sh
+	@echo "== server PSK (X25519MLKEM768) vs wolfSSL =="; SERVER=$(BUILD)/example_server_hybrid WNGROUP=hybrid sh tests/interop_server_wolfssl.sh
+	@echo "== server PSK (X25519MLKEM768) vs mbedTLS =="; SERVER=$(BUILD)/example_server_hybrid WNGROUP=hybrid sh tests/interop_server_mbedtls.sh
+	@$(MAKE) --no-print-directory example-server-cert
+	@echo "== cert server (ECDSA) vs OpenSSL =="; PEER=openssl sh tests/interop_server_cert.sh ecdsa
+	@echo "== cert server (ECDSA) vs wolfSSL =="; PEER=wolfssl sh tests/interop_server_cert.sh ecdsa
+	@echo "== cert server (ECDSA) vs mbedTLS =="; PEER=mbedtls sh tests/interop_server_cert.sh ecdsa
+	@echo "== cert server (Ed25519) vs OpenSSL =="; PEER=openssl sh tests/interop_server_cert.sh ed
+	@echo "== cert server (Ed25519) vs wolfSSL =="; PEER=wolfssl sh tests/interop_server_cert.sh ed
+	@echo "== cert server (RSA-PSS) vs OpenSSL =="; SERVER=$(BUILD)/example_server_cert_rsa PEER=openssl sh tests/interop_server_cert.sh rsa
+	@echo "== cert server (RSA-PSS) vs wolfSSL =="; SERVER=$(BUILD)/example_server_cert_rsa PEER=wolfssl sh tests/interop_server_cert.sh rsa
+	@echo "== cert server (ML-DSA-44) vs wolfSSL =="; SERVER=$(BUILD)/example_server_cert_mldsa PEER=wolfssl sh tests/interop_server_cert.sh mldsa
+	@echo "== HelloRetryRequest (PSK) vs OpenSSL =="; SERVER=$(BUILD)/example_server sh tests/interop_server_hrr.sh psk
+	@echo "== HelloRetryRequest (cert) vs OpenSSL =="; SERVER=$(BUILD)/example_server_cert sh tests/interop_server_hrr.sh cert
 
 # Build + run the all-algo bench for the active WOLFNANO_ASM arch.
 benchrun:
@@ -665,6 +789,37 @@ example: ## build the minimal PSK client example (examples/client.c)
 	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_TARGET_PORTABLE_C \
 	   $(CONN_SRC) examples/client.c -o $(BUILD)/example_client
 	@echo "built $(BUILD)/example_client"
+
+example-server: ## build the minimal PSK server example (examples/server.c)
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER \
+	   -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(SERVER_SRC) examples/server.c -o $(BUILD)/example_server
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER \
+	   -DWOLFNANO_HAVE_ECDHE_P256 -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(SERVER_P256_SRC) examples/server.c -o $(BUILD)/example_server_p256
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER \
+	   -DWOLFNANO_HAVE_MLKEM_HYBRID -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(SERVER_HYBRID_SRC) examples/server.c -o $(BUILD)/example_server_hybrid
+	@echo "built $(BUILD)/example_server{,_p256,_hybrid}"
+
+example-server-cert: ## build the cert server example (ECDSA/Ed25519, plus an RSA-PSS build)
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER -DWOLFNANO_X509 \
+	   $(X509_BACKEND_FLAG) -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(SERVER_CERT_SRC) $(X509_BACKEND_SRC) examples/server_cert.c \
+	   -o $(BUILD)/example_server_cert
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER -DWOLFNANO_X509 \
+	   $(X509_BACKEND_FLAG) -DWOLFNANO_HAVE_RSA_VERIFY -DWOLFNANO_RSA_FULL \
+	   -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(SERVER_CERT_SRC) $(WC)/rsa.c $(X509_BACKEND_SRC) examples/server_cert.c \
+	   -o $(BUILD)/example_server_cert_rsa
+	$(CC) $(CFLAGS_COMMON) $(SHELL_INC) -DWOLFNANO_SERVER -DWOLFNANO_X509 \
+	   $(X509_BACKEND_FLAG) -DWOLFNANO_MLDSA -DWOLFNANO_MLDSA_SIGN \
+	   -DWOLFNANO_MLDSA_LEVEL=2 -DWOLFNANO_TARGET_PORTABLE_C \
+	   $(SERVER_CERT_SRC) $(WC)/wc_mldsa.c $(WC)/sha3.c $(X509_BACKEND_SRC) \
+	   examples/server_cert.c -o $(BUILD)/example_server_cert_mldsa
+	@echo "built $(BUILD)/example_server_cert{,_rsa,_mldsa}"
 
 example-cert: ## build the X.509 server-cert client example (examples/client_cert.c)
 	@mkdir -p $(BUILD)
@@ -767,6 +922,7 @@ m33mu: ## build + run the wolfNanoTLS floor on an emulated Cortex-M33 (STM32H563
 
 STACK_SRC := wn_connect.c wn_session.c wn_record.c wn_keyschedule.c \
   wn_keyshare.c wn_transcript.c wn_msg.c wn_serverhello.c wn_clienthello.c
+STACK_SERVER_SRC := wn_accept.c wn_handshake.c wn_servercert.c
 stackcheck: ## fail if any wolfNanoTLS function exceeds the stack budget (-fstack-usage)
 	@mkdir -p $(BUILD)/su
 	@for b in $(STACK_SRC); do \
@@ -775,7 +931,38 @@ stackcheck: ## fail if any wolfNanoTLS function exceeds the stack budget (-fstac
 	    -DWOLFNANO_HAVE_RSA_VERIFY \
 	    -I. -I$(WOLFSSL) src/$$b -o $(BUILD)/su/$${b%.c}.o; \
 	done
+	@for b in $(STACK_SERVER_SRC); do \
+	  $(CC) -Os -fstack-usage -c $(SHELL_INC) -DWOLFSSL_USER_SETTINGS \
+	    -DWOLFNANO_TARGET_PORTABLE_C -DWOLFSSL_SMALL_STACK -DWOLFNANO_SERVER \
+	    -DWOLFNANO_X509 -DWOLFNANO_HAVE_RSA_VERIFY -DWOLFNANO_RSA_FULL \
+	    -DWOLFNANO_MLDSA -DWOLFNANO_MLDSA_SIGN \
+	    -I. -I$(WOLFSSL) src/$$b -o $(BUILD)/su/$${b%.c}.o; \
+	done
 	@sh scripts/check_stack.sh $(BUILD)/su/*.su
+
+# One consistent --coverage build of the server shell (SERVER + X509 + RSA_FULL):
+# compile the shell once, then link + run the PSK, all-algo cert, and adversarial
+# drivers against the shared objects so their gcov data accumulates and merges.
+SERVERCOV_FLAGS := --coverage -O0 -DWOLFSSL_USER_SETTINGS $(SHELL_INC) -I. \
+  -I$(WOLFSSL) -DWOLFNANO_SERVER -DWOLFNANO_X509 -DWOLFNANO_RSA_FULL \
+  -DWOLFNANO_HAVE_RSA_VERIFY -DWOLFNANO_TARGET_PORTABLE_C
+SERVERCOV_SRC := $(SERVER_CERT_SRC) $(WC)/rsa.c
+servercov: ## single consistent --coverage build; PSK + all-algo cert + neg merge to 100%
+	@rm -rf $(BUILD)/scov && mkdir -p $(BUILD)/scov
+	@for f in $(SERVERCOV_SRC); do \
+	  $(CC) $(SERVERCOV_FLAGS) -c $$f -o $(BUILD)/scov/`basename $$f .c`.o || exit 1; \
+	done
+	@$(CC) $(SERVERCOV_FLAGS) $(BUILD)/scov/*.o tests/accept_mock_test.c -o $(BUILD)/scov/pm
+	@./$(BUILD)/scov/pm
+	@$(CC) $(SERVERCOV_FLAGS) $(BUILD)/scov/*.o tests/accept_neg_test.c -o $(BUILD)/scov/neg
+	@./$(BUILD)/scov/neg
+	@$(CC) $(SERVERCOV_FLAGS) $(BUILD)/scov/*.o tests/accept_cert_mock_test.c -o $(BUILD)/scov/cm
+	@./$(BUILD)/scov/cm tests/pki/server/ec-cert.der tests/pki/server/ec-key-sec1.der 0403
+	@./$(BUILD)/scov/cm tests/pki/server/p384-cert.der tests/pki/server/p384-key-sec1.der 0503
+	@./$(BUILD)/scov/cm tests/pki/server/ed-cert.der tests/pki/server/ed-key.der 0807
+	@./$(BUILD)/scov/cm tests/pki/server/rsa-cert.der tests/pki/server/rsa-key-trad.der 0804
+	@./$(BUILD)/scov/cm tests/pki/server/rsa-cert.der tests/pki/server/rsa-key-trad.der 0805
+	@./$(BUILD)/scov/cm tests/pki/server/rsa-cert.der tests/pki/server/rsa-key-trad.der 0806
 
 coverage: ## Linux: run the suites under --coverage and enforce 100% (.github/ci/coverage-100.txt)
 	@command -v lcov >/dev/null 2>&1 || { echo "SKIP coverage (no lcov; Linux/CI only)"; exit 0; }
@@ -788,6 +975,11 @@ coverage: ## Linux: run the suites under --coverage and enforce 100% (.github/ci
 	lcov --capture --directory . --output-file cov-lite.info --rc lcov_branch_coverage=0 2>/dev/null || true
 	lcov --remove cov-lite.info '*/wolfssl/*' '/usr/*' '*/tests/*' --output-file cov-lite.info 2>/dev/null || true
 	sh scripts/check_coverage.sh cov-lite.info .github/ci/coverage-100-lite.txt
+	find . -name '*.gcda' -delete
+	$(MAKE) servercov
+	lcov --capture --directory $(BUILD)/scov --output-file cov-server.info --rc lcov_branch_coverage=0 2>/dev/null || true
+	lcov --remove cov-server.info '*/wolfssl/*' '/usr/*' '*/tests/*' --output-file cov-server.info 2>/dev/null || true
+	sh scripts/check_coverage.sh cov-server.info .github/ci/coverage-100-server.txt
 
 clean:
 	rm -rf $(BUILD) *.o *.gcda *.gcno cov.info cov-lite.info

@@ -20,5 +20,5 @@ jobs:
         with:
           submodules: recursive
       - uses: ./.github/actions/setup
-      - name: fuzz the ServerHello parser
+      - name: fuzz the wire parsers (ServerHello, ClientHello, msg, record, x509)
         run: make fuzz FUZZ_TIME=${{ github.event_name == 'schedule' && 600 || 60 }}

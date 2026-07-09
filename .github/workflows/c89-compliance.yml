@@ -28,3 +28,11 @@ jobs:
               -DWOLFNANO_MLDSA \
               -I. -Iwolfssl -Iinclude/wolfnano -Isrc "$f"
           done
+          # server adder must also be C89-clean
+          for f in src/*.c; do
+            cc -std=gnu89 -Wall -Wextra -Wdeclaration-after-statement -Werror -fsyntax-only \
+              -DWOLFSSL_USER_SETTINGS -DWOLFNANO_TARGET_PORTABLE_C -DWOLFNANO_SERVER \
+              -DWOLFNANO_X509 -DWOLFNANO_HAVE_RSA_VERIFY -DWOLFNANO_RSA_FULL \
+              -DWOLFNANO_MLKEM -DWOLFNANO_MLDSA -DWOLFNANO_MLDSA_SIGN \
+              -I. -Iwolfssl -Iinclude/wolfnano -Isrc "$f"
+          done

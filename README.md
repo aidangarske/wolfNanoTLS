@@ -10,10 +10,11 @@ zero-allocation mode, built as a thin shell on top of
 
 ## Description and project goals
 
-wolfNanoTLS is a TLS 1.3 client library with a selectable zero-allocation mode,
-built as a thin shell on top of wolfSSL for resource-constrained embedded
-systems. It consumes wolfSSL as a pinned git submodule and never modifies it,
-reaching crypto only through a small `wc_*` provider seam.
+wolfNanoTLS is a TLS 1.3 client library (with an optional server) and a
+selectable zero-allocation mode, built as a thin shell on top of wolfSSL for
+resource-constrained embedded systems. It consumes wolfSSL as a pinned git
+submodule and never modifies it, reaching crypto only through a small `wc_*`
+provider seam.
 
 wolfNanoTLS is a behavioral subset of wolfSSL so it never offers a primitive,
 group, suite, or extension that wolfSSL lacks, so interop stays identical to
@@ -24,6 +25,9 @@ wolfSSL.
 - TLS 1.3 only (RFC 8446).
 - External PSK + ECDHE by default. X.509 server-certificate authentication is
   a compile-time adder.
+- TLS 1.3 server (`WOLFNANO_SERVER`), a compile-time adder off by default:
+  external PSK and X.509 server-cert (ECDSA, Ed25519, RSA-PSS, ML-DSA) across
+  all supported groups. Interops both ways with OpenSSL, wolfSSL, and mbedTLS.
 - Selectable memory model: plain wolfSSL heap (default), `WOLFSSL_SMALL_STACK`
   (embedded), or true zero dynamic allocation (`WOLFSSL_NO_MALLOC`) proven by a
   runtime allocation probe over the full handshake.
@@ -42,7 +46,7 @@ wolfSSL.
 | Category | Algorithms |                                                                                                                                    
 |---|---|                                                                                                                                                    
 | Key exchange | ECDHE P-256/P-384, X25519, ML-KEM-768, X25519MLKEM768 (hybrid) |
-| Signatures | ECDSA P-256/P-384, Ed25519, RSA-PSS (verify), ML-DSA (verify) |
+| Signatures | ECDSA P-256/P-384, Ed25519, RSA-PSS, ML-DSA (client verifies; server signs under `WOLFNANO_SERVER`) |
 | AEAD | AES-128/256-GCM, ChaCha20-Poly1305 |
 | Hash / KDF | SHA-256, SHA-384, SHA3-256, HMAC, HKDF |
 
@@ -92,6 +96,12 @@ wn_Close(&sess);
 [examples/client_cert.c](examples/client_cert.c) (X.509), and
 [examples/client_https.c](examples/client_https.c) (live HTTPS GET) for
 complete clients.
+
+The server (built with `WOLFNANO_SERVER`) mirrors the API with `wn_Accept_Psk`
+and `wn_Accept_Cert`, then the same `wn_Send` / `wn_Recv` / `wn_Close`. See
+[examples/server.c](examples/server.c) (PSK) and
+[examples/server_cert.c](examples/server_cert.c) (X.509). Build with
+`make example-server` / `make example-server-cert`.
 
 ## Documentation
 

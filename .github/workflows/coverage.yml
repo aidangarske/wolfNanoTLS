@@ -42,6 +42,21 @@ jobs:
             --output-file cov-lite.info 2>/dev/null || true
       - name: enforce 100% on wn_x509.c (.github/ci/coverage-100-lite.txt)
         run: sh scripts/check_coverage.sh cov-lite.info .github/ci/coverage-100-lite.txt
+      # The server files compile only under WOLFNANO_SERVER and, across the
+      # ordinary suites, with differing flags (PSK-only vs X509 vs group
+      # variants) whose gcov line tables cannot merge. `make servercov` builds
+      # the server shell once with one flag set and runs every server driver
+      # against it, so coverage accumulates correctly.
+      - name: server coverage pass (wn_accept/handshake/servercert)
+        run: |
+          find . -name '*.gcda' -delete
+          make servercov
+          lcov --capture --directory build/scov --output-file cov-server.info \
+            --rc lcov_branch_coverage=0 2>/dev/null || true
+          lcov --remove cov-server.info '*/wolfssl/*' '/usr/*' '*/tests/*' \
+            --output-file cov-server.info 2>/dev/null || true
+      - name: enforce 100% on server files (.github/ci/coverage-100-server.txt)
+        run: sh scripts/check_coverage.sh cov-server.info .github/ci/coverage-100-server.txt
       - name: report tables to summary
         if: always()
         run: |
@@ -49,4 +64,6 @@ jobs:
             sh scripts/check_coverage.sh cov.info .github/ci/coverage-100.txt || true;
             echo '```'; echo '## Coverage (X509_LITE: wn_x509.c)'; echo '```';
             sh scripts/check_coverage.sh cov-lite.info .github/ci/coverage-100-lite.txt || true;
+            echo '```'; echo '## Coverage (WOLFNANO_SERVER)'; echo '```';
+            sh scripts/check_coverage.sh cov-server.info .github/ci/coverage-100-server.txt || true;
             echo '```'; } >> "$GITHUB_STEP_SUMMARY"

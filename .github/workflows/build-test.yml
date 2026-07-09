@@ -38,7 +38,7 @@ jobs:
       - uses: ./.github/actions/wolfssl-checkout
       - name: protocol + crypto suites
         if: matrix.suite == 'protocol'
-        run: make test-core mlkemtest mldsatest hybridtest mockhybridtest wctestpqc $MEMARG
+        run: make test-core mlkemtest mldsatest hybridtest mockhybridtest wctestpqc servertest $MEMARG
       - name: native wn_x509 parser + cert-verify unit tests
         if: matrix.suite == 'x509'
         run: make test-x509 $MEMARG
@@ -50,5 +50,7 @@ jobs:
           make test-cert X509_LITE=1 $MEMARG  # native wn_x509 backend
           make certmldsatest $MEMARG          # ML-DSA-44 leaf, asn.c
           make certmldsatest X509_LITE=1 $MEMARG  # ML-DSA-44 leaf, native
+          make servercerttest $MEMARG         # cert server (ECDSA/Ed25519/RSA/ML-DSA)
+          make servernegtest $MEMARG          # adversarial server (arg/parse/IO failures)
           make cert-notime-build $MEMARG      # clockless tier compiles
           make configs-build                  # every starter template (incl cert_p256min)
