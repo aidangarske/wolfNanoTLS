@@ -1,45 +1,95 @@
 # Footprint
 
-wolfNanoTLS's whole TLS 1.3 client `.text`, measured on Cortex-M33 (Thumb2,
-`arm-none-eabi-gcc -Os -flto -ffunction-sections -fdata-sections
--Wl,--gc-sections` + nano specs, ArmGNU 14.2). Each row builds from a public
-`configs/` starter template, so the numbers reproduce from the same
-`user_settings.h` a deployment ships.
+wolfNanoTLS's whole TLS 1.3 `.text` - as a **client**, as a **server**
+(`WOLFNANO_SERVER`), and as a combined **client+server device** - measured on
+Cortex-M33 (Thumb2, `arm-none-eabi-gcc -Os -flto -ffunction-sections
+-fdata-sections -Wl,--gc-sections` + nano specs, ArmGNU 14.2). Same method and
+toolchain as the head-to-head in [Comparison](Comparison.md). Each row builds
+from a public `configs/` starter template, so the numbers reproduce from the
+same `user_settings.h` a deployment ships.
 
 ## Whole TLS 1.3 client (Cortex-M33, measured)
 
 The cert rows show the native `wn_x509` parser (`WOLFNANO_X509_LITE`); the
 default backend is wolfSSL `asn.c` (see the X.509 backend section below).
 
-| Client profile | config | `.text` | Public HTTPS? |
-|---|---|--:|:--|
-| PSK + ECDHE, X25519 | `user_settings_minimal.h` | 18680 (18.2 KB) | no — no certificates |
-| PSK + ECDHE, P-256 | `user_settings_psk_p256.h` | 26604 (26.0 KB) | no — no certificates |
-| PSK + X25519MLKEM768 (PQC KEX) | `user_settings_pqc.h` | 34436 (33.6 KB) | no — no certificates |
-| cert / X.509, P-256 min | `user_settings_cert_p256min.h` | 36440 (35.6 KB) | private PKI only |
-| cert / X.509, P-256 (`X509_LITE`) | `user_settings_cert.h` | 54280 (53.0 KB) | yes — full public chains |
-| cert / X.509 + ML-DSA-44 (PQC auth, `X509_LITE`) | `user_settings_cert_mldsa.h` | 69071 (67.5 KB) | yes + PQC auth |
-| cert / X.509 + X25519MLKEM768 (PQC KEX, `X509_LITE`) | `user_settings_cert_pqc.h` | 76052 (74.3 KB) | yes + PQC key exchange |
+| Client profile | config | `.text` |
+|---|---|--:|
+| PSK + ECDHE, X25519 | `user_settings_minimal.h` | 18680 (18.2 KB) |
+| PSK + ECDHE, P-256 | `user_settings_psk_p256.h` | 26604 (26.0 KB) |
+| PSK + X25519MLKEM768 (PQC KEX) | `user_settings_pqc.h` | 34436 (33.6 KB) |
+| cert / X.509, P-256 min | `user_settings_cert_p256min.h` | 36440 (35.6 KB) |
+| cert / X.509, P-256 (`X509_LITE`) | `user_settings_cert.h` | 54280 (53.0 KB) |
+| cert / X.509 + ML-DSA-44 (PQC auth, `X509_LITE`) | `user_settings_cert_mldsa.h` | 69071 (67.5 KB) |
+| cert / X.509 + X25519MLKEM768 (PQC KEX, `X509_LITE`) | `user_settings_cert_pqc.h` | 76052 (74.3 KB) |
 
 Reproduce: `sh bench/footprint-clients.sh` (wolfNanoTLS column).
 
-### Authentication decides "can it do public HTTPS?"
+These client rows are the **pre-server-code production numbers** actually
+measured on Cortex-M33, kept as the reference client footprint. A fresh build at
+the current pin lands ~0.6 KB higher on the PSK rows (shared shell files grew
+with the server adder); the server and device tables below are measured on that
+current codebase.
 
-A public HTTPS connection is TLS 1.3 with X.509 server-cert validation, so a cert
-row is required. **PSK** rows use a pre-shared key (no certificates) and cannot
-authenticate a public web server — they are for private/embedded peers that share
-a key. The PQC PSK row uses X25519MLKEM768 for the *key exchange*, still PSK auth.
+## Whole TLS 1.3 server (Cortex-M33, measured)
+
+The `WOLFNANO_SERVER` adder (off by default): the same `configs/` template built
+with `-DWOLFNANO_SERVER`, linking only `wn_Accept_*` (no `wn_Connect_*`). cert
+rows use the native `wn_x509` `X509_LITE` backend.
+
+| Server profile | config (+ `WOLFNANO_SERVER`) | `.text` |
+|---|---|--:|
+| PSK + ECDHE, X25519 | `user_settings_minimal.h` | 20084 (19.6 KB) |
+| PSK + ECDHE, P-256 | `user_settings_psk_p256.h` | 28008 (27.4 KB) |
+| PSK + X25519MLKEM768 (PQC KEX) | `user_settings_pqc.h` | 33128 (32.4 KB) |
+| cert / X.509, P-256 (`X509_LITE`) | `user_settings_cert.h` | 46768 (45.7 KB) |
+| cert / X.509 + ML-DSA-44 (PQC auth, `X509_LITE`) | `user_settings_cert_mldsa.h` | 57449 (56.1 KB) |
+
+Reproduce: `sh bench/footprint-servers.sh` (wolfNanoTLS column).
+
+The cert server (45.7 KB) is 14% under its own cert client (53.0 KB) because
+`wn_accept` (sign) and `wn_connect` (verify a full chain) are genuinely separate
+units - unlike mbedTLS, whose server ≈ its client (see [Comparison](Comparison.md)).
+
+## Whole TLS 1.3 client+server device (Cortex-M33, measured)
+
+One binary that is **both** roles (`wn_Connect_*` + `wn_Accept_*`), the realistic
+device case:
+
+| Client+server device | config | `.text` |
+|---|---|--:|
+| PSK + ECDHE, X25519 | `user_settings_minimal.h` | 22612 (22.1 KB) |
+| PSK + ECDHE, P-256 | `user_settings_psk_p256.h` | 30392 (29.7 KB) |
+| PSK + X25519MLKEM768 (PQC KEX) | `user_settings_pqc.h` | 39236 (38.3 KB) |
+| cert / X.509, P-256 (`X509_LITE`) | `user_settings_cert.h` | 61424 (60.0 KB) |
+| cert / X.509 + ML-DSA-44 (PQC auth, `X509_LITE`) | `user_settings_cert_mldsa.h` | 77518 (75.7 KB) |
+
+Reproduce: `sh bench/footprint-serverclient.sh` (wolfNanoTLS column).
+
+## Which rows can reach public HTTPS
+
+Public HTTPS is TLS 1.3 with X.509 server-cert validation, so only the **cert**
+rows can do it; the **PSK** rows cannot. The distinction, per profile:
+
+- **PSK** (`minimal`, `psk_p256`, `pqc`): a pre-shared key, no certificates - for
+  private/embedded peers that already share a key. Cannot authenticate a public
+  web server. The PQC PSK row uses X25519MLKEM768 for the *key exchange*, but auth
+  is still PSK.
+- **cert, P-256 min** (`cert_p256min`): private PKI only - see the two cert tiers
+  below.
+- **cert, P-256 / ML-DSA / X25519MLKEM768** (`cert`, `cert_mldsa`, `cert_pqc`):
+  full public web PKI - validates real public HTTPS chains to a public root.
 
 The two cert tiers differ by which chains they can validate:
 
 - **35.6 KB, P-256 min** (`user_settings_cert_p256min.h`): ECDSA P-256 / SHA-256
   only (no SHA-384/512, P-384, RSA; `rsa.c`/`sha512.c` dropped). Validates a chain
-  that is P-256/ECDSA-SHA256 from the pinned anchor down — a private PKI you issue,
+  that is P-256/ECDSA-SHA256 from the pinned anchor down - a private PKI you issue,
   or a public site pinned at a P-256 intermediate. It **cannot** validate a full
   public chain to the root (public roots/intermediates are ECDSA-SHA384 or RSA),
   so it is not a general-web client.
 - **53.0 KB, P-256** (full algorithms): adds RSA + SHA-384, so it validates real
-  public HTTPS chains to a public root — verified live against Let's Encrypt (ISRG
+  public HTTPS chains to a public root - verified live against Let's Encrypt (ISRG
   Root X1) each build, on both the `asn.c` and native `wn_x509` backends.
 
 The PQC PSK client adds ~15 KB over the classical X25519 client for the
@@ -51,8 +101,8 @@ versus the `-flto` rows. That row is **PQC authentication** (ML-DSA cert) with a
 classical ECDHE P-256 key exchange.
 
 The **X25519MLKEM768 cert** row (`user_settings_cert_pqc.h`) is the complementary
-axis: **PQC key exchange** — a hybrid ML-KEM-768/X25519 handshake that resists
-harvest-now-decrypt-later — with a classical X.509 cert. It is
+axis: **PQC key exchange** - a hybrid ML-KEM-768/X25519 handshake that resists
+harvest-now-decrypt-later - with a classical X.509 cert. It is
 `WOLFNANO_HAVE_MLKEM_HYBRID` layered on the cert config, so `WN_DEFAULT_GROUP`
 becomes X25519MLKEM768 and `wn_keyshare` routes through `wn_hybrid`; no cert-path
 code changes. The two PQC rows are independent and can be combined for a
